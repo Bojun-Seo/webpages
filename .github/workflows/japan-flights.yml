@@ -1,0 +1,62 @@
+# Tests japan-flights on every push that touches it, and publishes japan-flights/site to GitHub
+# Pages from the default branch. A daily run publishes again so the fares fetched into the build
+# stay fresh. Pages must be set to deploy from GitHub Actions; see japan-flights/README.md.
+name: japan-flights
+
+on:
+  push:
+    paths:
+      - japan-flights/**
+      - .github/workflows/japan-flights.yml
+  schedule:
+    - cron: '23 21 * * *' # 06:23 in Korea
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm test
+        working-directory: japan-flights
+
+  deploy:
+    needs: test
+    # Pages takes deployments from the default branch only. Scheduled runs always start there.
+    if: github.event_name == 'schedule' || github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: cp -R japan-flights/site _site
+      - name: Fetch live fares
+        # Writes an empty file when the secret is not set. The page publishes even if this fails.
+        continue-on-error: true
+        env:
+          TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
+        run: >-
+          node japan-flights/tools/fetch-fares.js
+          --routes _site/data/routes.json --out _site/data/live-fares.json
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
