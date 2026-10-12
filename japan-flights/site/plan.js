@@ -34,6 +34,30 @@ export function lastDayOfMonth(month) {
   return fromUTC(Date.UTC(y, m, 0));
 }
 
+// Every route the page knows: those routes.json lists, and one from each
+// Korean airport in `origins` to each destination that has none listed,
+// which only fares bring trips to, nonstop or with a connection. A place in
+// `destinations` gives its city, country and time zone; any other
+// destination takes those of a route listed to it.
+export function routesOf(doc) {
+  const listed = new Set(doc.routes.map((route) => route.id));
+  const places = new Map();
+  for (const place of [...doc.routes, ...(doc.destinations || [])]) {
+    if (!places.has(place.dest)) places.set(place.dest, place);
+  }
+  const routes = [...doc.routes];
+  for (const origin of doc.origins || []) {
+    for (const [dest, place] of places) {
+      if (listed.has(`${origin}-${dest}`)) continue;
+      routes.push({
+        id: `${origin}-${dest}`, origin, dest, city: place.city, country: place.country,
+        ...('utcOffset' in place ? { utcOffset: place.utcOffset } : {}), periods: [],
+      });
+    }
+  }
+  return routes;
+}
+
 function periodOn(route, date) {
   return route.periods.find((p) => p.from <= date && date <= p.to);
 }
@@ -117,19 +141,19 @@ export function leaveFor(depart, lands, holidays, { morningArrival = false } = {
   return { leave, holidays: names };
 }
 
-// Times are 'HH:MM', so they compare as strings. The marks read only times
-// in Korea: when the flight out leaves and when the flight back lands.
-const EVENING = '16:00';
+// Times are 'HH:MM', so they compare as strings.
 const NOON = '12:00';
+const LATE = '18:00';
 
-// Whether a route's Korean Air flight out leaves Korea at 4 p.m. or later,
-// and whether its flight back lands there before noon. A route whose times
-// are not known has neither.
+// Whether a route's Korean Air flight back lands in Korea before noon. A
+// route whose times are not known says no.
 export function flightMarks(route) {
-  return {
-    eveningDeparture: Boolean(route.flights && route.flights.out.departs >= EVENING),
-    morningArrival: Boolean(route.flights && route.flights.back.arrives < NOON),
-  };
+  return { morningArrival: Boolean(route.flights && route.flights.back.arrives < NOON) };
+}
+
+// Whether a fare's flight back lands in Korea before noon, where it says.
+export function landsInTheMorning(fare) {
+  return Boolean(fare.arrives && fare.arrives < NOON);
 }
 
 // The airline a fare is for. Fares written before the page knew other
@@ -190,38 +214,59 @@ export function bagFee(fare, route, baggage, party = DEFAULT_PARTY) {
 
 // The marks a trip's flights earn: from the fare's own times where it has
 // them, else from the route's times when the trip is Korean Air's. Another
-// airline's fare without times earns neither.
+// airline's fare without times earns none.
 function marksFor(route, fare) {
-  if (fare && (fare.departs || fare.arrives)) {
-    return {
-      eveningDeparture: Boolean(fare.departs && fare.departs >= EVENING),
-      morningArrival: Boolean(fare.arrives && fare.arrives < NOON),
-    };
-  }
+  if (fare && (fare.departs || fare.arrives)) return { morningArrival: landsInTheMorning(fare) };
   if (!fare || airlineOf(fare) === 'KE') return flightMarks(route);
-  return { eveningDeparture: false, morningArrival: false };
+  return { morningArrival: false };
+}
+
+// Whether the flight out lands abroad at 6 p.m. local time or later, or on
+// a day after it leaves, so that the first day is lost; the page offers no
+// such trip. A fare's own times decide where it has them (`arrivesAbroad`,
+// `landsAbroad`), else a Korean Air trip goes by the route's times, and
+// another airline's fare without them is let through.
+export function landsLate(route, fare) {
+  if (fare && (fare.departs || fare.arrivesAbroad)) {
+    return Boolean(fare.landsAbroad && fare.landsAbroad > fare.depart)
+      || Boolean(fare.arrivesAbroad && fare.arrivesAbroad >= LATE);
+  }
+  if (!fare || airlineOf(fare) === 'KE') return Boolean(route.flights && route.flights.out.arrives >= LATE);
+  return false;
+}
+
+// The connections a fare makes on the way out and on the way back; a fare
+// that names none (`stops`) is nonstop both ways.
+export function stopsOf(fare) {
+  return (fare && fare.stops) || [0, 0];
+}
+
+function nonstop(fare) {
+  const [out, back] = stopsOf(fare);
+  return out === 0 && back === 0;
+}
+
+// How much less than its price a fare counts for each person when trips
+// are ordered and a trip's fare is picked: Korean Air and Asiana by 50,000
+// won, business by 200,000 and first by 500,000, together for Korean Air's
+// business. The page still shows what the fare costs.
+export const ADVANTAGE = { airlines: { KE: 50000, OZ: 50000 }, cabins: { business: 200000, first: 500000 } };
+
+export function advantageOf(fare) {
+  return (ADVANTAGE.airlines[airlineOf(fare)] || 0) + (ADVANTAGE.cabins[cabinOf(fare)] || 0);
 }
 
 function tripKey(trip) {
   return `${trip.route} ${trip.depart} ${trip.return}`;
 }
 
-// The cheapest fare for each route, pair of dates and cabin, among trips
-// that have not left yet, by what `cost` makes of each: its price unless
-// told otherwise.
-export function cheapestFares(fares, today, cost = (fare) => fare.price) {
-  const best = new Map();
-  for (const fare of fares) {
-    if (!(fare.depart >= today && fare.return > fare.depart && fare.price > 0)) continue;
-    const key = `${tripKey(fare)} ${cabinOf(fare)}`;
-    const held = best.get(key);
-    if (!held || cost(fare) < cost(held)) best.set(key, fare);
-  }
-  return best;
+// Whether trip `a` takes less leave than trip `b`, or as much at a lower rank.
+function takesLess(a, b) {
+  return a.leave < b.leave || (a.leave === b.leave && a.rank < b.rank);
 }
 
 function priceOf(trip) {
-  return trip.fare ? trip.total : Infinity;
+  return trip.fare ? trip.rank : Infinity;
 }
 
 function byNumber(a, b) {
@@ -233,25 +278,30 @@ function byString(a, b) {
 }
 
 // The trips that take the least leave first; among them, those with a
-// known fare, the cheapest first; then the soonest departure, and on the
-// same day the shorter trip.
+// known fare, the lowest rank first; then the soonest departure, and on the
+// same day the shorter trip, and a nonstop one before one that connects.
 function byLeaveFareDate(a, b) {
   return a.leave - b.leave || byNumber(priceOf(a), priceOf(b)) || byString(a.depart, b.depart)
     || a.nights - b.nights || byString(a.route, b.route)
-    || CABINS.indexOf(a.cabin) - CABINS.indexOf(b.cabin);
+    || CABINS.indexOf(a.cabin) - CABINS.indexOf(b.cabin)
+    || Number(!nonstop(a.fare)) - Number(!nonstop(b.fare));
 }
 
-// The trips that match `filter`, one for each cabin with a known fare among
-// the airlines asked for, each with its cheapest fare there, its airline and
-// cabin, the day its flight back lands, its leave, the holidays it spans and
-// the marks its flight times earn: the least leave first, then known fares,
-// the cheapest first, then the soonest departure. A fare costs its price for
+// The trips that match `filter`: for each cabin with a known fare among the
+// airlines asked for, one nonstop both ways and one that connects once on
+// the way out, back or both, each with the fare that takes the least leave
+// and then ranks lowest, and with its airline and cabin, its connections,
+// the day its flight back lands, its leave, the holidays it spans and the
+// marks its flight times earn; the least leave first, then known fares, the
+// lowest rank first, then the soonest departure. A fare costs its price for
 // each of the people in `party` and the fee for the bags they check that it
-// does not include, each both ways (`bag`, from `bagFee`), and is chosen,
-// sorted and held to the budget by that `total`. The schedules are Korean
-// Air's, so another airline's trip comes only from a fare; a trip without a
-// fare is offered in the cheaper cabin asked for of economy and business,
-// but never in first, which Korean Air hardly sells on these routes.
+// does not include, each both ways (`bag`, from `bagFee`), and is held to the
+// budget by that `total`; it ranks at that less its advantage for each
+// person (`advantageOf`). A trip whose flight out lands late (`landsLate`) is
+// not offered. The schedules are Korean Air's, so another airline's trip
+// comes only from a fare; a trip from them without a nonstop fare is offered
+// without one, in the cheaper cabin asked for of economy and business, but
+// never in first, which Korean Air hardly sells on these routes.
 //
 // filter: { from, to, nights, maxLeave, maxPrice, origins, cities, airlines, cabins, party }
 // `from` and `to` bound the departure date. `nights` (a Set of trip lengths
@@ -268,49 +318,50 @@ export function recommend({ routes, fares, holidays, today, baggage }, filter) {
     && (!filter.cities || filter.cities.has(route.dest));
   const flown = (airline) => !filter.airlines || filter.airlines.has(airline);
   const seated = (cabin) => !filter.cabins || filter.cabins.has(cabin);
-  const byId = new Map(routes.map((route) => [route.id, route]));
-  const feeOf = (fare) => bagFee(fare, fare && byId.get(fare.route), baggage, party);
-  const totalOf = (fare) => party.people * fare.price + feeOf(fare).amount;
-  const cheapest = cheapestFares(fares.filter((fare) => byId.has(fare.route)
-    && wanted(byId.get(fare.route)) && flown(airlineOf(fare)) && seated(cabinOf(fare))), today,
-  totalOf);
-  const faresOf = new Map();
-  for (const fare of cheapest.values()) {
-    const key = tripKey(fare);
-    if (!faresOf.has(key)) faresOf.set(key, []);
-    faresOf.get(key).push(fare);
-  }
-
   const scheduled = ['economy', 'business'].find(seated);
-  const trips = new Map();
-  for (const route of flown('KE') && scheduled ? routes : []) {
-    if (!wanted(route)) continue;
-    for (const trip of roundTrips(route, from, filter.to, nights)) {
-      trips.set(tripKey(trip), trip);
-    }
-  }
+  const byId = new Map(routes.map((route) => [route.id, route]));
+
+  const rowFor = (trip, fare) => {
+    const route = byId.get(trip.route);
+    const marks = marksFor(route, fare);
+    // A flight back that leaves late at night lands the next day.
+    const lands = (fare && fare.lands) || trip.return;
+    const { leave, holidays: names } = leaveFor(trip.depart, lands, holidays, marks);
+    const bag = bagFee(fare, route, baggage, party);
+    const total = fare ? party.people * fare.price + bag.amount : null;
+    return {
+      ...trip, fare, airline: fare ? airlineOf(fare) : 'KE', cabin: fare ? cabinOf(fare) : scheduled,
+      stops: stopsOf(fare), total, rank: fare ? total - party.people * advantageOf(fare) : null,
+      bag, lands, leave, holidays: names, ...marks,
+    };
+  };
+  const kept = (row) => (filter.maxLeave == null || row.leave <= filter.maxLeave)
+    && (filter.maxPrice == null || (row.fare && row.total <= filter.maxPrice));
+
   // A fare proves a flight even where the schedule is not known.
-  for (const [key, [fare]] of faresOf) {
+  const best = new Map();
+  const nonstopTrips = new Set();
+  for (const fare of fares) {
+    const route = byId.get(fare.route);
+    if (!route || !wanted(route) || !flown(airlineOf(fare)) || !seated(cabinOf(fare))) continue;
     const n = daysBetween(fare.depart, fare.return);
-    if (trips.has(key) || fare.depart < from || fare.depart > filter.to || !nights.has(n)) continue;
-    trips.set(key, { route: fare.route, depart: fare.depart, return: fare.return, nights: n });
+    if (!(fare.depart >= from && fare.depart <= filter.to && nights.has(n) && fare.price > 0)) continue;
+    if (landsLate(route, fare)) continue;
+    const row = rowFor({ route: fare.route, depart: fare.depart, return: fare.return, nights: n }, fare);
+    if (nonstop(fare)) nonstopTrips.add(tripKey(row));
+    if (!kept(row)) continue;
+    const key = `${tripKey(row)} ${row.cabin} ${nonstop(fare) ? 'nonstop' : 'via'}`;
+    const held = best.get(key);
+    if (!held || takesLess(row, held)) best.set(key, row);
   }
 
-  const out = [];
-  for (const [key, trip] of trips) {
-    for (const fare of faresOf.get(key) || [null]) {
-      const marks = marksFor(byId.get(trip.route), fare);
-      // A flight back that leaves late at night lands the next day.
-      const lands = (fare && fare.lands) || trip.return;
-      const { leave, holidays: names } = leaveFor(trip.depart, lands, holidays, marks);
-      const bag = feeOf(fare);
-      const total = fare ? totalOf(fare) : null;
-      if (filter.maxLeave != null && leave > filter.maxLeave) continue;
-      if (filter.maxPrice != null && !(fare && total <= filter.maxPrice)) continue;
-      out.push({
-        ...trip, fare, airline: fare ? airlineOf(fare) : 'KE', cabin: fare ? cabinOf(fare) : scheduled,
-        total, bag, lands, leave, holidays: names, ...marks,
-      });
+  const out = [...best.values()];
+  for (const route of flown('KE') && scheduled ? routes : []) {
+    if (!wanted(route) || landsLate(route, null)) continue;
+    for (const trip of roundTrips(route, from, filter.to, nights)) {
+      if (nonstopTrips.has(tripKey(trip))) continue;
+      const row = rowFor(trip, null);
+      if (kept(row)) out.push(row);
     }
   }
   return out.sort(byLeaveFareDate);
@@ -330,10 +381,13 @@ export function monthsAhead(routes, today) {
   return months;
 }
 
-// Searches for one trip in one cabin for `people` adults on sites that show
-// live prices. None of them documents these URLs, so a site may change its
-// format without notice. KAYAK's asks for the trip's airline, nonstop.
-export function searchLinks(route, depart, ret, airline = 'KE', cabin = 'economy', people = 1) {
+// Searches for one trip on sites that show live prices: in `cabin`, for
+// `people` adults, and on KAYAK on `airline`, nonstop unless the trip
+// connects (`nonstop`). None of the sites documents these URLs, so one may
+// change its format without notice.
+export function searchLinks(route, depart, ret, {
+  airline = 'KE', cabin = 'economy', people = 1, nonstop: direct = true,
+} = {}) {
   const from = route.origin;
   const to = route.dest;
   const compact = (date) => date.replaceAll('-', '');
@@ -355,13 +409,13 @@ export function searchLinks(route, depart, ret, airline = 'KE', cabin = 'economy
       name: '스카이스캐너',
       url: `https://www.skyscanner.co.kr/transport/flights/${from.toLowerCase()}/${to.toLowerCase()}/`
         + `${compact(depart).slice(2)}/${compact(ret).slice(2)}/`
-        + `?adultsv2=${people}&cabinclass=${cabin}&rtn=1&preferdirects=true`,
+        + `?adultsv2=${people}&cabinclass=${cabin}&rtn=1&preferdirects=${direct}`,
     },
     {
       name: '카약',
       url: `https://www.kayak.co.kr/flights/${from}-${to}/${depart}/${ret}`
         + `${cabin === 'economy' ? '' : `/${cabin}`}${people === 1 ? '' : `/${people}adults`}`
-        + `?sort=price_a&fs=airlines=${airline};stops=0`,
+        + `?sort=price_a&fs=airlines=${airline}${direct ? ';stops=0' : ''}`,
     },
   ];
 }

@@ -3,7 +3,7 @@
 
 import {
   CABINS, DAY_NAMES, DEFAULT_PARTY, TRIP_NIGHTS, airlineOf, daysBetween, dayOf, lastDayOfMonth,
-  monthsAhead, recommend, searchLinks,
+  monthsAhead, recommend, routesOf, searchLinks,
 } from './plan.js';
 
 const PAGE_SIZE = 30;
@@ -13,13 +13,20 @@ const PAGE_SIZE = 30;
 const MAX_PEOPLE = 9;
 const MAX_BAGS = 9;
 
-// Names for the airlines that fly these routes; any other shows its code.
+// Names for the airlines that fly these routes or connect on them; any
+// other shows its code.
 const AIRLINE_NAMES = {
   KE: '대한항공', OZ: '아시아나항공', '7C': '제주항공', LJ: '진에어', TW: '트리니티(티웨이)',
   BX: '에어부산', RS: '에어서울', ZE: '이스타항공', RF: '에어로케이', YP: '에어프레미아', WE: '파라타항공',
   JL: '일본항공', NH: 'ANA', NQ: '에어재팬', MM: '피치항공', ZG: 'ZIPAIR', IJ: '스프링재팬',
-  GK: '젯스타재팬', ET: '에티오피아항공', BR: '에바항공', CI: '중화항공', JX: '스타럭스항공',
-  IT: '타이거에어 타이완', CX: '캐세이퍼시픽', UO: '홍콩익스프레스', HX: '홍콩항공', NX: '에어마카오', TR: '스쿠트',
+  GK: '젯스타재팬', BC: '스카이마크', HD: '에어두', '6J': '솔라시드에어', NU: '일본트랜스오션항공',
+  ET: '에티오피아항공', BR: '에바항공', CI: '중화항공', JX: '스타럭스항공', IT: '타이거에어 타이완',
+  CX: '캐세이퍼시픽', UO: '홍콩익스프레스', HX: '홍콩항공', NX: '에어마카오', TR: '스쿠트',
+  VN: '베트남항공', VJ: '비엣젯항공', QH: '뱀부항공', VU: '비에트래블항공',
+  TG: '타이항공', FD: '타이에어아시아', XJ: '타이에어아시아엑스', SL: '타이라이온에어', VZ: '타이비엣젯',
+  UA: '유나이티드항공', MU: '중국동방항공', CZ: '중국남방항공', CA: '중국국제항공', FM: '상하이항공',
+  HO: '길상항공', '9C': '춘추항공', MF: '샤먼항공', SC: '산둥항공', PR: '필리핀항공', '5J': '세부퍼시픽',
+  SQ: '싱가포르항공', MH: '말레이시아항공', AK: '에어아시아', D7: '에어아시아엑스', OD: '바틱에어 말레이시아',
 };
 
 const CABIN_NAMES = { economy: '이코노미', business: '비즈니스', first: '퍼스트' };
@@ -126,14 +133,23 @@ function bagLine(bag) {
   return `왕복 ${bags} 가격 ${bag.approx ? '약\u00a0' : ''}${won(bag.amount)}\u00a0포함`;
 }
 
+// Where a trip connects: "갈 때 경유", "올 때 경유" or "왕복 경유", or
+// nothing for one nonstop both ways.
+function stopsLabel([out, back]) {
+  if (out && back) return '왕복 경유';
+  if (out) return '갈 때 경유';
+  return back ? '올 때 경유' : null;
+}
+
 function tripRow(trip) {
   const { data } = state;
   const route = data.byId.get(trip.route);
+  const stops = stopsLabel(trip.stops);
   const badges = [
     el('span', { class: `badge ${trip.leave === 0 ? 'badge-good' : ''}` }, `연차 ${trip.leave}일`),
     trip.cabin !== 'economy' && el('span', { class: 'badge badge-cabin' }, CABIN_NAMES[trip.cabin]),
+    stops && el('span', { class: 'badge badge-stops' }, stops),
     ...trip.holidays.map((name) => el('span', { class: 'badge badge-holiday' }, name)),
-    trip.eveningDeparture && el('span', { class: 'badge' }, '저녁 출발'),
     trip.morningArrival && el('span', { class: 'badge' }, trip.lands > trip.return ? '다음 날 오전 도착' : '오전 도착'),
     route.tag && el('span', { class: 'badge' }, route.tag),
   ];
@@ -154,8 +170,9 @@ function tripRow(trip) {
     el('div', { class: 'badges' }, badges),
     price,
     el('div', { class: 'links' },
-      searchLinks(route, trip.depart, trip.return, trip.airline, trip.cabin, state.party.people)
-        .map((l) => link(l.url, l.name))));
+      searchLinks(route, trip.depart, trip.return, {
+        airline: trip.airline, cabin: trip.cabin, people: state.party.people, nonstop: !stops,
+      }).map((l) => link(l.url, l.name))));
 }
 
 function renderTrips() {
@@ -254,7 +271,7 @@ async function main() {
   const manual = manualDoc?.fares || [];
   const fares = [...manual, ...(live?.fares || [])];
   const today = localToday();
-  const routes = routesDoc.routes;
+  const routes = routesOf(routesDoc);
   state.data = {
     routes,
     fares,

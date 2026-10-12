@@ -13,6 +13,8 @@
   --good-soft: #def1e6;
   --holiday: #b1352a;
   --holiday-soft: #f9e4e1;
+  --caution: #7a4a00;
+  --caution-soft: #fbedd5;
 
   --font-display: "Do Hyeon", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui,
@@ -38,6 +40,8 @@
     --good-soft: #15301f;
     --holiday: #ff8e7e;
     --holiday-soft: #3a1c19;
+    --caution: #f2c46b;
+    --caution-soft: #3a2a10;
     color-scheme: dark;
   }
 }
@@ -56,6 +60,8 @@
   --good-soft: #15301f;
   --holiday: #ff8e7e;
   --holiday-soft: #3a1c19;
+  --caution: #f2c46b;
+  --caution-soft: #3a2a10;
   color-scheme: dark;
 }
 
@@ -200,6 +206,7 @@ h2 { font-size: 1.25rem; font-weight: 600; }
 .badge-good { background: var(--good-soft); color: var(--good); font-weight: 600; }
 .badge-holiday { background: var(--holiday-soft); color: var(--holiday); }
 .badge-cabin { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.badge-stops { background: var(--caution-soft); color: var(--caution); }
 .price { grid-area: price; display: grid; justify-items: end; align-content: start; text-align: right; }
 .price strong {
   font-family: var(--font-data);
