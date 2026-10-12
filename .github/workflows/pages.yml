@@ -1,13 +1,17 @@
-# Tests japan-flights on every push that touches it, and publishes japan-flights/site to GitHub
-# Pages from the default branch. A daily run publishes again so the fares fetched into the build
-# stay fresh. Pages must be set to deploy from GitHub Actions; see japan-flights/README.md.
-name: japan-flights
+# Publishes this repository's pages to GitHub Pages: each page's site/ under the page's name, and
+# index.html, which links to them, at the root. A repository has one Pages site and every
+# deployment replaces all of it, so this one workflow builds every page. It tests a page on every
+# push that touches it and publishes from the default branch; a daily run publishes again so the
+# fares japan-flights fetches into the build stay fresh. Pages must be set to deploy from GitHub
+# Actions; see README.md.
+name: pages
 
 on:
   push:
     paths:
+      - index.html
       - japan-flights/**
-      - .github/workflows/japan-flights.yml
+      - .github/workflows/pages.yml
   schedule:
     - cron: '23 21 * * *' # 06:23 in Korea
   workflow_dispatch:
@@ -16,7 +20,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  japan-flights:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -27,7 +31,7 @@ jobs:
         working-directory: japan-flights
 
   deploy:
-    needs: test
+    needs: japan-flights
     # Pages takes deployments from the default branch only. Scheduled runs always start there.
     if: github.event_name == 'schedule' || github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
@@ -45,7 +49,10 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: cp -R japan-flights/site _site
+      - run: |
+          mkdir _site
+          cp index.html _site/
+          cp -R japan-flights/site _site/japan-flights
       - name: Fetch live fares
         # Writes an empty file when the secret is not set. The page publishes even if this fails.
         continue-on-error: true
@@ -53,7 +60,8 @@ jobs:
           TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
         run: >-
           node japan-flights/tools/fetch-fares.js
-          --routes _site/data/routes.json --out _site/data/live-fares.json
+          --routes _site/japan-flights/data/routes.json
+          --out _site/japan-flights/data/live-fares.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
