@@ -63,7 +63,10 @@ Amadeus closed its free Self-Service APIs on 17 July 2026. That leaves two sourc
 
 `live-fares.json` is never committed; the workflow fetches it into the build. Without a token the
 workflow writes an empty one and the page says live fares are not set up. Aviasales data comes from
-its own users' searches, so regional routes may have few fares or none. The tests use the response
+its own users' searches, so regional routes may have few fares or none. The API answers for cities,
+Seoul for both Incheon and Gimpo and Tokyo for both Narita and Haneda, so the fetcher keeps a ticket
+only on the route whose airports its flight out flies between; the API does not say where the flight
+back lands, so a return to the city's other airport goes unnoticed. The tests use the response
 format the API documents; each run logs the fields a real ticket has, to check it against.
 
 A hand-written fare looks like this. `airline` is the airline's two-letter code (`KE`, `7C`, `LJ`
