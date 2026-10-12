@@ -67,7 +67,7 @@ function link(href, text, cls) {
   return el('a', { href, target: '_blank', rel: 'noopener', class: cls }, text);
 }
 
-const state = { data: null, cities: new Set(), shown: PAGE_SIZE };
+const state = { data: null, cities: new Set(), trips: [], shown: PAGE_SIZE };
 
 function readFilter() {
   const { data } = state;
@@ -116,8 +116,7 @@ function tripRow(trip) {
 }
 
 function renderTrips() {
-  const { data } = state;
-  const trips = recommend(data, readFilter());
+  const { data, trips } = state;
   const priced = trips.filter((t) => t.fare).length;
   $('summary').textContent = trips.length
     ? `조건에 맞는 일정 ${trips.length.toLocaleString('ko-KR')}개 · 가격 확인 ${priced}개`
@@ -182,6 +181,7 @@ function renderCities() {
 
 function update() {
   state.shown = PAGE_SIZE;
+  state.trips = recommend(state.data, readFilter());
   renderCities();
   renderTrips();
 }
