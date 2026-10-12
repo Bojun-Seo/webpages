@@ -6,8 +6,6 @@
       "origin": "ICN",
       "dest": "NRT",
       "city": "도쿄 나리타",
-      "region": "간토 · 지바현",
-      "about": "도쿄 도심까지 열차로 1시간 안팎",
       "periods": [
         { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
         { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
@@ -22,8 +20,6 @@
       "origin": "ICN",
       "dest": "HND",
       "city": "도쿄 하네다",
-      "region": "간토 · 도쿄도",
-      "about": "인천에서 밤에 떠나 하네다에서 새벽에 돌아오는 심야편",
       "periods": [
         { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
         { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
@@ -39,8 +35,6 @@
       "origin": "GMP",
       "dest": "HND",
       "city": "도쿄 하네다",
-      "region": "간토 · 도쿄도",
-      "about": "도심에서 가까운 김포와 하네다를 잇는 노선",
       "periods": [
         { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
         { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
@@ -55,8 +49,6 @@
       "origin": "ICN",
       "dest": "KIX",
       "city": "오사카",
-      "region": "간사이 · 오사카부",
-      "about": "도톤보리와 오사카성, 교토·나라로 가는 길",
       "periods": [
         { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
         { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
@@ -71,8 +63,6 @@
       "origin": "GMP",
       "dest": "KIX",
       "city": "오사카",
-      "region": "간사이 · 오사카부",
-      "about": "도톤보리와 오사카성, 교토·나라로 가는 길",
       "periods": [],
       "note": "대한항공의 운항 여부와 요일은 확인하지 못했습니다. 아시아나항공은 동계에도 매일 운항하며, 운임이 확인된 일정만 나옵니다.",
       "sources": [
@@ -84,8 +74,6 @@
       "origin": "ICN",
       "dest": "NGO",
       "city": "나고야",
-      "region": "주부 · 아이치현",
-      "about": "나고야성과 지브리 파크, 다카야마로 가는 길",
       "periods": [
         { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
         { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
@@ -100,8 +88,6 @@
       "origin": "GMP",
       "dest": "NGO",
       "city": "나고야",
-      "region": "주부 · 아이치현",
-      "about": "나고야성과 지브리 파크, 다카야마로 가는 길",
       "periods": [],
       "note": "대한항공 노선이 아닙니다. 피치항공이 하루 2회 운항하며, 운임이 확인된 일정만 나옵니다.",
       "sources": [
@@ -114,8 +100,6 @@
       "origin": "ICN",
       "dest": "FUK",
       "city": "후쿠오카",
-      "region": "규슈 · 후쿠오카현",
-      "about": "하카타 야타이와 다자이후 텐만구",
       "periods": [
         { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
         { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
@@ -131,8 +115,6 @@
       "origin": "ICN",
       "dest": "CTS",
       "city": "삿포로",
-      "region": "홋카이도",
-      "about": "눈축제와 오타루 운하, 비에이·후라노",
       "periods": [
         { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
         { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
@@ -147,8 +129,6 @@
       "origin": "ICN",
       "dest": "OKA",
       "city": "오키나와",
-      "region": "오키나와현",
-      "about": "나하 국제거리와 추라우미 수족관",
       "periods": [
         { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
         { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
@@ -163,8 +143,6 @@
       "origin": "ICN",
       "dest": "OIT",
       "city": "오이타",
-      "region": "규슈 · 오이타현",
-      "about": "벳부·유후인 온천으로 가는 관문",
       "tag": "운항 재개",
       "periods": [
         { "from": "2026-10-25", "to": "2027-03-26", "days": ["mon", "wed", "fri", "sun"] }
@@ -173,7 +151,6 @@
         "out": { "departs": "09:15", "arrives": "10:50" },
         "back": { "departs": "12:00", "arrives": "13:45" }
       },
-      "aircraft": "A321neo",
       "sources": [
         { "title": "뉴스핌 (2026-09-11)", "url": "https://www.newspim.com/news/view/20260911000744" }
       ]
@@ -183,14 +160,11 @@
       "origin": "ICN",
       "dest": "NGS",
       "city": "나가사키",
-      "region": "규슈 · 나가사키현",
-      "about": "이나사야마 야경과 하우스텐보스",
       "tag": "동계 증편",
       "periods": [
         { "from": "2026-03-29", "to": "2026-10-24", "days": ["tue", "thu", "sat"] },
         { "from": "2026-10-25", "to": "2027-03-27", "days": ["mon", "tue", "thu", "sat"] }
       ],
-      "aircraft": "A220-300",
       "sources": [
         { "title": "트래블뉴스 (2026-09)", "url": "https://thetravelnews.co.kr/2026/09/incheon-nagasaki-direct-flight-winter-2026/" },
         { "title": "Aviation Wire (2026-02-10)", "url": "https://www.aviationwire.jp/archives/337821" }
@@ -201,8 +175,6 @@
       "origin": "ICN",
       "dest": "HIJ",
       "city": "히로시마",
-      "region": "주고쿠 · 히로시마현",
-      "about": "미야지마 이쓰쿠시마 신사와 평화기념공원",
       "tag": "신규 취항",
       "periods": [
         { "from": "2026-12-23", "to": "2027-03-27", "days": "daily" }
@@ -211,7 +183,6 @@
         "out": { "number": "KE2183", "departs": "10:35", "arrives": "12:15" },
         "back": { "number": "KE2184", "departs": "13:25", "arrives": "15:25" }
       },
-      "aircraft": "A321neo",
       "sources": [
         { "title": "Aviation Wire (2026-08-24)", "url": "https://www.aviationwire.jp/archives/349303" }
       ]
@@ -221,8 +192,6 @@
       "origin": "ICN",
       "dest": "KIJ",
       "city": "니가타",
-      "region": "주부 · 니가타현",
-      "about": "유자와 스키장과 니혼슈 양조장",
       "periods": [
         { "from": "2026-06-01", "to": "2027-03-27", "days": "daily" }
       ],
@@ -230,7 +199,6 @@
         "out": { "number": "KE2197", "departs": "08:20", "arrives": "10:25" },
         "back": { "number": "KE2198", "departs": "11:35", "arrives": "14:05" }
       },
-      "aircraft": "B737-8 (12월까지), B737-800 (1월부터)",
       "sources": [
         { "title": "니가타현 발표 (2026 동계)", "url": "https://www.pref.niigata.lg.jp/uploaded/attachment/509406.pdf" }
       ]
@@ -240,8 +208,6 @@
       "origin": "ICN",
       "dest": "AOJ",
       "city": "아오모리",
-      "region": "도호쿠 · 아오모리현",
-      "about": "핫코다산 수빙과 스카유 온천",
       "periods": [
         { "from": "2026-03-29", "to": "2026-10-24", "days": ["mon", "wed", "thu", "fri", "sun"] },
         { "from": "2026-10-25", "to": "2027-03-27", "days": ["tue", "thu", "fri", "sat", "sun"] }
@@ -250,7 +216,6 @@
         "out": { "departs": "10:05", "arrives": "12:40" },
         "back": { "departs": "13:50", "arrives": "16:50" }
       },
-      "aircraft": "B787-8",
       "sources": [
         { "title": "아오모리현 발표 (2026-09)", "url": "https://www.pref.aomori.lg.jp/release/2026/81360.html" }
       ]
@@ -260,12 +225,9 @@
       "origin": "ICN",
       "dest": "KMQ",
       "city": "고마쓰",
-      "region": "호쿠리쿠 · 이시카와현",
-      "about": "가나자와 겐로쿠엔과 시라카와고로 가는 길",
       "periods": [
         { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" }
       ],
-      "aircraft": "A220-300",
       "note": "하계는 매일 운항했습니다. 10월 25일부터의 동계 운항 요일은 아직 확인하지 못했습니다.",
       "sources": [
         { "title": "Travel Voice (2026-02)", "url": "https://www.travelvoice.jp/english/korean-air-will-considerably-extend-flight-networks-to-local-cities-in-japan-in-this-summer" },
@@ -277,8 +239,6 @@
       "origin": "ICN",
       "dest": "KMJ",
       "city": "구마모토",
-      "region": "규슈 · 구마모토현",
-      "about": "구마모토성과 아소산",
       "periods": [
         { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" }
       ],
@@ -292,8 +252,6 @@
       "origin": "ICN",
       "dest": "KOJ",
       "city": "가고시마",
-      "region": "규슈 · 가고시마현",
-      "about": "사쿠라지마 화산과 이부스키 모래찜질",
       "periods": [],
       "note": "대한항공은 6월부터 주 3회로 줄었고, 운항 요일과 동계 일정은 아직 확인하지 못했습니다. 제주항공은 10월 25일부터 매일 운항합니다.",
       "sources": [
@@ -306,8 +264,6 @@
       "origin": "ICN",
       "dest": "OKJ",
       "city": "오카야마",
-      "region": "주고쿠 · 오카야마현",
-      "about": "고라쿠엔, 구라시키 미관지구, 나오시마",
       "periods": [],
       "note": "하계 주 4회였습니다. 운항 요일과 동계 일정은 아직 확인하지 못했습니다.",
       "sources": [
@@ -319,8 +275,6 @@
       "origin": "ICN",
       "dest": "SDJ",
       "city": "센다이",
-      "region": "도호쿠 · 미야기현",
-      "about": "마쓰시마 만과 규탄",
       "tag": "아시아나 노선 편입",
       "periods": [],
       "note": "12월 17일 아시아나항공 통합 후 대한항공 노선이 됩니다. 운항 요일은 아직 확인하지 못했습니다.",
@@ -333,8 +287,6 @@
       "origin": "ICN",
       "dest": "KMI",
       "city": "미야자키",
-      "region": "규슈 · 미야자키현",
-      "about": "다카치호 협곡과 아오시마",
       "tag": "아시아나 노선 편입",
       "periods": [],
       "note": "12월 17일 아시아나항공 통합 후 대한항공 노선이 됩니다. 운항 요일은 아직 확인하지 못했습니다.",
@@ -347,8 +299,6 @@
       "origin": "ICN",
       "dest": "UKB",
       "city": "고베",
-      "region": "간사이 · 효고현",
-      "about": "기타노 이진칸과 고베규, 아리마 온천",
       "tag": "전세편",
       "periods": [
         { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
@@ -366,8 +316,6 @@
       "origin": "ICN",
       "dest": "HKD",
       "city": "하코다테",
-      "region": "홋카이도",
-      "about": "하코다테산 야경과 아침시장",
       "periods": [],
       "note": "대한항공 노선이 아닙니다. 제주항공이 12월 1일부터 매일 운항하며, 운임이 확인된 일정만 나옵니다.",
       "sources": [
@@ -380,8 +328,6 @@
       "origin": "ICN",
       "dest": "TAK",
       "city": "다카마쓰",
-      "region": "시코쿠 · 가가와현",
-      "about": "리쓰린 공원과 나오시마 예술섬",
       "periods": [],
       "note": "대한항공 노선이 아닙니다. 에어서울이 운항하며, 운임이 확인된 일정만 나옵니다.",
       "sources": [
@@ -394,8 +340,6 @@
       "origin": "ICN",
       "dest": "MYJ",
       "city": "마쓰야마",
-      "region": "시코쿠 · 에히메현",
-      "about": "도고 온천과 마쓰야마성",
       "periods": [],
       "note": "대한항공 노선이 아닙니다. 제주항공이 운항하며, 운임이 확인된 일정만 나옵니다.",
       "sources": [
@@ -408,8 +352,6 @@
       "origin": "ICN",
       "dest": "YGJ",
       "city": "요나고",
-      "region": "주고쿠 · 돗토리현",
-      "about": "다이센과 아다치 미술관, 사카이미나토",
       "periods": [],
       "note": "대한항공 노선이 아닙니다. 에어서울이 운항한다는 정리 자료만 찾았으며, 운임이 확인된 일정만 나옵니다.",
       "sources": [
@@ -421,8 +363,6 @@
       "origin": "ICN",
       "dest": "FSZ",
       "city": "시즈오카",
-      "region": "주부 · 시즈오카현",
-      "about": "후지산 조망과 녹차 밭, 이즈 반도 온천",
       "periods": [],
       "note": "대한항공 노선이 아닙니다. 제주항공이 하계에 하루 2회 운항했고 동계 일정은 확인하지 못했으며, 운임이 확인된 일정만 나옵니다.",
       "sources": [
@@ -435,8 +375,6 @@
       "origin": "ICN",
       "dest": "TKS",
       "city": "도쿠시마",
-      "region": "시코쿠 · 도쿠시마현",
-      "about": "나루토 소용돌이와 이야 계곡",
       "periods": [],
       "note": "대한항공 노선이 아닙니다. 이스타항공이 주 3회 운항하며, 2027년 1월 이후 항공권은 아직 팔지 않는다는 보도가 있습니다. 운임이 확인된 일정만 나옵니다.",
       "sources": [
@@ -449,8 +387,6 @@
       "origin": "ICN",
       "dest": "KKJ",
       "city": "기타큐슈",
-      "region": "규슈 · 후쿠오카현",
-      "about": "모지코 레트로와 고쿠라성",
       "periods": [],
       "note": "대한항공 노선이 아닙니다. 진에어가 매일 운항하고 대한항공은 공동운항으로 팔기만 하며, 운임이 확인된 일정만 나옵니다.",
       "sources": [
@@ -463,8 +399,6 @@
       "origin": "ICN",
       "dest": "HSG",
       "city": "사가",
-      "region": "규슈 · 사가현",
-      "about": "유토쿠 이나리 신사와 다케오·우레시노 온천",
       "periods": [],
       "note": "대한항공 노선이 아닙니다. 트리니티(티웨이)가 주 4회(월·수·금·일) 운항하며, 운임이 확인된 일정만 나옵니다.",
       "sources": [
@@ -477,8 +411,6 @@
       "origin": "ICN",
       "dest": "SHI",
       "city": "미야코지마",
-      "region": "오키나와현 · 미야코 제도",
-      "about": "요나하마에하마 해변과 이라부 대교",
       "periods": [],
       "note": "대한항공 노선이 아닙니다. 진에어가 시모지시마 공항으로 매일 운항하며, 운임이 확인된 일정만 나옵니다.",
       "sources": [
@@ -491,8 +423,6 @@
       "origin": "ICN",
       "dest": "ISG",
       "city": "이시가키",
-      "region": "오키나와현 · 야에야마 제도",
-      "about": "가비라만과 다케토미섬으로 가는 길",
       "periods": [],
       "note": "대한항공 노선이 아닙니다. 진에어가 단독 운항하고 동계 운항 횟수는 확인하지 못했으며, 운임이 확인된 일정만 나옵니다.",
       "sources": [
@@ -505,8 +435,6 @@
       "origin": "ICN",
       "dest": "TPE",
       "city": "타이베이 타오위안",
-      "region": "대만 · 북부",
-      "about": "타이베이 101과 지우펀, 스펀 천등",
       "utcOffset": 8,
       "periods": [
         { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
@@ -524,8 +452,6 @@
       "origin": "GMP",
       "dest": "TSA",
       "city": "타이베이 쑹산",
-      "region": "대만 · 타이베이 시내",
-      "about": "시내 한가운데 있어 도심이 가까운 공항",
       "utcOffset": 8,
       "periods": [],
       "note": "대한항공 노선이 아닙니다. 트리니티(티웨이)·이스타항공·에바항공·중화항공이 운항하며, 운임이 확인된 일정만 나옵니다.",
@@ -539,15 +465,12 @@
       "origin": "ICN",
       "dest": "RMQ",
       "city": "타이중",
-      "region": "대만 · 중부",
-      "about": "펑지아 야시장과 무지개 마을, 가오메이 습지",
       "tag": "운항 재개",
       "utcOffset": 8,
       "periods": [
         { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
       ],
       "note": "대한항공은 10월 25일부터 매일 운항을 재개합니다. 끝나는 날은 발표되지 않아 동계가 끝날 때까지 운항한다고 보고 넣었습니다. 진에어(하루 2회)와 트리니티(티웨이)도 매일 운항합니다.",
-      "aircraft": "A220-300",
       "sources": [
         { "title": "udn (대한항공 타이중 운항 재개)", "url": "https://udn.com/news/story/124378/9630970" },
         { "title": "AeroRoutes (Jin Air NS26 서울-타이중)", "url": "https://www.aeroroutes.com/eng/260128-ljns26rmq" },
@@ -559,8 +482,6 @@
       "origin": "ICN",
       "dest": "KHH",
       "city": "가오슝",
-      "region": "대만 · 남부",
-      "about": "보얼 예술특구와 렌츠탄, 컨딩으로 가는 길",
       "utcOffset": 8,
       "periods": [],
       "note": "대한항공 노선이 아닙니다. 트리니티(티웨이)가 매일 운항하고 중화항공·에바항공도 운항하며, 운임이 확인된 일정만 나옵니다.",
@@ -574,8 +495,6 @@
       "origin": "GMP",
       "dest": "KHH",
       "city": "가오슝",
-      "region": "대만 · 남부",
-      "about": "보얼 예술특구와 렌츠탄, 컨딩으로 가는 길",
       "utcOffset": 8,
       "periods": [],
       "note": "대한항공 노선이 아닙니다. 트리니티(티웨이)가 주 4회 운항하고 타이거에어 타이완·제주항공 등도 운항하며, 운임이 확인된 일정만 나옵니다.",
@@ -589,8 +508,6 @@
       "origin": "ICN",
       "dest": "HKG",
       "city": "홍콩",
-      "region": "홍콩",
-      "about": "빅토리아 하버 야경과 딤섬",
       "utcOffset": 8,
       "periods": [
         { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
@@ -607,8 +524,6 @@
       "origin": "ICN",
       "dest": "MFM",
       "city": "마카오",
-      "region": "마카오",
-      "about": "세나도 광장과 성 바울 성당 유적",
       "utcOffset": 8,
       "periods": [],
       "note": "대한항공은 2024년 7월부터 매일 운항했지만 2026년 일정은 확인하지 못했습니다. 에어마카오·제주항공 등 운임이 확인된 일정만 나옵니다.",

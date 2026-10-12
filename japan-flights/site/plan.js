@@ -5,7 +5,6 @@
 // time zone never moves a trip by a day.
 
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-export const WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 export const DAY_NAMES = { mon: '월', tue: '화', wed: '수', thu: '목', fri: '금', sat: '토', sun: '일' };
 const DAY_MS = 86400000;
 
@@ -48,28 +47,6 @@ function periodFlies(period, day) {
 export function fliesOn(route, date) {
   const period = periodOn(route, date);
   return period ? periodFlies(period, dayOf(date)) : false;
-}
-
-// The days a period flies in airline timetable notation: a digit per day
-// from 1 for Monday, a dot where there is no flight, so Monday, Wednesday,
-// Friday and Sunday read "1.3.5.7".
-export function timetableDays(period) {
-  return WEEK.map((day, i) => (periodFlies(period, day) ? String(i + 1) : '.')).join('');
-}
-
-export function weeklyFlights(period) {
-  return WEEK.filter((day) => periodFlies(period, day)).length;
-}
-
-export const ORIGIN_NAMES = { ICN: '인천', GMP: '김포' };
-
-// A route's flight times as its card shows them, such as
-// "KE2183 인천 10:35 → 히로시마 12:15 · KE2184 히로시마 13:25 → 인천 15:25".
-export function flightTimes(route) {
-  const home = ORIGIN_NAMES[route.origin] || route.origin;
-  const leg = (flight, from, to) =>
-    `${flight.number ? `${flight.number} ` : ''}${from} ${flight.departs} → ${to} ${flight.arrives}`;
-  return `${leg(route.flights.out, home, route.city)} · ${leg(route.flights.back, route.city, home)}`;
 }
 
 // Every round trip on `route` leaving between `from` and `to` that stays

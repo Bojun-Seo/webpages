@@ -1,5 +1,4 @@
-/* Layout: one column; the filters sit above a departures-board list of trips, and the route
-   cards with their days of operation follow below. */
+/* Layout: one column; the filters sit above a departures-board list of trips. */
 :root {
   --bg: #f2f4f7;
   --surface: #ffffff;
@@ -14,7 +13,6 @@
   --good-soft: #def1e6;
   --holiday: #b1352a;
   --holiday-soft: #f9e4e1;
-  --caution-soft: #f8efd9;
 
   --font-display: "Do Hyeon", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui,
@@ -40,7 +38,6 @@
     --good-soft: #15301f;
     --holiday: #ff8e7e;
     --holiday-soft: #3a1c19;
-    --caution-soft: #2f2712;
     color-scheme: dark;
   }
 }
@@ -59,7 +56,6 @@
   --good-soft: #15301f;
   --holiday: #ff8e7e;
   --holiday-soft: #3a1c19;
-  --caution-soft: #2f2712;
   color-scheme: dark;
 }
 
@@ -250,49 +246,6 @@ h2 { font-size: 1.25rem; font-weight: 600; }
   cursor: pointer;
 }
 .more:hover { border-color: var(--accent); }
-
-/* Routes */
-.routes { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 1rem; }
-.route {
-  display: grid;
-  align-content: start;
-  gap: 0.45rem;
-  padding: 1rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  min-width: 0;
-}
-.route header { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
-.route h3 { font-family: var(--font-display); font-weight: 400; font-size: 1.6rem; line-height: 1.1; }
-.route h3 .code { margin-left: 0.4rem; font-size: 0.8125rem; }
-.region { font-size: 0.8125rem; color: var(--muted); }
-.about { font-size: 0.9375rem; }
-.period { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; }
-.range { font-size: 0.8125rem; font-variant-numeric: tabular-nums; min-width: 6.5rem; }
-.week { display: inline-flex; gap: 2px; }
-.week span {
-  display: inline-grid;
-  place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  color: var(--muted);
-  background: var(--bg);
-  border: 1px solid var(--line);
-}
-.week span.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
-.freq { font-family: var(--font-data); font-size: 0.75rem; color: var(--muted); }
-.note {
-  font-size: 0.8125rem;
-  padding: 0.45rem 0.6rem;
-  border-radius: 6px;
-  background: var(--caution-soft);
-  color: var(--ink);
-}
-.times, .aircraft { font-size: 0.8125rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-.sources { font-size: 0.75rem; color: var(--muted); }
 
 /* Footer */
 .foot {
