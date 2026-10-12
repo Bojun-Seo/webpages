@@ -29,9 +29,9 @@ the page:
    `data/routes.json`, and every trip a known fare of one of the airlines picked proves;
 2. counts the leave each takes: the weekdays from departure to return, both ends included as
    whole days, that are not public holidays;
-3. marks the trips that span a Friday (금요일 포함), and those whose flight out leaves Korea at
-   4 p.m. or later (저녁 출발) or whose flight back lands there before noon (오전 도착), from the
-   fare's own times, or for a Korean Air trip without them from the route's flight times;
+3. marks the trips whose flight out leaves Korea at 4 p.m. or later (저녁 출발) or whose flight
+   back lands there before noon (오전 도착), from the fare's own times, or for a Korean Air trip
+   without them from the route's flight times;
 4. attaches the cheapest known fare for the route and dates among the airlines picked, and names
    its airline;
 5. lists the trips with a known fare first, cheapest first, then the rest by departure date,

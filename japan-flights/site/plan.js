@@ -86,8 +86,8 @@ export function roundTrips(route, from, to, minNights, maxNights) {
   return trips;
 }
 
-// Leave and Fridays are counted by day number, days since 1 January 1970,
-// so that thousands of trips need no date strings built day by day.
+// Leave is counted by day number, days since 1 January 1970, so that
+// thousands of trips need no date strings built day by day.
 function dayNumber(date) {
   return toUTC(date) / DAY_MS;
 }
@@ -127,12 +127,6 @@ export function leaveFor(depart, ret, holidays) {
     }
   }
   return { leave, holidays: names };
-}
-
-// Whether a trip spans a Friday, departure and return days included.
-export function spansFriday(depart, ret) {
-  const first = dayNumber(depart);
-  return (5 - weekday(first) + 7) % 7 <= dayNumber(ret) - first;
 }
 
 // Times are 'HH:MM' on the clock Korea and Japan share, so they compare as
@@ -207,8 +201,8 @@ function byFareThenDate(a, b) {
 }
 
 // The trips that match `filter`, each with the cheapest known fare among
-// the airlines asked for and its airline, its leave, the holidays it spans,
-// whether it spans a Friday and the marks its flight times earn: known
+// the airlines asked for and its airline, its leave, the holidays it spans
+// and the marks its flight times earn: known
 // fares first, the cheapest first, then the soonest departure. The
 // schedules are Korean Air's, so another airline's trip comes only from a
 // fare.
@@ -250,7 +244,7 @@ export function recommend({ routes, fares, holidays, today }, filter) {
     if (filter.maxPrice != null && !(fare && fare.price <= filter.maxPrice)) continue;
     out.push({
       ...trip, fare, airline: fare ? airlineOf(fare) : 'KE', leave, holidays: names,
-      friday: spansFriday(trip.depart, trip.return), ...marksFor(byId.get(trip.route), fare),
+      ...marksFor(byId.get(trip.route), fare),
     });
   }
   return out.sort(byFareThenDate);
