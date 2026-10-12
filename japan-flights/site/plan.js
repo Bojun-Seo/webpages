@@ -104,6 +104,24 @@ export function leaveFor(depart, ret, holidays) {
   return { leave, holidays: names };
 }
 
+// Whether a trip spans a Friday, departure and return days included.
+export function spansFriday(depart, ret) {
+  for (let date = depart; date <= ret; date = addDays(date, 1)) {
+    if (dayOf(date) === 'fri') return true;
+  }
+  return false;
+}
+
+// Whether a route's flight out leaves Incheon at 4 p.m. or later, and
+// whether its flight back lands there before noon. Times are 'HH:MM', so
+// they compare as strings. A route whose times are not known has neither.
+export function flightMarks(route) {
+  return {
+    eveningDeparture: Boolean(route.flights && route.flights.out.departs >= '16:00'),
+    morningArrival: Boolean(route.flights && route.flights.back.arrives < '12:00'),
+  };
+}
+
 function tripKey(trip) {
   return `${trip.route} ${trip.depart} ${trip.return}`;
 }
@@ -141,7 +159,8 @@ function byDate(a, b) {
 }
 
 // The trips that match `filter`, each with its leave, the holidays it
-// spans and the cheapest known fare, the soonest departure first.
+// spans, whether it spans a Friday, the marks its flight times earn and
+// the cheapest known fare, the soonest departure first.
 //
 // filter: { from, to, minNights, maxNights, maxLeave, maxPrice, cities }
 // `from` and `to` bound the departure date; `maxLeave`, `maxPrice` and
@@ -149,8 +168,8 @@ function byDate(a, b) {
 export function recommend({ routes, fares, holidays, today }, filter) {
   const from = filter.from > today ? filter.from : today;
   const wanted = (id) => !filter.cities || filter.cities.has(id);
-  const known = new Set(routes.map((route) => route.id));
-  const cheapest = cheapestFares(fares.filter((fare) => known.has(fare.route)), today);
+  const byId = new Map(routes.map((route) => [route.id, route]));
+  const cheapest = cheapestFares(fares.filter((fare) => byId.has(fare.route)), today);
 
   const trips = new Map();
   for (const route of routes) {
@@ -173,7 +192,10 @@ export function recommend({ routes, fares, holidays, today }, filter) {
     const { leave, holidays: names } = leaveFor(trip.depart, trip.return, holidays);
     if (filter.maxLeave != null && leave > filter.maxLeave) continue;
     if (filter.maxPrice != null && !(fare && fare.price <= filter.maxPrice)) continue;
-    out.push({ ...trip, fare, leave, holidays: names });
+    out.push({
+      ...trip, fare, leave, holidays: names, friday: spansFriday(trip.depart, trip.return),
+      ...flightMarks(byId.get(trip.route)),
+    });
   }
   return out.sort(byDate);
 }

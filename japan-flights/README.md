@@ -25,11 +25,13 @@ visitor picks, the page:
 
 1. lists every round trip with a flight at both ends, within the schedule periods in
    `data/routes.json`;
-2. counts the leave each takes: the weekdays from departure to return, both ends included, that
-   are not public holidays (the flights leave Incheon in the morning and land back in the
-   afternoon);
-3. attaches the cheapest known fare for the route and dates;
-4. lists them by departure date, soonest first; on the same day, the shorter trip first.
+2. counts the leave each takes: the weekdays from departure to return, both ends included as
+   whole days, that are not public holidays;
+3. marks the trips that span a Friday (금요일 포함), and, from the route's flight times, those
+   whose flight out leaves Incheon at 4 p.m. or later (저녁 출발) or whose flight back lands
+   there before noon (오전 도착);
+4. attaches the cheapest known fare for the route and dates;
+5. lists them by departure date, soonest first; on the same day, the shorter trip first.
 
 Every trip links to Naver, Google Flights, Skyscanner and KAYAK searches with the route and dates
 filled in, for the live price. Below the list, a card per route shows its days of operation in
@@ -91,8 +93,9 @@ Schedules change every season (late March and late October). Everything is in `s
   same days serve both directions, since each route turns around in Japan the same day. A route
   whose days are not known keeps `periods` empty and says why in `note`. `flights`, where known,
   gives the flight `out` and the flight `back`, each with `departs` and `arrives` in local 24-hour
-  time (`"09:15"`) and the flight `number` where the source names it; the route card shows them.
-  Add the source of every change to `sources`, and move `updated` on.
+  time (`"09:15"`) and the flight `number` where the source names it. The route card shows them,
+  and they decide 저녁 출발 and 오전 도착. Add the source of every change to `sources`, and move
+  `updated` on.
 - `holidays.json`: public holidays by date, through 2027, from the 월력요항 that the Korea
   AeroSpace Administration publishes each June. A substitute holiday is named after the holiday it
   stands in for.
@@ -129,6 +132,9 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   appear in recommendations only through a fare.
 - The search links follow URL formats the sites do not document, and any of them can change. The
   KAYAK link asks for Korean Air nonstop flights; the others show every airline.
-- Leave assumes a morning departure and an afternoon return, and counts only Korean public
-  holidays, not company holidays.
+- Leave counts the departure and return days as whole days even for a trip marked 저녁 출발 or
+  오전 도착, and counts only Korean public holidays, not company holidays.
+- A route lists one set of flight times, the latest its sources give, and 저녁 출발 and 오전 도착
+  follow them even for a trip in another season. The Korean Air routes here all leave Incheon in
+  the morning and land back in the afternoon, so no trip is marked either way yet.
 - Prices are for one adult in economy and may differ from what a booking finally costs.
