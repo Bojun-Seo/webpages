@@ -219,10 +219,10 @@ function byLeaveFareDate(a, b) {
 // the marks its flight times earn: the least leave first, then known fares,
 // the cheapest first, then the soonest departure. A fare without a checked
 // bag costs its price and a bag each way (`bagFee`, `total`), and is chosen,
-// sorted and held to the budget by that. The schedules are Korean
-// Air's, so another airline's trip comes only from a fare; they say nothing
-// of business or first, so they bring in trips without a fare only when
-// economy is asked for, as economy.
+// sorted and held to the budget by that. The schedules are Korean Air's,
+// so another airline's trip comes only from a fare; a trip without a fare
+// is offered in the cheaper cabin asked for of economy and business, but
+// never in first, which Korean Air hardly sells on these routes.
 //
 // filter: { from, to, nights, maxLeave, maxPrice, origins, cities, airlines, cabins }
 // `from` and `to` bound the departure date. `nights` (a Set of trip lengths
@@ -250,8 +250,9 @@ export function recommend({ routes, fares, holidays, today, baggage }, filter) {
     faresOf.get(key).push(fare);
   }
 
+  const scheduled = ['economy', 'business'].find(seated);
   const trips = new Map();
-  for (const route of flown('KE') && seated('economy') ? routes : []) {
+  for (const route of flown('KE') && scheduled ? routes : []) {
     if (!wanted(route)) continue;
     for (const trip of roundTrips(route, from, filter.to, nights)) {
       trips.set(tripKey(trip), trip);
@@ -276,7 +277,7 @@ export function recommend({ routes, fares, holidays, today, baggage }, filter) {
       if (filter.maxLeave != null && leave > filter.maxLeave) continue;
       if (filter.maxPrice != null && !(fare && total <= filter.maxPrice)) continue;
       out.push({
-        ...trip, fare, airline: fare ? airlineOf(fare) : 'KE', cabin: fare ? cabinOf(fare) : 'economy',
+        ...trip, fare, airline: fare ? airlineOf(fare) : 'KE', cabin: fare ? cabinOf(fare) : scheduled,
         total, bagFee: fee.amount, bagFeeApprox: fee.approx, bagFeeUnknown: fee.unknown,
         lands, leave, holidays: names, ...marks,
       });

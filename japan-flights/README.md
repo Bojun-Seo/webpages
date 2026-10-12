@@ -43,8 +43,8 @@ picks, the page:
    and dates among the airlines picked, as a trip of its own, and names its airline and cabin. A
    fare without a checked bag costs its price and the fee for a bag each way from
    `data/baggage.json`, shown under the price; it is chosen, sorted and held to the budget by that
-   total. Korean Air's days say nothing of its business or first seats, so they bring in trips
-   without a fare only when economy is picked;
+   total. A trip without a fare, from Korean Air's days, is offered in the cheaper cabin picked of
+   economy and business, but never in first, which Korean Air hardly sells on these routes;
 5. lists the trips that take the least leave first; among those, the trips with a known fare
    first, cheapest first, then the rest by departure date, soonest first; on the same day, the
    shorter trip first.
@@ -62,7 +62,7 @@ Amadeus closed its free Self-Service APIs on 17 July 2026. That leaves two sourc
 | File | Written by | What it holds |
 |---|---|---|
 | `site/data/fares.json` | you, by hand | fares you saw yourself, kept in the repository |
-| `site/data/live-fares.json` | the workflow, at each deploy | nonstop fares of every airline that Aviasales users found in the last 48 hours, from the [Travelpayouts Data API](https://support.travelpayouts.com/hc/en-us/articles/203956163-Aviasales-Data-API): the cheapest for each route, pair of dates, airline and cabin (economy, business and first), with and without a checked bag, with the time the flight out leaves and, when the API gives the return flight's duration, the time the flight back lands and, if it lands after midnight, the day |
+| `site/data/live-fares.json` | the workflow, at each deploy | nonstop fares of every airline that Aviasales users found in the last 48 hours, from the [Travelpayouts Data API](https://support.travelpayouts.com/hc/en-us/articles/203956163-Aviasales-Data-API): the cheapest economy fare for each route, pair of dates and airline, with and without a checked bag, with the time the flight out leaves and, when the API gives the return flight's duration, the time the flight back lands and, if it lands after midnight, the day |
 
 `live-fares.json` is never committed; the workflow fetches it into the build. Without a token the
 workflow writes an empty one and the page says live fares are not set up. Aviasales data comes from
@@ -71,12 +71,11 @@ route between the airports it names. The `static_fare_key` in its link says what
 `L0` for no checked bag, `L1_1_15` for one bag of 15 kg, and so on. A fare without one is marked
 `bags: 0`, and the cheapest such fare is kept apart from the cheapest with a bag, so that the page
 can weigh the first with its bag fee against the second; the log counts the fares without a bag by
-airline. `prices_for_dates` documents no cabin, but the fetcher asks for business and first with
-`trip_class` (`1` and `2`), as the API's older methods take it; an answer for business or first
-whose tickets are mostly those of the economy answer for the same months is dropped, since that is
-what the API would give if it paid the class no heed, and the log counts such answers and shows the
-first ticket in each cabin. The tests use the response format the API documents; each run logs the
-fields a real ticket has, to check it against.
+airline. `prices_for_dates` documents no cabin, and asked for business and first with `trip_class`
+(`1` and `2`), as the API's older methods take it, it answered all 143 queries that had tickets on
+12 October 2026 with the economy answer's tickets; so the fetcher asks for economy only, and
+business and first fares come only from `fares.json`. The tests use the response format the API
+documents; each run logs the fields a real ticket has, to check it against.
 
 A hand-written fare looks like this. `airline` is the airline's two-letter code (`KE`, `7C`, `LJ`
 ...), and a fare without one counts as Korean Air's; `cabin` is `business` or `first` for those
@@ -106,10 +105,9 @@ a route whose days are not known yet.
    demand. The [top-level README](../README.md#publishing) says how the site is put together.
 3. For live fares, sign up at [Travelpayouts](https://www.travelpayouts.com/), copy the API token
    from its developer settings, and add it as the repository secret `TRAVELPAYOUTS_TOKEN`
-   (**Settings → Secrets and variables → Actions**). The fetch makes about 1,800 queries, one for
-   each route, pair of months and cabin, 0.15 seconds apart to stay well under the API's limit of
-   600 a minute, so it adds about nine minutes to a deploy. A failed fetch does not stop the page
-   from publishing.
+   (**Settings → Secrets and variables → Actions**). The fetch makes about 610 queries, one for each
+   route and pair of months, 0.15 seconds apart to stay well under the API's limit of 600 a minute,
+   so it adds about two minutes to a deploy. A failed fetch does not stop the page from publishing.
 
 ## Update the data
 
@@ -203,7 +201,7 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   follow them even for a trip in another season. The routes with times all leave Incheon in the
   morning and land back in the afternoon, so only a fare's own times can mark a trip either way.
 - Prices are for one adult, in economy unless the trip is marked 비즈니스 or 퍼스트, and may differ from
-  what a booking finally costs. Business and first fares are only as many as the searches Aviasales
-  users make for them. Only HK Express's bag fee comes from the airline itself, and ZIPAIR's from a
+  what a booking finally costs. Business and first fares come only from `fares.json`, since the API
+  gives economy alone. Only HK Express's bag fee comes from the airline itself, and ZIPAIR's from a
   travel site; the others are the usual fees in `baggage.json`, from Jin Air's advance price to
   Japan and HK Express's, and the page marks them 약.

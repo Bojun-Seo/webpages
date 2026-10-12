@@ -1,10 +1,11 @@
-// Fetches the nonstop round-trip fares of every airline, in economy,
-// business and first, for the routes in routes.json from the Travelpayouts
-// (Aviasales) Data API and writes them where the page looks for live fares,
-// each with its airline, its cabin and the times its flights leave and land
-// where the API gives them. The API serves prices
-// that Aviasales users found in the last 48 hours, so a route few people
-// search there can come back empty.
+// Fetches the nonstop round-trip economy fares of every airline for the
+// routes in routes.json from the Travelpayouts (Aviasales) Data API and
+// writes them where the page looks for live fares, each with its airline,
+// whether it includes a checked bag and the times its flights leave and
+// land where the API gives them. The API takes no cabin: asked for business
+// or first with `trip_class`, it answers with the same economy tickets. The
+// API serves prices that Aviasales users found in the last 48 hours, so a
+// route few people search there can come back empty.
 //
 //   TRAVELPAYOUTS_TOKEN=... node tools/fetch-fares.js \
 //       [--routes site/data/routes.json] [--out site/data/live-fares.json] [--months 6]
@@ -20,9 +21,6 @@ const API = 'https://api.travelpayouts.com/aviasales/v3/prices_for_dates';
 // The API takes 600 queries a minute; a pause of 0.15 s between them keeps
 // well under that even when answers come back at once.
 const PAUSE_MS = 150;
-
-// The cabins fares are fetched for, as the API's `trip_class` numbers them.
-export const CABINS = { economy: 0, business: 1, first: 2 };
 
 // Local dates and times, whatever offset the API writes its times in.
 // Korea and Japan keep UTC+9 all year, and Taiwan, Hong Kong and Macau
@@ -61,9 +59,8 @@ export function monthsFrom(today, count) {
 // out leaves Korea; `arrives`, when the flight back lands there, is known
 // only if the response gives its duration, and `lands` gives the day too
 // when it is not the date the flight left on, as for a flight that leaves
-// late at night. A fare in business or first says so in `cabin`, and a
-// fare without a checked bag in `bags`.
-export function pickFares(response, route, seen, cabin = 'economy') {
+// late at night. A fare without a checked bag says so in `bags`.
+export function pickFares(response, route, seen) {
   if (!response || response.success === false || !Array.isArray(response.data)) return [];
   return response.data
     .filter((t) => t.airline && !t.transfers && !t.return_transfers
@@ -80,7 +77,6 @@ export function pickFares(response, route, seen, cabin = 'economy') {
         seen,
         source: 'Aviasales',
         departs: localTime(t.departure_at),
-        ...(cabin === 'economy' ? {} : { cabin }),
         ...(checkedBags(t.link) === 0 ? { bags: 0 } : {}),
       };
       if (Number.isFinite(t.duration_back)) {
@@ -92,13 +88,13 @@ export function pickFares(response, route, seen, cabin = 'economy') {
     });
 }
 
-// The cheapest fare for each route, pair of dates, airline and cabin, and
-// the cheapest of those with a checked bag apart from those without, since
-// the page adds the bag's fee to the second; it needs no other.
+// The cheapest fare for each route, pair of dates and airline, and the
+// cheapest of those with a checked bag apart from those without, since the
+// page adds the bag's fee to the second; it needs no other.
 export function keepCheapest(fares) {
   const best = new Map();
   for (const fare of fares) {
-    const key = `${fare.route} ${fare.depart} ${fare.return} ${fare.airline} ${fare.cabin || 'economy'}`
+    const key = `${fare.route} ${fare.depart} ${fare.return} ${fare.airline}`
       + (fare.bags === 0 ? ' no bag' : '');
     const held = best.get(key);
     if (!held || fare.price < held.price) best.set(key, fare);
@@ -117,27 +113,14 @@ export function checkedBags(link) {
   return part === 'L0' ? 0 : Number(part.split('_')[1] || 1);
 }
 
-// Whether the tickets an answer for business or first gives are mostly
-// those of the economy answer for the same months, as they would be if the
-// API paid no heed to `trip_class`, which `prices_for_dates` does not
-// document. Such tickets are economy fares and must not pass for others.
-export function repeatsEconomy(tickets, economy) {
-  const sign = (t) => `${t.airline} ${t.departure_at} ${t.return_at} ${t.price}`;
-  const signs = new Set(economy.map(sign));
-  return tickets.length > 0 && tickets.filter((t) => signs.has(sign(t))).length * 2 > tickets.length;
-}
-
-// How many of `fares` there are in each cabin, with their airlines, for the
-// log: "12 economy (7C, KE), 1 business (KE), 0 first".
+// How many `fares` there are, with their airlines, for the log:
+// "12 fares (7C, KE)".
 function tally(fares) {
-  return Object.keys(CABINS).map((cabin) => {
-    const these = fares.filter((f) => (f.cabin || 'economy') === cabin);
-    const airlines = [...new Set(these.map((f) => f.airline))].sort().join(', ');
-    return `${these.length} ${cabin}${airlines ? ` (${airlines})` : ''}`;
-  }).join(', ');
+  const airlines = [...new Set(fares.map((f) => f.airline))].sort().join(', ');
+  return `${fares.length} fares${airlines ? ` (${airlines})` : ''}`;
 }
 
-async function query(route, departMonth, returnMonth, tripClass, token) {
+async function query(route, departMonth, returnMonth, token) {
   const url = new URL(API);
   url.search = new URLSearchParams({
     origin: route.origin,
@@ -150,7 +133,6 @@ async function query(route, departMonth, returnMonth, tripClass, token) {
     sorting: 'price',
     currency: 'krw',
     limit: '1000',
-    trip_class: String(tripClass),
   });
   const res = await fetch(url, { headers: { 'X-Access-Token': token } });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -182,46 +164,27 @@ async function main(argv) {
   let ok = 0;
   let failed = 0;
   // The API's own documentation is all the tests check the format against,
-  // so the log names the fields a real ticket has and shows the first ticket
-  // in business and in first, once a run, and each route's fares in each
-  // cabin with their airlines.
+  // so the log names the fields a real ticket has, once a run, and the
+  // airlines of each route's fares.
   let shown = false;
-  const sampled = new Set();
-  const repeated = { business: 0, first: 0 };
   for (const route of routes) {
     const before = fares.length;
     for (const out of months) {
       // Ask for returns in the same month and the next, so a trip over a
       // month's end (New Year's) is not missed.
       for (const back of [out, monthsFrom(`${out}-01`, 2)[1]]) {
-        // The economy answer, which the answers for the other cabins are
-        // checked against; without it they are not asked for.
-        let economy = null;
-        for (const [cabin, tripClass] of Object.entries(CABINS)) {
-          if (cabin !== 'economy' && !economy) continue;
-          if (ok + failed > 0) await new Promise((resolve) => setTimeout(resolve, PAUSE_MS));
-          try {
-            const response = await query(route, out, back, tripClass, token);
-            const tickets = Array.isArray(response?.data) ? response.data : [];
-            ok++;
-            if (!shown && tickets.length) {
-              console.log(`Ticket fields: ${Object.keys(tickets[0]).join(', ')}`);
-              shown = true;
-            }
-            if (cabin === 'economy') {
-              economy = tickets;
-            } else if (repeatsEconomy(tickets, economy)) {
-              repeated[cabin]++;
-              continue;
-            } else if (tickets.length && !sampled.has(cabin)) {
-              console.log(`First ${cabin} ticket: ${JSON.stringify(tickets[0])}`);
-              sampled.add(cabin);
-            }
-            fares.push(...pickFares(response, route, seen, cabin));
-          } catch (error) {
-            failed++;
-            console.warn(`${route.id} ${out}/${back} ${cabin}: ${error.message}`);
+        if (ok + failed > 0) await new Promise((resolve) => setTimeout(resolve, PAUSE_MS));
+        try {
+          const response = await query(route, out, back, token);
+          if (!shown && response?.data?.length) {
+            console.log(`Ticket fields: ${Object.keys(response.data[0]).join(', ')}`);
+            shown = true;
           }
+          fares.push(...pickFares(response, route, seen));
+          ok++;
+        } catch (error) {
+          failed++;
+          console.warn(`${route.id} ${out}/${back}: ${error.message}`);
         }
       }
     }
@@ -230,16 +193,11 @@ async function main(argv) {
 
   fares = keepCheapest(fares);
   await write({ updated: new Date().toISOString(), source: 'Aviasales', fares });
-  console.log(`Wrote ${fares.length} fares, ${tally(fares)}, from ${ok} queries `
-    + `(${failed} failed) to ${values.out}.`);
+  console.log(`Wrote ${tally(fares)} from ${ok} queries (${failed} failed) to ${values.out}.`);
   const bagless = {};
   for (const fare of fares) if (fare.bags === 0) bagless[fare.airline] = (bagless[fare.airline] || 0) + 1;
   console.log(`Fares without a checked bag: ${Object.entries(bagless).sort()
     .map(([airline, n]) => `${airline} ${n}`).join(', ') || 'none'}.`);
-  if (repeated.business + repeated.first > 0) {
-    console.log(`Dropped as repeats of economy: ${repeated.business} answers in business, `
-      + `${repeated.first} in first.`);
-  }
   return ok === 0 ? 1 : 0;
 }
 

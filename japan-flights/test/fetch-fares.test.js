@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  checkedBags, keepCheapest, localDate, localTime, monthsFrom, pickFares, repeatsEconomy,
+  checkedBags, keepCheapest, localDate, localTime, monthsFrom, pickFares,
 } from '../tools/fetch-fares.js';
 
 const oita = { id: 'ICN-OIT', origin: 'ICN', dest: 'OIT' };
@@ -101,12 +101,11 @@ test("a ticket counts only between the route's own airports", () => {
   assert.deepEqual(pickFares(response, haneda, '2026-10-11').map((f) => f.price), [310000]);
 });
 
-test('only the cheapest fare for each route, pair of dates, airline and cabin is kept', () => {
-  const fare = (airline, price, ret = '2026-11-15', cabin) =>
-    ({ route: 'ICN-OIT', airline, depart: '2026-11-13', return: ret, price, ...(cabin ? { cabin } : {}) });
-  assert.deepEqual(keepCheapest([fare('KE', 300000), fare('7C', 150000), fare('KE', 280000), fare('KE', 260000, '2026-11-16'),
-    fare('KE', 790000, '2026-11-15', 'business'), fare('KE', 820000, '2026-11-15', 'business')]),
-  [fare('KE', 280000), fare('7C', 150000), fare('KE', 260000, '2026-11-16'), fare('KE', 790000, '2026-11-15', 'business')]);
+test('only the cheapest fare for each route, pair of dates and airline is kept', () => {
+  const fare = (airline, price, ret = '2026-11-15') =>
+    ({ route: 'ICN-OIT', airline, depart: '2026-11-13', return: ret, price });
+  assert.deepEqual(keepCheapest([fare('KE', 300000), fare('7C', 150000), fare('KE', 280000), fare('KE', 260000, '2026-11-16')]),
+    [fare('KE', 280000), fare('7C', 150000), fare('KE', 260000, '2026-11-16')]);
 });
 
 // The link of a real ticket, which says in its static_fare_key what the fare includes.
@@ -130,18 +129,7 @@ test('the cheapest fare with a checked bag is kept apart from the cheapest witho
     [fare(110000, 0), fare(170000)]);
 });
 
-test('a fare in business or first says so, and economy goes unsaid', () => {
-  const response = { success: true, data: [ticket({ price: 820000 })] };
-  assert.equal(pickFares(response, oita, '2026-10-11', 'business')[0].cabin, 'business');
-  assert.equal('cabin' in pickFares(response, oita, '2026-10-11')[0], false);
-});
 
-test('an answer for business that repeats economy is told apart from a real one', () => {
-  const economy = [ticket({}), ticket({ airline: '7C', price: 150000 })];
-  assert.equal(repeatsEconomy([ticket({}), ticket({ airline: '7C', price: 150000 })], economy), true);
-  assert.equal(repeatsEconomy([ticket({ price: 790000 }), ticket({ price: 810000, flight_number: '2183' })], economy), false);
-  assert.equal(repeatsEconomy([], economy), false);
-});
 
 test('an error response yields no fares', () => {
   assert.deepEqual(pickFares({ success: false, error: 'Unauthorized' }, oita, '2026-10-11'), []);
