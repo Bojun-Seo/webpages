@@ -1,23 +1,62 @@
 {
   "updated": "2026-10-12",
-  "included": ["KE", "OZ", "JL", "NH", "ET"],
-  "usual": { "JP": 45000, "TW": 59000, "HK": 59000, "MO": 59000 },
+  "included": ["KE", "OZ", "JL", "NH", "ET", "LJ", "WE", "YP"],
+  "includedSources": [
+    { "title": "진에어 무료 수하물 허용량 (특가를 포함한 모든 운임 15kg)", "url": "https://help.jinair.com/hc/ko/articles/4409835717657" },
+    { "title": "파라타항공 수하물 안내 (모든 일반석 운임 15kg)", "url": "https://www.parataair.com/ko/contents/information/showBaggageInformation.do" },
+    { "title": "에어프레미아 이코노미 (Lite 15kg, Standard·Flex 23kg)", "url": "https://www.airpremia.com/a/en/inflight/class-service/ey" }
+  ],
+  "usual": { "JP": 40000, "TW": 50000, "HK": 50000, "MO": 50000 },
   "usualSources": [
-    { "title": "진에어 사전 구매 수하물 (일본·중국 45,000원)", "url": "https://www.jinair.com/addService/onlineBaggage?snsLang=en_US&ctrCd=USA" },
-    { "title": "HK Express 수하물 요금표 (2026-03)", "url": "https://www.hkexpress.com/-/media/Plan/Extras/Baggage/BaggageFee/202603PriceTable-Baggage-EN.pdf" },
-    { "title": "인사이트 (2026-09-23, 제주항공 공항 구매 일본 75,000원)", "url": "https://www.insight.co.kr/news/574944" }
+    { "title": "제주항공 수하물 운임 (일본 40,000원, 홍콩·마카오·대만 50,000원)", "url": "https://www.jejuair.net/ko/linkService/boardingProcessGuide/baggageFare.do" },
+    { "title": "트리니티항공 국제선 초과수하물 금액 변경 안내 (2026-03-30부터 일본 40,000원, 대만 50,000원)", "url": "https://www.twayair.com/app/customerCenter/notice/retrieve/12579" }
   ],
   "airlines": {
+    "7C": {
+      "fee": { "JP": 40000, "TW": 50000, "HK": 50000, "MO": 50000 },
+      "kg": 15,
+      "source": { "title": "제주항공 수하물 운임 (BASIC 운임, 출발 24시간 전까지)", "url": "https://www.jejuair.net/ko/linkService/boardingProcessGuide/baggageFare.do" }
+    },
+    "TW": {
+      "fee": { "JP": 40000, "TW": 50000 },
+      "kg": 15,
+      "source": { "title": "트리니티항공 국제선 초과수하물 금액 변경 안내 (2026-03-30부터, 이벤트운임)", "url": "https://www.twayair.com/app/customerCenter/notice/retrieve/12579" }
+    },
+    "RS": {
+      "fee": { "JP": 40000, "HK": 50000 },
+      "kg": 15,
+      "note": "출발 48시간 전까지 사는 값, 그 뒤로는 5,000원 더",
+      "source": { "title": "에어서울 위탁수하물 규정 변경 안내 (2023-11-01부터)", "url": "https://flyairseoul.com/CW/ko/noticeContent.do?seq=7246&pageNo=1" }
+    },
+    "ZE": {
+      "fee": { "JP": 45000 },
+      "kg": 15,
+      "source": { "title": "이스타항공 수하물 안내 (특가운임)", "url": "https://www.eastarjet.com/newstar/PGWHD00001?lang=US" }
+    },
+    "RF": {
+      "fee": 50000,
+      "kg": 15,
+      "source": { "title": "에어로케이 부가서비스 요금 인상 공지 (2026-03-29부터, LITE 운임)", "url": "https://www.aerok.com/ko-KR/cscenter/announcement/1974?page=1" }
+    },
     "UO": {
       "fee": 59000,
       "kg": 20,
-      "source": { "title": "HK Express 수하물 요금표 (2026-03, 예약 시 구매)", "url": "https://www.hkexpress.com/-/media/Plan/Extras/Baggage/BaggageFee/202603PriceTable-Baggage-EN.pdf" }
+      "note": "예약할 때 사는 값, 나중에 더하면 72,000원",
+      "source": { "title": "HK Express 수하물 요금표 (2026-03)", "url": "https://www.hkexpress.com/-/media/Plan/Extras/Baggage/BaggageFee/202603PriceTable-Baggage-EN.pdf" }
     },
     "ZG": {
-      "fee": 37000,
+      "fee": 38100,
       "approx": true,
-      "note": "1개 4,000엔을 원으로 어림한 값",
-      "source": { "title": "Trip.com ZIPAIR 안내", "url": "https://jp.trip.com/flights/airline-zg/zipair/" }
+      "kg": 30,
+      "note": "인천 출발 38,100원, 나리타 출발 4,000엔",
+      "source": { "title": "ZIPAIR Regarding Baggage", "url": "https://www.zipair.net/en/service/baggage" }
+    },
+    "IT": {
+      "fee": 38000,
+      "approx": true,
+      "kg": 15,
+      "note": "예약할 때 사는 15kg 850대만달러를 원으로 어림한 값",
+      "source": { "title": "2026 台灣虎航評價 (여행 블로그)", "url": "https://massi.tw/tigerair/" }
     }
   }
 }

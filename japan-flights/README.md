@@ -132,15 +132,16 @@ Schedules change every season (late March and late October). Everything is in `s
   stands in for.
 - `baggage.json`: what a checked bag bought in advance costs one way, in won, for a bag a fare does
   not include. `airlines` gives an airline's own `fee`, one for all its routes or one for each
-  destination country (`{ "JP": 35000, "TW": 45000 }`), with the `kg` it buys, its `source` and
-  `approx` when the fee is converted or otherwise rough; a country it gives none for, and an airline
-  without one, take the `usual` fee to that country (`country` in `routes.json`), always shown as
-  approximate. `included` names the airlines whose economy fares always include a checked bag on
-  these routes, Korean Air, Asiana, JAL, ANA and Ethiopian, so that the few fares of theirs
-  Aviasales marks without one get no fee. The page counts one bag for each person on their fares,
-  and since the usual fee is a low-cost airline's, shows a bag beyond that as 요금 미확인 (fee not known)
-  and adds nothing for it. Add an airline when the deploy log counts fares of its without a checked
-  bag, the first of its three numbers there.
+  destination country (`{ "JP": 40000, "TW": 50000 }`), with the `kg` it buys, its `source`,
+  `approx` when the fee is converted or otherwise rough, and a `note` on how it was worked out or
+  when it applies; a country it gives none for, and an airline without one, take the `usual` fee to
+  that country (`country` in `routes.json`), always shown as approximate. `included` names the
+  airlines whose economy fares always include a checked bag on these routes, Korean Air, Asiana,
+  JAL, ANA, Ethiopian, Jin Air, Parata Air and Air Premia, with `includedSources` for the last
+  three, so that the few fares of theirs Aviasales marks without one get no fee. The page counts one
+  bag for each person on their fares, and since the usual fee is a low-cost airline's, shows a bag
+  beyond that as 요금 미확인 (fee not known) and adds nothing for it. Add an airline when the deploy log
+  counts fares of its without a checked bag, the first of its three numbers there.
 - `fares.json`: see above.
 
 The tests check that every route has the fields the page reads and that the 2027 holidays add up
@@ -212,10 +213,15 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   morning and land back in the afternoon, so only a fare's own times can mark a trip either way.
 - Prices are a fare for each person picked, all as adults, in economy unless the trip is marked 비즈니스
   or 퍼스트, and may differ from what a booking finally costs. Business and first fares come only from
-  `fares.json`, since the API gives economy alone. Only HK Express's bag fee comes from the airline
-  itself, and ZIPAIR's from a travel site; the others are the usual fees in `baggage.json`, from Jin
-  Air's advance price to Japan and HK Express's, and the page marks them 약. A second bag for one
-  person is charged the same as the first, though an airline may charge more. A fare with a checked
-  bag counts as including one for each person. Only Korean Air and Asiana say so on their own sites;
-  JAL and ANA have given two in economy, and ANA's Basic fares, sold on some routes since November
-  2024, can include none.
+  `fares.json`, since the API gives economy alone. Bag fees are the cheapest price online in
+  advance, from the airlines' own pages for Jeju Air, Trinity, Air Seoul, Eastar Jet, Aero K, HK
+  Express and ZIPAIR (whose won price out of Incheon the page also takes for the way back, charged
+  in yen, and marks 약), and from a travel blog for Tigerair Taiwan, converted from Taiwan dollars.
+  Peach, Air Busan and Scoot published none that could be found, and Eastar Jet none to Taiwan or
+  Hong Kong, so they take the usual fee, Jeju Air's and Trinity's, which the page marks 약. An
+  airline may charge more for a bag bought late: Air Seoul 5,000 won more within 48 hours of
+  departure, HK Express 72,000 won after booking. A second bag for one person is charged the same as
+  the first, though an airline may charge more. A fare with a checked bag counts as including one
+  for each person. Of the airlines that always include one, Korean Air, Asiana, Jin Air, Parata Air
+  and Air Premia say so on their own pages; JAL and ANA have given two in economy, and ANA's Basic
+  fares, sold on some routes since November 2024, can include none.
