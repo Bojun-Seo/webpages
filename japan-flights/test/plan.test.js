@@ -136,7 +136,7 @@ test('each trip carries the marks its flight times earn', () => {
   assert.deepEqual(marks('ICN-KIJ', '2026-12-21', '2026-12-23'), [true, true]);
 });
 
-test('known fares come first, the cheapest first, then the soonest trips', () => {
+test('the least leave comes first, then known fares, the cheapest first, then the soonest', () => {
   const fares = [
     { route: 'ICN-AOJ', depart: '2026-12-01', return: '2026-12-03', price: 310000, seen: today },
     { route: 'ICN-AOJ', depart: '2026-12-01', return: '2026-12-03', price: 290000, seen: today },
@@ -149,13 +149,16 @@ test('known fares come first, the cheapest first, then the soonest trips', () =>
   // of the two Aomori fares is kept.
   assert.deepEqual(trips.filter((t) => t.fare).map((t) => `${t.route} ${t.depart} ${t.fare.price}`),
     ['ICN-OIT 2026-12-25 250000', 'ICN-AOJ 2026-12-01 290000']);
-  assert.deepEqual(trips.slice(0, 2).map((t) => t.route), ['ICN-OIT', 'ICN-AOJ']);
-  const rest = trips.slice(2);
-  assert.ok(rest.length > 0 && rest.every((t) => t.fare === null));
-  for (let i = 1; i < rest.length; i++) {
-    const [a, b] = [rest[i - 1], rest[i]];
-    assert.ok(a.depart < b.depart || (a.depart === b.depart && a.nights <= b.nights),
-      `${a.route} ${a.depart} ${a.nights} before ${b.route} ${b.depart} ${b.nights}`);
+  // Christmas takes no leave and has a fare; Aomori's Tuesday to Thursday takes two days,
+  // so it waits behind every trip that takes less.
+  assert.deepEqual([trips[0].route, trips[0].depart], ['ICN-OIT', '2026-12-25']);
+  const aomori = trips.findIndex((t) => t.fare && t.route === 'ICN-AOJ');
+  assert.ok(trips.slice(0, aomori).every((t) => t.leave < 2 || (t.leave === 2 && t.fare)));
+  const order = (t) => [t.leave, t.fare ? t.fare.price : Infinity, t.depart, t.nights];
+  for (let i = 1; i < trips.length; i++) {
+    const [a, b] = [order(trips[i - 1]), order(trips[i])];
+    const k = a.findIndex((x, j) => x !== b[j]);
+    assert.ok(k === -1 || a[k] < b[k], `${a} before ${b}`);
   }
 });
 

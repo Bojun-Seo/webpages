@@ -200,17 +200,18 @@ function byString(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-// Trips with a known fare first, the cheapest first; then the soonest
-// departure, and on the same day the shorter trip.
-function byFareThenDate(a, b) {
-  return byNumber(priceOf(a), priceOf(b)) || byString(a.depart, b.depart) || a.nights - b.nights
-    || byString(a.route, b.route);
+// The trips that take the least leave first; among them, those with a
+// known fare, the cheapest first; then the soonest departure, and on the
+// same day the shorter trip.
+function byLeaveFareDate(a, b) {
+  return a.leave - b.leave || byNumber(priceOf(a), priceOf(b)) || byString(a.depart, b.depart)
+    || a.nights - b.nights || byString(a.route, b.route);
 }
 
 // The trips that match `filter`, each with the cheapest known fare among
 // the airlines asked for and its airline, its leave, the holidays it spans
-// and the marks its flight times earn: known
-// fares first, the cheapest first, then the soonest departure. The
+// and the marks its flight times earn: the least leave first, then known
+// fares, the cheapest first, then the soonest departure. The
 // schedules are Korean Air's, so another airline's trip comes only from a
 // fare.
 //
@@ -254,7 +255,7 @@ export function recommend({ routes, fares, holidays, today }, filter) {
       ...trip, fare, airline: fare ? airlineOf(fare) : 'KE', leave, holidays: names, ...marks,
     });
   }
-  return out.sort(byFareThenDate);
+  return out.sort(byLeaveFareDate);
 }
 
 // The months from today's to the last one any route has a schedule for.
