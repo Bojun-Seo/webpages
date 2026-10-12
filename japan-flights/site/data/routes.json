@@ -281,9 +281,10 @@
       "region": "규슈 · 가고시마현",
       "about": "사쿠라지마 화산과 이부스키 모래찜질",
       "periods": [],
-      "note": "6월부터 주 3회로 줄었습니다. 운항 요일과 동계 일정은 아직 확인하지 못했습니다.",
+      "note": "대한항공은 6월부터 주 3회로 줄었고, 운항 요일과 동계 일정은 아직 확인하지 못했습니다. 제주항공은 10월 25일부터 매일 운항합니다.",
       "sources": [
-        { "title": "AeroRoutes (2026-02-12)", "url": "https://www.aeroroutes.com/eng/260212-kens26jp" }
+        { "title": "AeroRoutes (2026-02-12)", "url": "https://www.aeroroutes.com/eng/260212-kens26jp" },
+        { "title": "글로벌이코노믹 (2026-10-08)", "url": "https://www.g-enews.com/article/Industry/2026/10/202610080924497562ea14faf6f5_1" }
       ]
     },
     {
@@ -325,6 +326,61 @@
       "note": "12월 17일 아시아나항공 통합 후 대한항공 노선이 됩니다. 운항 요일은 아직 확인하지 못했습니다.",
       "sources": [
         { "title": "Aviation Wire (2026-09-07)", "url": "https://www.aviationwire.jp/archives/350200" }
+      ]
+    },
+    {
+      "id": "ICN-HKD",
+      "origin": "ICN",
+      "dest": "HKD",
+      "city": "하코다테",
+      "region": "홋카이도",
+      "about": "하코다테산 야경과 아침시장",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 제주항공이 12월 1일부터 매일 운항하며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "글로벌이코노믹 (2026-10-08)", "url": "https://www.g-enews.com/article/Industry/2026/10/202610080924497562ea14faf6f5_1" },
+        { "title": "중앙이코노미뉴스", "url": "https://www.joongangenews.com/news/articleView.html?idxno=553554" }
+      ]
+    },
+    {
+      "id": "ICN-TAK",
+      "origin": "ICN",
+      "dest": "TAK",
+      "city": "다카마쓰",
+      "region": "시코쿠 · 가가와현",
+      "about": "리쓰린 공원과 나오시마 예술섬",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 에어서울이 운항하며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "KAYAK 인천-다카마쓰", "url": "https://www.kayak.co.kr/%ED%95%AD%EA%B3%B5%EA%B6%8C/%EC%84%9C%EC%9A%B8-%EC%9D%B8%EC%B2%9C%EA%B5%AD%EC%A0%9C%EA%B3%B5%ED%95%AD-ICN/%EB%8B%A4%EC%B9%B4%EB%A7%88%EC%93%B0%EA%B3%B5%ED%95%AD-TAK" },
+        { "title": "삼진트래블 2026 한일 직항 정리", "url": "https://samjintravel.com/korea-japan-direct-flights-2026/" }
+      ]
+    },
+    {
+      "id": "ICN-MYJ",
+      "origin": "ICN",
+      "dest": "MYJ",
+      "city": "마쓰야마",
+      "region": "시코쿠 · 에히메현",
+      "about": "도고 온천과 마쓰야마성",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 제주항공이 운항하며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "에히메현 관광 (제주항공 탑승객 혜택)", "url": "https://www.visitehimejapan.com/ko/updates/update-002/" },
+        { "title": "LIVE JAPAN", "url": "https://livejapan.com/ko/article-a0005498/" }
+      ]
+    },
+    {
+      "id": "ICN-YGJ",
+      "origin": "ICN",
+      "dest": "YGJ",
+      "city": "요나고",
+      "region": "주고쿠 · 돗토리현",
+      "about": "다이센과 아다치 미술관, 사카이미나토",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 에어서울이 운항한다는 정리 자료만 찾았으며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "삼진트래블 2026 한일 직항 정리", "url": "https://samjintravel.com/korea-japan-direct-flights-2026/" }
       ]
     }
   ]
