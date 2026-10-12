@@ -31,8 +31,13 @@ export function localDate(timestamp, offset = KOREA) {
   return local(Date.parse(timestamp), offset).slice(0, 10);
 }
 
-export function localTime(timestamp, plusMinutes = 0) {
-  return local(Date.parse(timestamp) + plusMinutes * 60e3, KOREA).slice(11, 16);
+export function localTime(timestamp) {
+  return local(Date.parse(timestamp), KOREA).slice(11, 16);
+}
+
+// The moment a flight that leaves at `timestamp` and flies `minutes` lands.
+function landing(timestamp, minutes) {
+  return new Date(Date.parse(timestamp) + minutes * 60e3).toISOString();
 }
 
 export function monthsFrom(today, count) {
@@ -46,23 +51,32 @@ export function monthsFrom(today, count) {
 // The nonstop round trips in one API response for `route`, of every
 // airline. The dates are each flight's local date of departure. `departs`
 // is when the flight out leaves Korea; `arrives`, when the flight back lands
-// there, is known only if the response gives its duration.
+// there, is known only if the response gives its duration, and `lands`
+// gives the day too when it is not the date the flight left on, as for a
+// flight that leaves late at night.
 export function pickFares(response, route, seen) {
   if (!response || response.success === false || !Array.isArray(response.data)) return [];
   return response.data
     .filter((t) => t.airline && !t.transfers && !t.return_transfers
       && t.departure_at && t.return_at && t.price > 0)
-    .map((t) => ({
-      route: route.id,
-      airline: t.airline,
-      depart: localDate(t.departure_at),
-      return: localDate(t.return_at, route.utcOffset ?? KOREA),
-      price: Math.round(t.price),
-      seen,
-      source: 'Aviasales',
-      departs: localTime(t.departure_at),
-      ...(Number.isFinite(t.duration_back) ? { arrives: localTime(t.return_at, t.duration_back) } : {}),
-    }));
+    .map((t) => {
+      const fare = {
+        route: route.id,
+        airline: t.airline,
+        depart: localDate(t.departure_at),
+        return: localDate(t.return_at, route.utcOffset ?? KOREA),
+        price: Math.round(t.price),
+        seen,
+        source: 'Aviasales',
+        departs: localTime(t.departure_at),
+      };
+      if (Number.isFinite(t.duration_back)) {
+        const back = landing(t.return_at, t.duration_back);
+        fare.arrives = localTime(back);
+        if (localDate(back) > fare.return) fare.lands = localDate(back);
+      }
+      return fare;
+    });
 }
 
 // The cheapest fare for each route, pair of dates and airline; the page

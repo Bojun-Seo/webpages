@@ -101,6 +101,18 @@ test('a flight back that lands before noon frees the return day', () => {
   assert.equal(leave('2026-11-20'), 1); // the same days without a known arrival
 });
 
+test('a flight back that lands after midnight frees the day it lands, not the day it leaves', () => {
+  // Hong Kong at 23:30, Incheon at 04:05 the next day.
+  const fare = (ret, lands) => ({ route: 'ICN-HKG', airline: 'CX', depart: '2026-11-20', return: ret,
+    price: 400000, seen: today, departs: '10:00', arrives: '04:05', lands });
+  const fares = [fare('2026-11-22', '2026-11-23'), fare('2026-11-23', '2026-11-24')];
+  const trips = recommend({ routes, fares, holidays, today },
+    { from: '2026-11-01', to: '2026-11-30', minNights: 1, maxNights: 6, airlines: new Set(['CX']) });
+  const trip = (ret) => trips.find((t) => t.return === ret);
+  assert.deepEqual([trip('2026-11-22').lands, trip('2026-11-22').leave], ['2026-11-23', 0]); // back Monday morning
+  assert.deepEqual([trip('2026-11-23').lands, trip('2026-11-23').leave], ['2026-11-24', 1]); // Monday away
+});
+
 test('the 2027 holidays leave 119 days off in a five-day week, as the official calendar says', () => {
   let off = 0;
   for (let d = '2027-01-01'; d <= '2027-12-31'; d = addDays(d, 1)) {
