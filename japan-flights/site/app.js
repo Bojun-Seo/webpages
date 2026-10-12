@@ -2,12 +2,25 @@
 // The working out lives in plan.js.
 
 import {
-  DAY_NAMES, WEEK, daysBetween, dayOf, flightTimes, lastDayOfMonth, monthsAhead, recommend,
-  searchLinks, timetableDays, weeklyFlights,
+  DAY_NAMES, WEEK, airlineOf, daysBetween, dayOf, flightTimes, lastDayOfMonth, monthsAhead,
+  recommend, searchLinks, timetableDays, weeklyFlights,
 } from './plan.js';
 
 const PAGE_SIZE = 30;
 const NIGHTS = { '1-2': [1, 2], '2-3': [2, 3], '3-4': [3, 4], '4-5': [4, 5], any: [1, 6] };
+
+// Names for the airlines that fly between Korea and Japan; any other shows
+// its code.
+const AIRLINE_NAMES = {
+  KE: '대한항공', OZ: '아시아나항공', '7C': '제주항공', LJ: '진에어', TW: '트리니티(티웨이)',
+  BX: '에어부산', RS: '에어서울', ZE: '이스타항공', RF: '에어로케이', YP: '에어프레미아',
+  JL: '일본항공', NH: 'ANA', NQ: '에어재팬', MM: '피치항공', ZG: 'ZIPAIR', IJ: '스프링재팬',
+  GK: '젯스타재팬', ET: '에티오피아항공',
+};
+
+function airlineName(code) {
+  return AIRLINE_NAMES[code] || code;
+}
 
 const $ = (id) => document.getElementById(id);
 
@@ -67,7 +80,7 @@ function link(href, text, cls) {
   return el('a', { href, target: '_blank', rel: 'noopener', class: cls }, text);
 }
 
-const state = { data: null, cities: new Set(), trips: [], shown: PAGE_SIZE };
+const state = { data: null, cities: new Set(), airlines: new Set(), trips: [], shown: PAGE_SIZE };
 
 function readFilter() {
   const { data } = state;
@@ -83,6 +96,7 @@ function readFilter() {
     maxLeave: leave === 'any' ? null : Number(leave),
     maxPrice: budget > 0 ? budget * 10000 : null,
     cities: state.cities.size ? state.cities : null,
+    airlines: state.airlines.size ? state.airlines : null,
   };
 }
 
@@ -100,8 +114,9 @@ function tripRow(trip) {
   const price = trip.fare
     ? el('div', { class: 'price' },
       el('strong', null, won(trip.fare.price)),
-      el('span', null, `${trip.fare.source || '직접 입력'} · ${seenLabel(trip.fare.seen || data.today, data.today)}`))
-    : el('div', { class: 'price price-unknown' }, el('strong', null, '가격 미확인'), el('span', null, '검색 링크로 확인'));
+      el('span', null, `${airlineName(trip.airline)} · ${seenLabel(trip.fare.seen || data.today, data.today)}`))
+    : el('div', { class: 'price price-unknown' }, el('strong', null, '가격 미확인'),
+      el('span', null, `${airlineName(trip.airline)} · 검색 링크로 확인`));
   return el('li', { class: 'trip' },
     el('div', { class: 'when' },
       el('span', { class: 'dates' }, `${dayLabel(trip.depart)} → ${dayLabel(trip.return)}`),
@@ -112,7 +127,7 @@ function tripRow(trip) {
     el('div', { class: 'badges' }, badges),
     price,
     el('div', { class: 'links' },
-      searchLinks(route, trip.depart, trip.return).map((l) => link(l.url, l.name))));
+      searchLinks(route, trip.depart, trip.return, trip.airline).map((l) => link(l.url, l.name))));
 }
 
 function renderTrips() {
@@ -129,7 +144,7 @@ function renderTrips() {
   list.replaceChildren(...trips.slice(0, state.shown).map(tripRow));
   if (trips.length === 0) {
     list.append(el('li', { class: 'empty' },
-      '조건에 맞는 일정이 없습니다. 출발 시기나 여행 기간을 넓히거나, 운항 요일이 확인된 도시를 골라 보세요.'));
+      '조건에 맞는 일정이 없습니다. 출발 시기나 여행 기간을 넓히거나, 다른 도시나 항공사를 골라 보세요.'));
   }
   const more = $('more');
   more.hidden = trips.length <= state.shown;
@@ -144,13 +159,16 @@ function weekStrip(period) {
 }
 
 function routeCard(route) {
-  const periods = route.periods.filter((p) => p.to >= state.data.today);
+  const { fares, today } = state.data;
+  const periods = route.periods.filter((p) => p.to >= today);
+  const priced = [...new Set(fares.filter((f) => f.route === route.id && f.depart >= today).map(airlineOf))];
   return el('article', { class: 'route' },
     el('header', null,
       el('h3', null, route.city, el('span', { class: 'code' }, route.dest)),
       route.tag && el('span', { class: 'badge' }, route.tag)),
     el('p', { class: 'region' }, route.region),
     el('p', { class: 'about' }, route.about),
+    periods.length > 0 && el('p', { class: 'times' }, '대한항공 운항 요일'),
     periods.map((p) => el('div', { class: 'period' },
       el('span', { class: 'range' }, `${shortDate(p.from)} – ${shortDate(p.to)}`),
       weekStrip(p),
@@ -158,6 +176,7 @@ function routeCard(route) {
     route.note && el('p', { class: 'note' }, route.note),
     route.flights && el('p', { class: 'times' }, flightTimes(route)),
     route.aircraft && el('p', { class: 'aircraft' }, route.aircraft),
+    priced.length > 0 && el('p', { class: 'times' }, `운임이 확인된 항공사 · ${priced.map(airlineName).join(', ')}`),
     el('p', { class: 'sources' }, '출처 ',
       route.sources.map((s, i) => [i > 0 && ' · ', link(s.url, s.title)])));
 }
@@ -166,23 +185,34 @@ function renderRoutes() {
   $('routes').replaceChildren(...state.data.routes.map(routeCard));
 }
 
-function renderCities() {
-  const box = $('cities');
+// A row of toggle chips for `picked`, a Set that stays empty for "all".
+function renderChips(box, allLabel, picked, options) {
   const chip = (label, pressed, onclick) =>
     el('button', { type: 'button', class: 'chip', 'aria-pressed': String(pressed), onclick }, label);
   box.replaceChildren(
-    chip('전체', state.cities.size === 0, () => { state.cities.clear(); update(); }),
-    ...state.data.routes.map((route) => chip(route.city, state.cities.has(route.id), () => {
-      if (state.cities.has(route.id)) state.cities.delete(route.id);
-      else state.cities.add(route.id);
+    chip(allLabel, picked.size === 0, () => { picked.clear(); update(); }),
+    ...options.map(({ value, label }) => chip(label, picked.has(value), () => {
+      if (picked.has(value)) picked.delete(value);
+      else picked.add(value);
       update();
     })));
+}
+
+function renderCities() {
+  renderChips($('cities'), '모든 도시', state.cities,
+    state.data.routes.map((route) => ({ value: route.id, label: route.city })));
+}
+
+function renderAirlines() {
+  renderChips($('airlines'), '모든 항공사', state.airlines,
+    state.data.airlines.map((code) => ({ value: code, label: airlineName(code) })));
 }
 
 function update() {
   state.shown = PAGE_SIZE;
   state.trips = recommend(state.data, readFilter());
   renderCities();
+  renderAirlines();
   renderTrips();
 }
 
@@ -217,6 +247,10 @@ async function main() {
     byId: new Map(routes.map((r) => [r.id, r])),
     months: monthsAhead(routes, today),
     fareCount: fares.filter((f) => f.depart >= today).length,
+    // Korean Air, whose schedules the page knows, then the airlines with fares.
+    airlines: ['KE', ...[...new Set(fares.filter((f) => f.depart >= today).map(airlineOf))]
+      .filter((code) => code !== 'KE')
+      .sort((a, b) => airlineName(a).localeCompare(airlineName(b), 'ko'))],
   };
 
   $('status').textContent = statusLine(routesDoc, manual, live);

@@ -1,12 +1,13 @@
 # Japan Flights
 
-A static page that recommends Korean Air round trips from Seoul Incheon to Japan: Tokyo, Osaka,
+A static page that recommends nonstop round trips from Seoul Incheon to Japan: Tokyo, Osaka,
 Fukuoka and the other main cities, and regional airports such as Oita, Hiroshima and Aomori. It
-knows the days each route flies, lists the round trips the schedule allows, counts the days of leave
-each trip takes against Korean public holidays, and puts trips with a known fare first, cheapest
-first. GitHub Pages serves it; there is no server.
+knows the days Korean Air flies each route and lists the round trips that schedule allows; other
+airlines' trips come from the fares known for them. It counts the days of leave each trip takes
+against Korean public holidays, and puts trips with a known fare first, cheapest first. GitHub
+Pages serves it; there is no server.
 
-The page is in Korean. It is not affiliated with Korean Air.
+The page is in Korean. It is not affiliated with any airline.
 
 ## Contents
 
@@ -21,23 +22,25 @@ The page is in Korean. It is not affiliated with Korean Air.
 
 The main routes fly every day, but regional ones fly a few days a week (Oita: Monday, Wednesday,
 Friday and Sunday), so on those most pairs of dates are not a round trip at all. For the departure
-month, trip length, leave and budget the visitor picks, the page:
+month, trip length, leave, budget, cities and airlines the visitor picks, the page:
 
-1. lists every round trip with a flight at both ends, within the schedule periods in
-   `data/routes.json`;
+1. lists every round trip with a Korean Air flight at both ends, within the schedule periods in
+   `data/routes.json`, and every trip a known fare of one of the airlines picked proves;
 2. counts the leave each takes: the weekdays from departure to return, both ends included as
    whole days, that are not public holidays;
-3. marks the trips that span a Friday (금요일 포함), and, from the route's flight times, those
-   whose flight out leaves Incheon at 4 p.m. or later (저녁 출발) or whose flight back lands
-   there before noon (오전 도착);
-4. attaches the cheapest known fare for the route and dates;
+3. marks the trips that span a Friday (금요일 포함), and those whose flight out leaves Korea at
+   4 p.m. or later (저녁 출발) or whose flight back lands there before noon (오전 도착), from the
+   fare's own times, or for a Korean Air trip without them from the route's flight times;
+4. attaches the cheapest known fare for the route and dates among the airlines picked, and names
+   its airline;
 5. lists the trips with a known fare first, cheapest first, then the rest by departure date,
    soonest first; on the same day, the shorter trip first.
 
 Every trip links to Naver, Google Flights, Skyscanner and KAYAK searches with the route and dates
-filled in, for the live price. Below the list, a card per route shows its days of operation in
-airline timetable notation (`1.3.5.7` is Monday, Wednesday, Friday and Sunday), flight times,
-aircraft and the announcement the schedule came from.
+filled in, for the live price; the KAYAK search asks for the trip's airline. Below the list, a card
+per route shows Korean Air's days of operation in airline timetable notation (`1.3.5.7` is Monday,
+Wednesday, Friday and Sunday), flight times, aircraft, the airlines with known fares and the
+announcement the schedule came from.
 
 ## Where the fares come from
 
@@ -56,14 +59,15 @@ its own users' searches, so regional routes may have few fares or none. The fetc
 against the documented response format only: the API could not be reached from where this was
 written.
 
-A hand-written fare looks like this. `price` is the round trip for one adult, in won; `seen` is
-when you saw it, and the page shows how long ago that was.
+A hand-written fare looks like this. `airline` is the airline's two-letter code (`KE`, `7C`, `LJ`
+...), and a fare without one counts as Korean Air's; `price` is the round trip for one adult, in
+won; `seen` is when you saw it, and the page shows how long ago that was.
 
 ```json
 {
   "fares": [
-    { "route": "ICN-OIT", "depart": "2026-12-25", "return": "2026-12-27", "price": 289000,
-      "seen": "2026-10-11", "source": "대한항공" }
+    { "route": "ICN-OIT", "airline": "KE", "depart": "2026-12-25", "return": "2026-12-27",
+      "price": 289000, "seen": "2026-10-11", "source": "대한항공" }
   ]
 }
 ```

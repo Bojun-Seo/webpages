@@ -129,7 +129,7 @@ select, input {
   width: 100%;
   min-width: 0;
 }
-.cities { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .chip {
   font: inherit;
   font-size: 0.875rem;
