@@ -4,7 +4,6 @@
   "destinations": [
     { "dest": "HAN", "city": "하노이", "country": "VN", "utcOffset": 7 },
     { "dest": "SGN", "city": "호찌민", "country": "VN", "utcOffset": 7 },
-    { "dest": "LTH", "city": "호찌민 롱탄", "country": "VN", "utcOffset": 7 },
     { "dest": "DAD", "city": "다낭", "country": "VN", "utcOffset": 7 },
     { "dest": "CXR", "city": "나트랑", "country": "VN", "utcOffset": 7 },
     { "dest": "PQC", "city": "푸꾸옥", "country": "VN", "utcOffset": 7 },

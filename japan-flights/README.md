@@ -122,7 +122,7 @@ a route whose days are not known yet.
    demand. The [top-level README](../README.md#publishing) says how the site is put together.
 3. For live fares, sign up at [Travelpayouts](https://www.travelpayouts.com/), copy the API token
    from its developer settings, and add it as the repository secret `TRAVELPAYOUTS_TOKEN`
-   (**Settings → Secrets and variables → Actions**). The fetch makes about 2,230 queries, one for
+   (**Settings → Secrets and variables → Actions**). The fetch makes about 2,200 queries, one for
    each route and pair of months, 0.15 seconds apart to stay well under the API's limit of 600 a
    minute, so it adds about eleven minutes to a deploy. A failed fetch does not stop the page from
    publishing.
@@ -237,10 +237,14 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   either way. A fare without its own times, and a Korean Air day on a route without them, is let
   through.
 - Vietnam, Bangkok, Guam and Saipan, and every route `origins` adds, come through fares only: the
-  page lists no Korean Air days for them. Long Thanh, Ho Chi Minh City's new airport, opens on 1
-  December 2026, and Ca Mau was closed until at least 31 October 2026; both are listed so that their
-  fares show once they fly. The page does not say where a trip connects or for how long; the search
-  links show it.
+  page lists no Korean Air days for them. Ca Mau was closed until at least 31 October 2026 and is
+  listed so that its fares show once it flies again. Long Thanh, Ho Chi Minh City's new airport,
+  opens on 1 December 2026, but the API answered every query for it with HTTP 400 on 13 October
+  2026, so it is left out until the API knows it. Most flights from Korea to Vietnam, Guam and
+  Saipan leave in the evening and land at night, so the rule against a late flight out leaves few of
+  their trips: on 13 October 2026 it left out 122 of the 257 tickets from Incheon to Da Nang and
+  every one to Guam and Saipan of two to six nights. The page does not say where a trip connects or
+  for how long; the search links show it.
 - Prices are a fare for each person picked, all as adults, in economy unless the trip is marked 비즈니스
   or 퍼스트, and may differ from what a booking finally costs. Business and first fares come only from
   `fares.json`, since the API gives economy alone. Bag fees are the cheapest price online in
