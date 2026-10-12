@@ -310,11 +310,30 @@ test('each cabin with a fare gets its own trip, and the cabins picked narrow the
   assert.ok(recommend(ctx, november).some((t) => !t.fare && t.cabin === 'economy'));
 });
 
+test('every destination has the fields a route would give it', () => {
+  const doc = data('routes.json');
+  assert.deepEqual(doc.origins, ['ICN', 'GMP', 'CJJ']);
+  const listed = new Set(routes.map((r) => r.dest));
+  for (const place of doc.destinations) {
+    assert.match(place.dest, /^[A-Z]{3}$/);
+    assert.ok(place.city && !listed.has(place.dest), place.dest);
+    assert.match(place.country, /^(VN|TH|GU|MP)$/, place.dest);
+    assert.ok(Number.isInteger(place.utcOffset), place.dest);
+  }
+  // Every Korean airport reaches every place, once.
+  const all = routesOf(doc);
+  assert.equal(new Set(all.map((r) => r.id)).size, all.length);
+  assert.equal(all.length, doc.origins.length * new Set(all.map((r) => r.dest)).size);
+});
+
 test('baggage.json has a usual fee for every country flown to, and a fee with a source for each airline', () => {
   const baggage = data('baggage.json');
-  const countries = new Set(routes.map((r) => r.country));
+  const countries = new Set(routesOf(data('routes.json')).map((r) => r.country));
   for (const country of countries) assert.ok(baggage.usual[country] > 0, country);
   for (const code of baggage.included) assert.ok(/^[A-Z0-9]{2}$/.test(code) && !(code in baggage.airlines), code);
+  for (const [code, places] of Object.entries(baggage.includedTo)) {
+    assert.ok(/^[A-Z0-9]{2}$/.test(code) && places.every((c) => countries.has(c)), code);
+  }
   for (const [code, airline] of Object.entries(baggage.airlines)) {
     assert.match(code, /^[A-Z0-9]{2}$/);
     const fees = typeof airline.fee === 'object' ? Object.entries(airline.fee) : [[null, airline.fee]];
@@ -345,6 +364,11 @@ test('the bag fee follows the airline, then the country of the destination', () 
   assert.deepEqual(fee('7C', 'ICN-NRT', 0, byCountry), { amount: 70000, approx: false, unknown: false });
   assert.deepEqual(fee('7C', 'ICN-HKG', 0, byCountry), { amount: 100000, approx: false, unknown: false });
   assert.deepEqual(fee('7C', 'ICN-TPE', 0, { ...byCountry, usual: { TW: 59000 } }), { amount: 118000, approx: true, unknown: false });
+  // An airline can include a bag to some countries only.
+  const guam = { id: 'ICN-GUM', origin: 'ICN', dest: 'GUM', country: 'GU', periods: [] };
+  const toGuam = { ...baggage, usual: { GU: 45000, JP: 40000 }, includedTo: { TW: ['GU'] } };
+  assert.equal(bagFee({ airline: 'TW', bags: 0 }, guam, toGuam).amount, 0);
+  assert.equal(bagFee({ airline: 'TW', bags: 0 }, route('ICN-NRT'), toGuam).amount, 80000);
 });
 
 test('a fare without a checked bag costs a bag each way, and the cheapest all in is offered', () => {
