@@ -146,22 +146,44 @@ export function cabinOf(fare) {
   return fare.cabin || 'economy';
 }
 
-// What checking one bag each way adds to `fare` on `route`. Nothing when
-// the fare includes a checked bag or does not say, or when its airline is
-// one whose fares always include one here (`included`), though Aviasales
-// marks a few of theirs without; else twice the one-way fee baggage.json
-// gives the airline, or failing that the usual fee to the destination's
-// country, which is a guess and so `approx`, as an airline's own fee may
-// also be. `unknown` when baggage.json gives neither.
-export function bagFee(fare, route, baggage) {
-  const none = { amount: 0, approx: false, unknown: false };
-  if (!fare || fare.bags !== 0) return none;
-  if (baggage && baggage.included && baggage.included.includes(airlineOf(fare))) return none;
-  const own = baggage && baggage.airlines && baggage.airlines[airlineOf(fare)];
-  if (own) return { amount: 2 * own.fee, approx: Boolean(own.approx), unknown: false };
-  const usual = baggage && baggage.usual && baggage.usual[route.country];
-  if (usual) return { amount: 2 * usual, approx: true, unknown: false };
-  return { amount: 0, approx: false, unknown: true };
+// Whether `airline`'s fares always include a checked bag here (`included`
+// in baggage.json), though Aviasales marks a few of theirs without.
+function alwaysIncludesBag(airline, baggage) {
+  return Boolean(baggage && baggage.included && baggage.included.includes(airline));
+}
+
+// The checked bags `fare` includes for each person: as many as it says
+// (`bags`), but one for an airline that always includes one, and one for a
+// fare that does not say.
+export function bagsIncluded(fare, baggage) {
+  if (fare.bags > 0) return fare.bags;
+  return fare.bags === 0 && !alwaysIncludesBag(airlineOf(fare), baggage) ? 0 : 1;
+}
+
+// Whom the page prices a trip for when not told otherwise: one person
+// checking one bag.
+export const DEFAULT_PARTY = { people: 1, bags: 1 };
+
+// What `party`, its `people` checking `bags` bags between them, pays for
+// the bags `fare` on `route` does not include (`count`), each both ways:
+// twice the one-way fee baggage.json gives the airline, or failing that the
+// usual fee to the destination's country, which is a guess and so `approx`,
+// as an airline's own fee may also be. The usual fee is a low-cost
+// airline's, so it is not used for one that always includes a bag; the fee
+// is `unknown` then, and when baggage.json gives neither. `included` is the
+// bags the fare includes for each person.
+export function bagFee(fare, route, baggage, party = DEFAULT_PARTY) {
+  const included = fare ? bagsIncluded(fare, baggage) : 0;
+  const count = fare ? Math.max(0, party.bags - party.people * included) : 0;
+  const fee = { amount: 0, count, included, approx: false, unknown: false };
+  if (count === 0) return fee;
+  const airline = airlineOf(fare);
+  const own = baggage && baggage.airlines && baggage.airlines[airline];
+  if (own) return { ...fee, amount: 2 * count * own.fee, approx: Boolean(own.approx) };
+  const usual = !alwaysIncludesBag(airline, baggage) && baggage && baggage.usual
+    && baggage.usual[route.country];
+  if (usual) return { ...fee, amount: 2 * count * usual, approx: true };
+  return { ...fee, unknown: true };
 }
 
 // The marks a trip's flights earn: from the fare's own times where it has
@@ -221,21 +243,23 @@ function byLeaveFareDate(a, b) {
 // the airlines asked for, each with its cheapest fare there, its airline and
 // cabin, the day its flight back lands, its leave, the holidays it spans and
 // the marks its flight times earn: the least leave first, then known fares,
-// the cheapest first, then the soonest departure. A fare without a checked
-// bag costs its price and a bag each way (`bagFee`, `total`), and is chosen,
-// sorted and held to the budget by that. The schedules are Korean Air's,
-// so another airline's trip comes only from a fare; a trip without a fare
-// is offered in the cheaper cabin asked for of economy and business, but
-// never in first, which Korean Air hardly sells on these routes.
+// the cheapest first, then the soonest departure. A fare costs its price for
+// each of the people in `party` and the fee for the bags they check that it
+// does not include, each both ways (`bag`, from `bagFee`), and is chosen,
+// sorted and held to the budget by that `total`. The schedules are Korean
+// Air's, so another airline's trip comes only from a fare; a trip without a
+// fare is offered in the cheaper cabin asked for of economy and business,
+// but never in first, which Korean Air hardly sells on these routes.
 //
-// filter: { from, to, nights, maxLeave, maxPrice, origins, cities, airlines, cabins }
+// filter: { from, to, nights, maxLeave, maxPrice, origins, cities, airlines, cabins, party }
 // `from` and `to` bound the departure date. `nights` (a Set of trip lengths
 // in nights) is left out to mean all of TRIP_NIGHTS, and no other length is
-// ever offered; `maxLeave`, `maxPrice`, `origins` (a Set of Korean airport
-// codes), `cities` (a Set of destination airport codes), `airlines` (a Set
-// of airline codes) and `cabins` (a Set of CABINS) are left out to mean no
-// limit.
+// ever offered; `party` ({ people, bags }) to mean DEFAULT_PARTY;
+// `maxLeave`, `maxPrice`, `origins` (a Set of Korean airport codes),
+// `cities` (a Set of destination airport codes), `airlines` (a Set of
+// airline codes) and `cabins` (a Set of CABINS) to mean no limit.
 export function recommend({ routes, fares, holidays, today, baggage }, filter) {
+  const party = filter.party || DEFAULT_PARTY;
   const from = filter.from > today ? filter.from : today;
   const nights = new Set(TRIP_NIGHTS.filter((n) => !filter.nights || filter.nights.has(n)));
   const wanted = (route) => (!filter.origins || filter.origins.has(route.origin))
@@ -243,10 +267,11 @@ export function recommend({ routes, fares, holidays, today, baggage }, filter) {
   const flown = (airline) => !filter.airlines || filter.airlines.has(airline);
   const seated = (cabin) => !filter.cabins || filter.cabins.has(cabin);
   const byId = new Map(routes.map((route) => [route.id, route]));
-  const feeOf = (fare) => bagFee(fare, fare && byId.get(fare.route), baggage);
+  const feeOf = (fare) => bagFee(fare, fare && byId.get(fare.route), baggage, party);
+  const totalOf = (fare) => party.people * fare.price + feeOf(fare).amount;
   const cheapest = cheapestFares(fares.filter((fare) => byId.has(fare.route)
     && wanted(byId.get(fare.route)) && flown(airlineOf(fare)) && seated(cabinOf(fare))), today,
-  (fare) => fare.price + feeOf(fare).amount);
+  totalOf);
   const faresOf = new Map();
   for (const fare of cheapest.values()) {
     const key = tripKey(fare);
@@ -276,14 +301,13 @@ export function recommend({ routes, fares, holidays, today, baggage }, filter) {
       // A flight back that leaves late at night lands the next day.
       const lands = (fare && fare.lands) || trip.return;
       const { leave, holidays: names } = leaveFor(trip.depart, lands, holidays, marks);
-      const fee = feeOf(fare);
-      const total = fare ? fare.price + fee.amount : null;
+      const bag = feeOf(fare);
+      const total = fare ? totalOf(fare) : null;
       if (filter.maxLeave != null && leave > filter.maxLeave) continue;
       if (filter.maxPrice != null && !(fare && total <= filter.maxPrice)) continue;
       out.push({
         ...trip, fare, airline: fare ? airlineOf(fare) : 'KE', cabin: fare ? cabinOf(fare) : scheduled,
-        total, bagFee: fee.amount, bagFeeApprox: fee.approx, bagFeeUnknown: fee.unknown,
-        lands, leave, holidays: names, ...marks,
+        total, bag, lands, leave, holidays: names, ...marks,
       });
     }
   }
@@ -304,21 +328,22 @@ export function monthsAhead(routes, today) {
   return months;
 }
 
-// Searches for one trip in one cabin on sites that show live prices. None
-// of them documents these URLs, so a site may change its format without
-// notice. KAYAK's asks for the trip's airline, nonstop.
-export function searchLinks(route, depart, ret, airline = 'KE', cabin = 'economy') {
+// Searches for one trip in one cabin for `people` adults on sites that show
+// live prices. None of them documents these URLs, so a site may change its
+// format without notice. KAYAK's asks for the trip's airline, nonstop.
+export function searchLinks(route, depart, ret, airline = 'KE', cabin = 'economy', people = 1) {
   const from = route.origin;
   const to = route.dest;
   const compact = (date) => date.replaceAll('-', '');
   const query = `Flights from ${from} to ${to} on ${depart} through ${ret}`
-    + (cabin === 'economy' ? '' : ` in ${cabin} class`);
+    + (cabin === 'economy' ? '' : ` in ${cabin} class`)
+    + (people === 1 ? '' : ` for ${people} adults`);
   const fareType = { economy: 'Y', business: 'C', first: 'F' }[cabin];
   return [
     {
       name: '네이버',
       url: `https://flight.naver.com/flights/international/${from}-${to}-${compact(depart)}/`
-        + `${to}-${from}-${compact(ret)}?adult=1&fareType=${fareType}`,
+        + `${to}-${from}-${compact(ret)}?adult=${people}&fareType=${fareType}`,
     },
     {
       name: 'Google',
@@ -328,12 +353,13 @@ export function searchLinks(route, depart, ret, airline = 'KE', cabin = 'economy
       name: '스카이스캐너',
       url: `https://www.skyscanner.co.kr/transport/flights/${from.toLowerCase()}/${to.toLowerCase()}/`
         + `${compact(depart).slice(2)}/${compact(ret).slice(2)}/`
-        + `?adultsv2=1&cabinclass=${cabin}&rtn=1&preferdirects=true`,
+        + `?adultsv2=${people}&cabinclass=${cabin}&rtn=1&preferdirects=true`,
     },
     {
       name: '카약',
       url: `https://www.kayak.co.kr/flights/${from}-${to}/${depart}/${ret}`
-        + `${cabin === 'economy' ? '' : `/${cabin}`}?sort=price_a&fs=airlines=${airline};stops=0`,
+        + `${cabin === 'economy' ? '' : `/${cabin}`}${people === 1 ? '' : `/${people}adults`}`
+        + `?sort=price_a&fs=airlines=${airline};stops=0`,
     },
   ];
 }
