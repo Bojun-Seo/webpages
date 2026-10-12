@@ -4,8 +4,8 @@ A static page that recommends nonstop round trips from Seoul Incheon and Gimpo t
 Osaka, Fukuoka and the other main cities, and regional airports such as Oita, Hiroshima and Aomori.
 It knows the days Korean Air flies each route and lists the round trips that schedule allows; other
 airlines' trips come from the fares known for them. It counts the days of leave each trip takes
-against Korean public holidays, and puts trips with a known fare first, cheapest first. GitHub Pages
-serves it; there is no server.
+against a Monday, Tuesday and Thursday work week and Korean public holidays, and puts trips with a
+known fare first, cheapest first. GitHub Pages serves it; there is no server.
 
 The page is in Korean. It is not affiliated with any airline.
 
@@ -27,8 +27,10 @@ the page:
 
 1. lists every round trip with a Korean Air flight at both ends, within the schedule periods in
    `data/routes.json`, and every trip a known fare of one of the airlines picked proves;
-2. counts the leave each takes: the weekdays from departure to return, both ends included as
-   whole days, that are not public holidays;
+2. counts the leave each takes: the workdays from departure to return that are not public
+   holidays, both ends included, except a return day whose flight back lands before noon. The
+   workdays are Monday, Tuesday and Thursday, the week of the person the page was made for;
+   `WORKDAYS` in `site/plan.js` sets them;
 3. marks the trips whose flight out leaves Korea at 4 p.m. or later (저녁 출발) or whose flight
    back lands there before noon (오전 도착), from the fare's own times, or for a Korean Air trip
    without them from the route's flight times;
@@ -149,8 +151,9 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   fares.
 - The search links follow URL formats the sites do not document, and any of them can change. The
   KAYAK link asks for the trip's airline, nonstop; the others show every airline.
-- Leave counts the departure and return days as whole days even for a trip marked 저녁 출발 or
-  오전 도착, and counts only Korean public holidays, not company holidays.
+- Leave counts the departure day as a whole day even for a trip marked 저녁 출발, and knows only
+  Korean public holidays and the days off of a Monday, Tuesday and Thursday week, not company
+  holidays.
 - A route lists one set of flight times, the latest its sources give, and 저녁 출발 and 오전 도착
   follow them even for a trip in another season. The routes with times all leave Incheon in the
   morning and land back in the afternoon, so only a fare's own times can mark a trip either way.

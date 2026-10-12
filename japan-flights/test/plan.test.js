@@ -77,11 +77,27 @@ test('a round trip may cross from one season into the next', () => {
   assert.deepEqual(trips.map((t) => t.return), ['2026-10-25']);
 });
 
-test('leave counts the weekdays that are not holidays', () => {
+test('leave counts the Mondays, Tuesdays and Thursdays that are not holidays', () => {
   assert.deepEqual(leaveFor('2026-12-25', '2026-12-27', holidays), { leave: 0, holidays: ['성탄절'] });
-  assert.deepEqual(leaveFor('2026-11-13', '2026-11-15', holidays), { leave: 1, holidays: [] });
+  assert.deepEqual(leaveFor('2026-11-13', '2026-11-15', holidays), { leave: 0, holidays: [] }); // Friday off
   assert.deepEqual(leaveFor('2027-02-06', '2027-02-09', holidays), { leave: 0, holidays: ['설 연휴'] });
-  assert.equal(leaveFor('2027-02-05', '2027-02-10', holidays).leave, 2); // Friday and Wednesday
+  assert.equal(leaveFor('2027-02-05', '2027-02-10', holidays).leave, 0); // Friday and Wednesday off
+  assert.equal(leaveFor('2026-11-16', '2026-11-19', holidays).leave, 3); // Monday to Thursday
+});
+
+test('a flight back that lands before noon frees the return day', () => {
+  const back = { morningArrival: true };
+  assert.equal(leaveFor('2026-11-16', '2026-11-19', holidays, back).leave, 2); // back on a Thursday
+  assert.equal(leaveFor('2026-11-16', '2026-11-20', holidays, back).leave, 3); // Friday is off anyway
+
+  // Haneda's late flight lands at Incheon before dawn on Monday.
+  const fares = [{ route: 'ICN-HND', airline: 'KE', depart: '2026-11-13', return: '2026-11-16', price: 300000,
+    seen: today, departs: '20:30', arrives: '04:35' }];
+  const trips = recommend({ routes, fares, holidays, today },
+    { from: '2026-11-01', to: '2026-11-30', minNights: 3, maxNights: 3, origins: new Set(['ICN']), cities: new Set(['HND']) });
+  const leave = (depart) => trips.find((t) => t.depart === depart).leave;
+  assert.equal(leave('2026-11-13'), 0);
+  assert.equal(leave('2026-11-20'), 1); // the same days without a known arrival
 });
 
 test('the 2027 holidays leave 119 days off in a five-day week, as the official calendar says', () => {
@@ -211,7 +227,9 @@ test('filters on city, leave and budget', () => {
   const base = { ...december, cities: new Set(['OIT']) };
   const ctx = { routes, fares, holidays, today };
   assert.ok(recommend(ctx, base).every((t) => t.route === 'ICN-OIT'));
-  assert.deepEqual(recommend(ctx, { ...base, maxLeave: 0 }).map((t) => t.depart), ['2026-12-25']);
+  // Friday to Sunday takes none, Wednesday and Friday being days off; the fare comes first.
+  assert.deepEqual(recommend(ctx, { ...base, maxLeave: 0 }).map((t) => t.depart),
+    ['2026-12-25', '2026-12-04', '2026-12-11', '2026-12-18']);
   assert.deepEqual(recommend(ctx, { ...base, maxPrice: 250000 }).map((t) => t.depart), ['2026-12-21']);
 });
 
