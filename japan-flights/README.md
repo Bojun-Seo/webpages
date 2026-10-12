@@ -1,6 +1,6 @@
 # Japan, Taiwan, Hong Kong and Macau Flights
 
-A static page that recommends nonstop round trips from Seoul Incheon and Gimpo to Japan, Taiwan,
+A static page that recommends nonstop round trips from Incheon, Gimpo and Cheongju to Japan, Taiwan,
 Hong Kong and Macau: Tokyo, Osaka, Fukuoka and the other main Japanese cities, regional airports
 such as Oita, Hiroshima and Aomori, Taipei, Taichung, Kaohsiung, Hong Kong and Macau. It knows the
 days Korean Air flies each route and lists the round trips that schedule allows; other airlines'
@@ -106,24 +106,24 @@ a route whose days are not known yet.
    demand. The [top-level README](../README.md#publishing) says how the site is put together.
 3. For live fares, sign up at [Travelpayouts](https://www.travelpayouts.com/), copy the API token
    from its developer settings, and add it as the repository secret `TRAVELPAYOUTS_TOKEN`
-   (**Settings → Secrets and variables → Actions**). The fetch makes about 1,400 queries, one for
+   (**Settings → Secrets and variables → Actions**). The fetch makes about 1,800 queries, one for
    each route, pair of months and cabin, 0.15 seconds apart to stay well under the API's limit of
-   600 a minute, so it adds about seven minutes to a deploy. A failed fetch does not stop the page
+   600 a minute, so it adds about nine minutes to a deploy. A failed fetch does not stop the page
    from publishing.
 
 ## Update the data
 
 Schedules change every season (late March and late October). Everything is in `site/data/`:
 
-- `routes.json`: one entry per route, from Incheon (`ICN`) or Gimpo (`GMP`); the city chips group
-  routes by the airport they fly to. `country` is the destination's country (`JP`, `TW`, `HK` or
-  `MO`), which bag fees go by. A destination outside UTC+9 gives `utcOffset` (Taiwan, Hong Kong and
-  Macau: `8`), so the fetcher gives the flight back its local date. `periods` lists the stretches
-  whose days are known, each with `from`, `to` and `days` (`"daily"`, or a list such as `["mon",
-  "wed", "fri", "sun"]`); the same days serve both directions, since each route turns around abroad
-  the same day. A route whose days are not known keeps `periods` empty and says why in `note`.
-  `flights`, where known, gives the flight `out` and the flight `back`, each with `departs` and
-  `arrives` in local 24-hour time (`"09:15"`) and the flight `number` where the source names it.
+- `routes.json`: one entry per route, from Incheon (`ICN`), Gimpo (`GMP`) or Cheongju (`CJJ`); the
+  city chips group routes by the airport they fly to. `country` is the destination's country (`JP`,
+  `TW`, `HK` or `MO`), which bag fees go by. A destination outside UTC+9 gives `utcOffset` (Taiwan,
+  Hong Kong and Macau: `8`), so the fetcher gives the flight back its local date. `periods` lists
+  the stretches whose days are known, each with `from`, `to` and `days` (`"daily"`, or a list such
+  as `["mon", "wed", "fri", "sun"]`); the same days serve both directions, since each route turns
+  around abroad the same day. A route whose days are not known keeps `periods` empty and says why in
+  `note`. `flights`, where known, gives the flight `out` and the flight `back`, each with `departs`
+  and `arrives` in local 24-hour time (`"09:15"`) and the flight `number` where the source names it.
   They decide 저녁 출발 and 오전 도착. Add the source of every change to `sources`, and move `updated` on.
 - `holidays.json`: public holidays by date, through 2027, from the 월력요항 that the Korea
   AeroSpace Administration publishes each June. A substitute holiday is named after the holiday it
@@ -183,10 +183,14 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   only: Korean Air does not fly the first two, and its daily Macau service from July 2024 was not
   confirmed for 2026.
 - On 12 October 2026 the routes were checked against press reports, airline filings and airport
-  pages for every Japanese and Taiwanese airport with scheduled flights from Incheon or Gimpo.
-  Routes flown only by charter, such as Toyama, Ube and Kushiro, and routes from other Korean
-  airports are left out. Many of those sources could be read only as search-result excerpts, so the
-  frequencies in the notes may be off.
+  pages for every Japanese and Taiwanese airport with scheduled flights from Incheon, Gimpo or
+  Cheongju. Routes flown only by charter, such as Toyama, Ube and Kushiro, and routes from other
+  Korean airports are left out. Many of those sources could be read only as search-result excerpts,
+  so the frequencies in the notes may be off.
+- Cheongju's routes are Aero K's, and Eastar Jet's to Taipei, and come through fares only. Aero K
+  had not published its winter days by 12 October 2026: Kumamoto is announced only to 24 October and
+  Matsuyama only from 2 January, Fukuoka and Hiroshima have no 2026 schedule, and Kobe is a charter
+  like Incheon's. Ibaraki and Obihiro, which Aero K suspended during the year, are left out.
 - Gimpo–Haneda was added on 12 October 2026 as flying daily; for Gimpo–Kansai only Asiana's daily
   winter service was found, so Korean Air's days are not given and the route comes only through
   fares.
