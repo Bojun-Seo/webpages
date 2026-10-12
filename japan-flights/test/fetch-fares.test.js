@@ -88,7 +88,7 @@ test("every airline's nonstop round trips are kept, with their times", () => {
 });
 
 test("a ticket counts only between the route's own airports", () => {
-  // The API answers for Seoul and Tokyo, whichever of their airports are asked for.
+  // Should the API answer for all of Seoul and Tokyo, only Gimpo-Haneda stays.
   const haneda = { id: 'GMP-HND', origin: 'GMP', dest: 'HND' };
   const tokyo = (from, to, price) =>
     ticket({ destination: 'TYO', origin_airport: from, destination_airport: to, price });
