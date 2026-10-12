@@ -147,12 +147,16 @@ export function cabinOf(fare) {
 }
 
 // What checking one bag each way adds to `fare` on `route`. Nothing when
-// the fare includes a checked bag or does not say; else twice the one-way
-// fee baggage.json gives the airline, or failing that the usual fee to the
-// destination's country, which is a guess and so `approx`, as an airline's
-// own fee may also be. `unknown` when baggage.json gives neither.
+// the fare includes a checked bag or does not say, or when its airline is
+// one whose fares always include one here (`included`), though Aviasales
+// marks a few of theirs without; else twice the one-way fee baggage.json
+// gives the airline, or failing that the usual fee to the destination's
+// country, which is a guess and so `approx`, as an airline's own fee may
+// also be. `unknown` when baggage.json gives neither.
 export function bagFee(fare, route, baggage) {
-  if (!fare || fare.bags !== 0) return { amount: 0, approx: false, unknown: false };
+  const none = { amount: 0, approx: false, unknown: false };
+  if (!fare || fare.bags !== 0) return none;
+  if (baggage && baggage.included && baggage.included.includes(airlineOf(fare))) return none;
   const own = baggage && baggage.airlines && baggage.airlines[airlineOf(fare)];
   if (own) return { amount: 2 * own.fee, approx: Boolean(own.approx), unknown: false };
   const usual = baggage && baggage.usual && baggage.usual[route.country];

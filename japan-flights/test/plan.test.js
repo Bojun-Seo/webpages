@@ -243,6 +243,7 @@ test('each cabin with a fare gets its own trip, and the cabins picked narrow the
 test('baggage.json has a usual fee for every country flown to, and a fee with a source for each airline', () => {
   const baggage = data('baggage.json');
   for (const r of routes) assert.ok(baggage.usual[r.country] > 0, r.id);
+  for (const code of baggage.included) assert.ok(/^[A-Z0-9]{2}$/.test(code) && !(code in baggage.airlines), code);
   for (const [code, airline] of Object.entries(baggage.airlines)) {
     assert.match(code, /^[A-Z0-9]{2}$/);
     assert.ok(Number.isInteger(airline.fee) && airline.fee > 0 && airline.source.url, code);
@@ -250,9 +251,12 @@ test('baggage.json has a usual fee for every country flown to, and a fee with a 
 });
 
 test('the bag fee follows the airline, then the country of the destination', () => {
-  const baggage = { usual: { JP: 45000, HK: 59000 }, airlines: { UO: { fee: 59000 }, ZG: { fee: 37000, approx: true } } };
+  const baggage = { included: ['KE'], usual: { JP: 45000, HK: 59000 },
+    airlines: { UO: { fee: 59000 }, ZG: { fee: 37000, approx: true } } };
   const fee = (airline, id, bags, data = baggage) => bagFee({ airline, ...(bags === 0 ? { bags } : {}) }, route(id), data);
   assert.deepEqual(fee('KE', 'ICN-NRT'), { amount: 0, approx: false, unknown: false });
+  // Korean Air's fares include a bag, whatever Aviasales says.
+  assert.deepEqual(fee('KE', 'ICN-NRT', 0), { amount: 0, approx: false, unknown: false });
   assert.deepEqual(fee('UO', 'ICN-HKG', 0), { amount: 118000, approx: false, unknown: false });
   assert.deepEqual(fee('ZG', 'ICN-NRT', 0), { amount: 74000, approx: true, unknown: false });
   assert.deepEqual(fee('MM', 'ICN-HND', 0), { amount: 90000, approx: true, unknown: false });

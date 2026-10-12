@@ -1,5 +1,6 @@
 {
   "updated": "2026-10-12",
+  "included": ["KE", "OZ", "JL", "NH", "ET"],
   "usual": { "JP": 45000, "TW": 59000, "HK": 59000, "MO": 59000 },
   "usualSources": [
     { "title": "진에어 사전 구매 수하물 (일본·중국 45,000원)", "url": "https://www.jinair.com/addService/onlineBaggage?snsLang=en_US&ctrCd=USA" },
