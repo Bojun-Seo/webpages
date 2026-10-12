@@ -129,8 +129,10 @@ Schedules change every season (late March and late October). Everything is in `s
 - `baggage.json`: what a checked bag bought in advance costs one way, in won, for a fare without
   one. `airlines` gives an airline's own `fee`, with the `kg` it buys, its `source` and `approx`
   when the fee is converted or otherwise rough; `usual` gives the fee to each destination country
-  (`country` in `routes.json`) for the airlines without one, always shown as approximate. Add an
-  airline when the deploy log names it among the fares without a checked bag.
+  (`country` in `routes.json`) for the airlines without one, always shown as approximate. `included`
+  names the airlines whose economy fares always include a checked bag on these routes, Korean Air,
+  Asiana, JAL, ANA and Ethiopian, so that the few fares of theirs Aviasales marks without one get no
+  fee. Add an airline when the deploy log names it among the fares without a checked bag.
 - `fares.json`: see above.
 
 The tests check that every route has the fields the page reads and that the 2027 holidays add up
