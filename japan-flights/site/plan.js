@@ -97,6 +97,10 @@ function weekday(day) {
   return (day + 4) % 7;
 }
 
+// The days of the week that take leave: Monday, Tuesday and Thursday, the
+// days the page's owner works. Wednesday and Friday are off like a weekend.
+const WORKDAYS = new Set([1, 2, 4]);
+
 const holidaysByDay = new WeakMap();
 
 // The holidays by day number, worked out once for each holidays object.
@@ -109,20 +113,23 @@ function holidayDays(holidays) {
   return days;
 }
 
-// The leave a trip takes: weekdays from departure to return, both ends
-// included as whole days, that are not public holidays. Also gives the
-// holidays the trip spans, a substitute day under the name of the holiday
-// it stands in for.
-export function leaveFor(depart, ret, holidays) {
+// The leave a trip takes: the workdays from departure to return that are
+// not public holidays, both ends included as whole days, except that the
+// return day takes none when the flight back lands before noon
+// (`morningArrival`), since there is still time to go to work. Also gives
+// the holidays the trip spans, a substitute day under the name of the
+// holiday it stands in for.
+export function leaveFor(depart, ret, holidays, { morningArrival = false } = {}) {
   const named = holidayDays(holidays);
   let leave = 0;
   const names = [];
-  for (let day = dayNumber(depart), last = dayNumber(ret); day <= last; day++) {
+  const last = dayNumber(ret);
+  for (let day = dayNumber(depart); day <= last; day++) {
     const name = named.get(day);
     if (name) {
       const shown = name.replace(/ 대체공휴일$/, '');
       if (!names.includes(shown)) names.push(shown);
-    } else if (weekday(day) !== 0 && weekday(day) !== 6) {
+    } else if (WORKDAYS.has(weekday(day)) && !(day === last && morningArrival)) {
       leave++;
     }
   }
@@ -239,12 +246,12 @@ export function recommend({ routes, fares, holidays, today }, filter) {
   const out = [];
   for (const [key, trip] of trips) {
     const fare = cheapest.get(key) || null;
-    const { leave, holidays: names } = leaveFor(trip.depart, trip.return, holidays);
+    const marks = marksFor(byId.get(trip.route), fare);
+    const { leave, holidays: names } = leaveFor(trip.depart, trip.return, holidays, marks);
     if (filter.maxLeave != null && leave > filter.maxLeave) continue;
     if (filter.maxPrice != null && !(fare && fare.price <= filter.maxPrice)) continue;
     out.push({
-      ...trip, fare, airline: fare ? airlineOf(fare) : 'KE', leave, holidays: names,
-      ...marksFor(byId.get(trip.route), fare),
+      ...trip, fare, airline: fare ? airlineOf(fare) : 'KE', leave, holidays: names, ...marks,
     });
   }
   return out.sort(byFareThenDate);
