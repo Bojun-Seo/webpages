@@ -96,6 +96,20 @@
       ]
     },
     {
+      "id": "GMP-NGO",
+      "origin": "GMP",
+      "dest": "NGO",
+      "city": "나고야",
+      "region": "주부 · 아이치현",
+      "about": "나고야성과 지브리 파크, 다카야마로 가는 길",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 피치항공이 하루 2회 운항하며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "핀테크타임스 (피치항공 김포 노선)", "url": "https://fintechtimes.co.kr/mobile/article.html?no=51302" },
+        { "title": "피치항공 2026 동계 운임표", "url": "https://www.flypeach.com/application/files/6517/8408/0957/KR_FareList_Internatinal_26WAs_of_16Jul26.pdf" }
+      ]
+    },
+    {
       "id": "ICN-FUK",
       "origin": "ICN",
       "dest": "FUK",
@@ -329,6 +343,25 @@
       ]
     },
     {
+      "id": "ICN-UKB",
+      "origin": "ICN",
+      "dest": "UKB",
+      "city": "고베",
+      "region": "간사이 · 효고현",
+      "about": "기타노 이진칸과 고베규, 아리마 온천",
+      "tag": "전세편",
+      "periods": [
+        { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
+        { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
+      ],
+      "note": "고베공항은 아직 정기 국제선을 받지 않아 정기성 전세편으로 운항하지만, 항공권은 다른 노선처럼 항공사에서 팝니다. 대한항공은 하루 2회 매일 운항하고 12월 17일 아시아나항공 통합 뒤에는 주 21회가 되며, 트리니티(티웨이)도 12월 18일부터 매일 운항합니다.",
+      "sources": [
+        { "title": "Aviation Wire (2026-09-07)", "url": "https://www.aviationwire.jp/archives/350200" },
+        { "title": "Aviation Wire (2026-08-03)", "url": "https://www.aviationwire.jp/archives/348310" },
+        { "title": "헤럴드경제 (트리니티 고베 취항)", "url": "https://biz.heraldcorp.com/article/10875830" }
+      ]
+    },
+    {
       "id": "ICN-HKD",
       "origin": "ICN",
       "dest": "HKD",
@@ -384,6 +417,90 @@
       ]
     },
     {
+      "id": "ICN-FSZ",
+      "origin": "ICN",
+      "dest": "FSZ",
+      "city": "시즈오카",
+      "region": "주부 · 시즈오카현",
+      "about": "후지산 조망과 녹차 밭, 이즈 반도 온천",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 제주항공이 하계에 하루 2회 운항했고 동계 일정은 확인하지 못했으며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "후지산 시즈오카 공항 서울 노선", "url": "https://www.mtfuji-shizuokaairport.jp/timetable/public/information/routedetail/international/18" },
+        { "title": "시즈오카현 공항 이용 현황 (2026-07)", "url": "https://www.pref.shizuoka.jp/_res/projects/default_project/_page_/001/085/031/0828airportshinkou.pdf" }
+      ]
+    },
+    {
+      "id": "ICN-TKS",
+      "origin": "ICN",
+      "dest": "TKS",
+      "city": "도쿠시마",
+      "region": "시코쿠 · 도쿠시마현",
+      "about": "나루토 소용돌이와 이야 계곡",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 이스타항공이 주 3회 운항하며, 2027년 1월 이후 항공권은 아직 팔지 않는다는 보도가 있습니다. 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "도쿠시마현 국제선 안내", "url": "https://www.pref.tokushima.lg.jp/ippannokata/kyoiku/kanko/7245532/" },
+        { "title": "네이트 뉴스 (2026-09-16)", "url": "https://m.news.nate.com/view/20260916n33757" }
+      ]
+    },
+    {
+      "id": "ICN-KKJ",
+      "origin": "ICN",
+      "dest": "KKJ",
+      "city": "기타큐슈",
+      "region": "규슈 · 후쿠오카현",
+      "about": "모지코 레트로와 고쿠라성",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 진에어가 매일 운항하고 대한항공은 공동운항으로 팔기만 하며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "기타큐슈 공항 시간표", "url": "https://www.kitakyu-air.jp/rev-boarding/timetable.php" },
+        { "title": "AeroRoutes (Jin Air NW26)", "url": "https://www.aeroroutes.com/eng/260630-ljnw26int" }
+      ]
+    },
+    {
+      "id": "ICN-HSG",
+      "origin": "ICN",
+      "dest": "HSG",
+      "city": "사가",
+      "region": "규슈 · 사가현",
+      "about": "유토쿠 이나리 신사와 다케오·우레시노 온천",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 트리니티(티웨이)가 주 4회(월·수·금·일) 운항하며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "사가TV (2026-09-10)", "url": "https://www.sagatv.co.jp/news/archives/2026091024387" },
+        { "title": "한국경제 (2026-03-20)", "url": "https://www.hankyung.com/article/202603204189g" }
+      ]
+    },
+    {
+      "id": "ICN-SHI",
+      "origin": "ICN",
+      "dest": "SHI",
+      "city": "미야코지마",
+      "region": "오키나와현 · 미야코 제도",
+      "about": "요나하마에하마 해변과 이라부 대교",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 진에어가 시모지시마 공항으로 매일 운항하며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "헤럴드경제 (2026-05-31)", "url": "https://www.heraldk.com/article/2026053118062569310" },
+        { "title": "sky-budget (2026-02-15)", "url": "https://sky-budget.com/2026/02/15/jin-air-increase-shi-icn/" }
+      ]
+    },
+    {
+      "id": "ICN-ISG",
+      "origin": "ICN",
+      "dest": "ISG",
+      "city": "이시가키",
+      "region": "오키나와현 · 야에야마 제도",
+      "about": "가비라만과 다케토미섬으로 가는 길",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 진에어가 단독 운항하고 동계 운항 횟수는 확인하지 못했으며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "TRAICY (2026-02-03)", "url": "https://www.traicy.com/posts/20260203362198/" },
+        { "title": "이시가키 공항 취항 노선", "url": "https://www.ishigaki-airport.co.jp/fly/network/index.html" }
+      ]
+    },
+    {
       "id": "ICN-TPE",
       "origin": "ICN",
       "dest": "TPE",
@@ -395,10 +512,11 @@
         { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
         { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
       ],
-      "note": "대한항공 노선 페이지에 2026년 10월 운임이 있습니다. 10월 25일부터의 동계 일정은 아직 확인하지 못해, 하계처럼 매일 운항한다고 보고 넣었습니다.",
+      "note": "동계(10월 25일부터)에도 하루 2회 이상 운항합니다.",
       "sources": [
         { "title": "대한항공 서울-타이베이 노선", "url": "https://www.koreanair.com/flights/en/flights-from-seoul-to-taipei" },
-        { "title": "FlightConnections 인천-타이베이", "url": "https://www.flightconnections.com/flights-from-icn-to-tpe" }
+        { "title": "FlightConnections 인천-타이베이", "url": "https://www.flightconnections.com/flights-from-icn-to-tpe" },
+        { "title": "AeroRoutes (Korean Air NW26 타이베이)", "url": "https://www.aeroroutes.com/eng/260902-kenw26tpe" }
       ]
     },
     {
@@ -417,6 +535,26 @@
       ]
     },
     {
+      "id": "ICN-RMQ",
+      "origin": "ICN",
+      "dest": "RMQ",
+      "city": "타이중",
+      "region": "대만 · 중부",
+      "about": "펑지아 야시장과 무지개 마을, 가오메이 습지",
+      "tag": "운항 재개",
+      "utcOffset": 8,
+      "periods": [
+        { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
+      ],
+      "note": "대한항공은 10월 25일부터 매일 운항을 재개합니다. 끝나는 날은 발표되지 않아 동계가 끝날 때까지 운항한다고 보고 넣었습니다. 진에어(하루 2회)와 트리니티(티웨이)도 매일 운항합니다.",
+      "aircraft": "A220-300",
+      "sources": [
+        { "title": "udn (대한항공 타이중 운항 재개)", "url": "https://udn.com/news/story/124378/9630970" },
+        { "title": "AeroRoutes (Jin Air NS26 서울-타이중)", "url": "https://www.aeroroutes.com/eng/260128-ljns26rmq" },
+        { "title": "AeroRoutes (T'way NW26 대만)", "url": "https://www.aeroroutes.com/eng/260612-twnw26tw" }
+      ]
+    },
+    {
       "id": "ICN-KHH",
       "origin": "ICN",
       "dest": "KHH",
@@ -425,9 +563,25 @@
       "about": "보얼 예술특구와 렌츠탄, 컨딩으로 가는 길",
       "utcOffset": 8,
       "periods": [],
-      "note": "대한항공 노선이 아닙니다. 트리니티(티웨이) 등이 운항한다는 자료를 찾았으며, 운임이 확인된 일정만 나옵니다.",
+      "note": "대한항공 노선이 아닙니다. 트리니티(티웨이)가 매일 운항하고 중화항공·에바항공도 운항하며, 운임이 확인된 일정만 나옵니다.",
       "sources": [
-        { "title": "트래블데일리 (티웨이 김포-송산·가오슝)", "url": "https://www.traveldaily.co.kr/news/articleView.html?idxno=70998" }
+        { "title": "트래블데일리 (티웨이 김포-송산·가오슝)", "url": "https://www.traveldaily.co.kr/news/articleView.html?idxno=70998" },
+        { "title": "ciaotw (가오슝-인천 항공편)", "url": "https://ciaotw.com/flight/route/%E9%AB%98%E9%9B%84-%E9%A6%96%E7%88%BE%E4%BB%81%E5%B7%9D/" }
+      ]
+    },
+    {
+      "id": "GMP-KHH",
+      "origin": "GMP",
+      "dest": "KHH",
+      "city": "가오슝",
+      "region": "대만 · 남부",
+      "about": "보얼 예술특구와 렌츠탄, 컨딩으로 가는 길",
+      "utcOffset": 8,
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 트리니티(티웨이)가 주 4회 운항하고 타이거에어 타이완·제주항공 등도 운항하며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "헤럴드경제 (2026-05-20)", "url": "https://www.heraldk.com/article/2026052015582665078" },
+        { "title": "AeroRoutes (제주항공 김포-가오슝 재개)", "url": "https://www.aeroroutes.com/eng/250530-7c2h25gmpkhh" }
       ]
     },
     {

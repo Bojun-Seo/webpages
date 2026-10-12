@@ -2,11 +2,12 @@
 
 A static page that recommends nonstop round trips from Seoul Incheon and Gimpo to Japan, Taiwan,
 Hong Kong and Macau: Tokyo, Osaka, Fukuoka and the other main Japanese cities, regional airports
-such as Oita, Hiroshima and Aomori, Taipei, Kaohsiung, Hong Kong and Macau. It knows the days Korean
-Air flies each route and lists the round trips that schedule allows; other airlines' trips come from
-the fares known for them. It counts the days of leave each trip takes against a Monday, Tuesday and
-Thursday work week and Korean public holidays, and puts the trips that take the least leave first,
-then those with a known fare, cheapest first. GitHub Pages serves it; there is no server.
+such as Oita, Hiroshima and Aomori, Taipei, Taichung, Kaohsiung, Hong Kong and Macau. It knows the
+days Korean Air flies each route and lists the round trips that schedule allows; other airlines'
+trips come from the fares known for them. It counts the days of leave each trip takes against a
+Monday, Tuesday and Thursday work week and Korean public holidays, and puts the trips that take the
+least leave first, then those with a known fare, cheapest first. GitHub Pages serves it; there is no
+server.
 
 The page is in Korean. It is not affiliated with any airline.
 
@@ -91,8 +92,8 @@ a route whose days are not known yet.
    demand. The [top-level README](../README.md#publishing) says how the site is put together.
 3. For live fares, sign up at [Travelpayouts](https://www.travelpayouts.com/), copy the API token
    from its developer settings, and add it as the repository secret `TRAVELPAYOUTS_TOKEN`
-   (**Settings → Secrets and variables → Actions**). The fetch makes about 350 queries, a little
-   over a second apart, so it adds about seven minutes to a deploy. A failed fetch does not stop
+   (**Settings → Secrets and variables → Actions**). The fetch makes about 470 queries, a little
+   over a second apart, so it adds about ten minutes to a deploy. A failed fetch does not stop
    the page from publishing.
 
 ## Update the data
@@ -148,13 +149,23 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   season; for the others the page assumes the summer's daily service goes on, and their cards say
   so. Their flight times are not listed, since only summer times could be found, so they get
   neither 저녁 출발 nor 오전 도착.
-- Hakodate, Takamatsu, Matsuyama and Yonago, which Korean Air does not fly, were added on 12 October
-  2026 for the fares of the airlines that do; Yonago's only source is a summary of routes. Other
-  destinations only other airlines fly are not listed yet, so their fares are not fetched.
-- Taipei Taoyuan and Hong Kong were added on 12 October 2026 as flying daily on Korean Air, whose
-  route pages had October fares; their winter season is assumed, and their cards say so. Taipei
-  Songshan, Kaohsiung and Macau come through fares only: Korean Air does not fly the first two, and
-  its daily Macau service from July 2024 was not confirmed for 2026.
+- Hakodate, Takamatsu, Matsuyama, Yonago, Shizuoka, Tokushima, Kitakyushu, Saga, Miyakojima and
+  Ishigaki, which Korean Air does not fly, and Gimpo–Nagoya, which only Peach flies, were added on
+  12 October 2026 for the fares of the airlines that do; Yonago's only source is a summary of
+  routes.
+- Kobe takes international flights only as charters until it opens to scheduled ones, but Korean Air
+  flies there twice a day to a timetable and sells the seats like any other route's, so it is listed
+  with Korean Air's days and marked 전세편.
+- Taipei Taoyuan, Taichung and Hong Kong fly daily on Korean Air. Taoyuan's winter flights are on
+  file; Taichung's daily service returns on 25 October 2026 with no end date given, so the page
+  assumes it lasts the season; Hong Kong's winter season is assumed. Their cards say so. Taipei
+  Songshan, Kaohsiung (from Incheon and from Gimpo) and Macau come through fares only: Korean Air
+  does not fly the first two, and its daily Macau service from July 2024 was not confirmed for 2026.
+- On 12 October 2026 the routes were checked against press reports, airline filings and airport
+  pages for every Japanese and Taiwanese airport with scheduled flights from Incheon or Gimpo.
+  Routes flown only by charter, such as Toyama, Ube and Kushiro, and routes from other Korean
+  airports are left out. Many of those sources could be read only as search-result excerpts, so the
+  frequencies on the cards are worth checking before booking.
 - Gimpo–Haneda was added on 12 October 2026 as flying daily; for Gimpo–Kansai only Asiana's daily
   winter service was found, so Korean Air's days are not given and the route comes only through
   fares.
