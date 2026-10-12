@@ -9,13 +9,13 @@ import {
 const PAGE_SIZE = 30;
 const NIGHTS = { '1-2': [1, 2], '2-3': [2, 3], '3-4': [3, 4], '4-5': [4, 5], any: [1, 6] };
 
-// Names for the airlines that fly between Korea and Japan; any other shows
-// its code.
+// Names for the airlines that fly these routes; any other shows its code.
 const AIRLINE_NAMES = {
   KE: '대한항공', OZ: '아시아나항공', '7C': '제주항공', LJ: '진에어', TW: '트리니티(티웨이)',
   BX: '에어부산', RS: '에어서울', ZE: '이스타항공', RF: '에어로케이', YP: '에어프레미아', WE: '파라타항공',
   JL: '일본항공', NH: 'ANA', NQ: '에어재팬', MM: '피치항공', ZG: 'ZIPAIR', IJ: '스프링재팬',
-  GK: '젯스타재팬', ET: '에티오피아항공',
+  GK: '젯스타재팬', ET: '에티오피아항공', BR: '에바항공', CI: '중화항공', JX: '스타럭스항공',
+  IT: '타이거에어 타이완', CX: '캐세이퍼시픽', UO: '홍콩익스프레스', HX: '홍콩항공', NX: '에어마카오',
 };
 
 function airlineName(code) {
@@ -198,7 +198,7 @@ function renderChips(box, allLabel, picked, options) {
     })));
 }
 
-// One chip per Japanese airport, whichever Korean airport its routes leave.
+// One chip per destination airport, whichever Korean airport its routes leave.
 function renderCities() {
   const airports = new Map();
   for (const route of state.data.routes) {

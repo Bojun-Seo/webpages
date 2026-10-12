@@ -32,6 +32,7 @@ test('every route has the fields the page reads', () => {
       assert.ok(p.days === 'daily' || p.days.every((d) => /^(mon|tue|wed|thu|fri|sat|sun)$/.test(d)));
     }
     if (r.periods.length === 0) assert.ok(r.note, `${r.id} needs a note saying why it has no days`);
+    if ('utcOffset' in r) assert.ok(Number.isInteger(r.utcOffset) && r.utcOffset !== 9, r.id);
     for (const flight of r.flights ? [r.flights.out, r.flights.back] : []) {
       assert.match(flight.departs, /^([01]\d|2[0-3]):[0-5]\d$/, r.id);
       assert.match(flight.arrives, /^([01]\d|2[0-3]):[0-5]\d$/, r.id);

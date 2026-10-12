@@ -382,6 +382,86 @@
       "sources": [
         { "title": "삼진트래블 2026 한일 직항 정리", "url": "https://samjintravel.com/korea-japan-direct-flights-2026/" }
       ]
+    },
+    {
+      "id": "ICN-TPE",
+      "origin": "ICN",
+      "dest": "TPE",
+      "city": "타이베이 타오위안",
+      "region": "대만 · 북부",
+      "about": "타이베이 101과 지우펀, 스펀 천등",
+      "utcOffset": 8,
+      "periods": [
+        { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
+        { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
+      ],
+      "note": "대한항공 노선 페이지에 2026년 10월 운임이 있습니다. 10월 25일부터의 동계 일정은 아직 확인하지 못해, 하계처럼 매일 운항한다고 보고 넣었습니다.",
+      "sources": [
+        { "title": "대한항공 서울-타이베이 노선", "url": "https://www.koreanair.com/flights/en/flights-from-seoul-to-taipei" },
+        { "title": "FlightConnections 인천-타이베이", "url": "https://www.flightconnections.com/flights-from-icn-to-tpe" }
+      ]
+    },
+    {
+      "id": "GMP-TSA",
+      "origin": "GMP",
+      "dest": "TSA",
+      "city": "타이베이 쑹산",
+      "region": "대만 · 타이베이 시내",
+      "about": "시내 한가운데 있어 도심이 가까운 공항",
+      "utcOffset": 8,
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 트리니티(티웨이)·이스타항공·에바항공·중화항공이 운항하며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "트래블데일리 (티웨이 김포-송산·가오슝)", "url": "https://www.traveldaily.co.kr/news/articleView.html?idxno=70998" },
+        { "title": "KAYAK 김포-쑹산", "url": "https://www.kayak.co.kr/%ED%95%AD%EA%B3%B5%EA%B6%8C/%EC%84%9C%EC%9A%B8-%EA%B9%80%ED%8F%AC%EA%B5%AD%EC%A0%9C%EA%B3%B5%ED%95%AD-GMP/%ED%83%80%EC%9D%B4%EB%B2%A0%EC%9D%B4-%EC%91%B9%EC%82%B0%EA%B3%B5%ED%95%AD-TSA" }
+      ]
+    },
+    {
+      "id": "ICN-KHH",
+      "origin": "ICN",
+      "dest": "KHH",
+      "city": "가오슝",
+      "region": "대만 · 남부",
+      "about": "보얼 예술특구와 렌츠탄, 컨딩으로 가는 길",
+      "utcOffset": 8,
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 트리니티(티웨이) 등이 운항한다는 자료를 찾았으며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "트래블데일리 (티웨이 김포-송산·가오슝)", "url": "https://www.traveldaily.co.kr/news/articleView.html?idxno=70998" }
+      ]
+    },
+    {
+      "id": "ICN-HKG",
+      "origin": "ICN",
+      "dest": "HKG",
+      "city": "홍콩",
+      "region": "홍콩",
+      "about": "빅토리아 하버 야경과 딤섬",
+      "utcOffset": 8,
+      "periods": [
+        { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
+        { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
+      ],
+      "note": "하루 4회 운항한다는 자료가 있습니다. 10월 25일부터의 동계 일정은 아직 확인하지 못해, 하계처럼 매일 운항한다고 보고 넣었습니다.",
+      "sources": [
+        { "title": "대한항공 서울-홍콩 노선", "url": "https://www.koreanair.com/flights/en/flights-from-seoul-to-hong-kong" },
+        { "title": "나무위키 인천-홍콩 항공노선", "url": "https://namu.wiki/w/%EC%9D%B8%EC%B2%9C-%ED%99%8D%EC%BD%A9%20%ED%95%AD%EA%B3%B5%EB%85%B8%EC%84%A0" }
+      ]
+    },
+    {
+      "id": "ICN-MFM",
+      "origin": "ICN",
+      "dest": "MFM",
+      "city": "마카오",
+      "region": "마카오",
+      "about": "세나도 광장과 성 바울 성당 유적",
+      "utcOffset": 8,
+      "periods": [],
+      "note": "대한항공은 2024년 7월부터 매일 운항했지만 2026년 일정은 확인하지 못했습니다. 에어마카오·제주항공 등 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "대한항공 뉴스룸 (2024, 인천~마카오 매일 운항)", "url": "https://news.koreanair.com/%EB%8C%80%ED%95%9C%ED%95%AD%EA%B3%B5-%EC%9D%B8%EC%B2%9C%EB%A7%88%EC%B9%B4%EC%98%A4-%EB%85%B8%EC%84%A0-%EB%9C%AC%EB%8B%A4-7%EC%9B%94-1%EC%9D%BC%EB%B6%80%ED%84%B0-%EB%A7%A4%EC%9D%BC-%EC%9A%B4/" },
+        { "title": "KAYAK 인천-마카오", "url": "https://www.kayak.com/flight-routes/Seoul-Incheon-Intl-ICN/Macau-MFM" }
+      ]
     }
   ]
 }
