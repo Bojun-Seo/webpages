@@ -49,17 +49,9 @@
         <span>예산 (만원)</span>
         <input id="budget" type="number" inputmode="numeric" min="0" step="1" placeholder="제한 없음">
       </label>
-      <label class="field">
-        <span>정렬</span>
-        <select id="sort">
-          <option value="best">추천순</option>
-          <option value="leave">연차 적은 순</option>
-          <option value="date">날짜순</option>
-        </select>
-      </label>
     </div>
     <div class="cities" id="cities" role="group" aria-label="도시"></div>
-    <p class="fine">예산을 넣으면 가격이 확인된 일정만 남습니다. 추천순은 확인된 운임이 싼 일정을 먼저, 그다음 연차가 적고 오래 머무는 일정을 보여 줍니다.</p>
+    <p class="fine">예산을 넣으면 가격이 확인된 일정만 남습니다. 일정은 출발일이 가까운 순서로 보여 줍니다.</p>
   </form>
 
   <section class="trips" aria-labelledby="trips-title">

@@ -78,9 +78,9 @@ test('the 2027 holidays leave 119 days off in a five-day week, as the official c
   assert.equal(off, 119);
 });
 
-const december = { from: '2026-12-01', to: '2026-12-31', minNights: 2, maxNights: 3, sort: 'best' };
+const december = { from: '2026-12-01', to: '2026-12-31', minNights: 2, maxNights: 3 };
 
-test('a known fare ranks first and the cheapest one for the dates is kept', () => {
+test('trips come soonest first, and the cheapest fare for the dates is kept', () => {
   const fares = [
     { route: 'ICN-AOJ', depart: '2026-12-01', return: '2026-12-03', price: 310000, seen: today },
     { route: 'ICN-AOJ', depart: '2026-12-01', return: '2026-12-03', price: 290000, seen: today },
@@ -88,30 +88,23 @@ test('a known fare ranks first and the cheapest one for the dates is kept', () =
     { route: 'ICN-XXX', depart: '2026-12-02', return: '2026-12-04', price: 80000, seen: today },
   ];
   const trips = recommend({ routes, fares, holidays, today }, december);
+  assert.ok(trips.length > 0);
+  for (let i = 1; i < trips.length; i++) {
+    const [a, b] = [trips[i - 1], trips[i]];
+    assert.ok(a.depart < b.depart || (a.depart === b.depart && a.nights <= b.nights),
+      `${a.route} ${a.depart} ${a.nights} before ${b.route} ${b.depart} ${b.nights}`);
+  }
+  // Nagasaki and Niigata also fly 1 to 3 December; the trip with a fare leads the day.
   assert.equal(trips[0].route, 'ICN-AOJ');
   assert.equal(trips[0].fare.price, 290000);
   assert.equal(trips.filter((t) => t.fare).length, 1);
-  // Then the Christmas weekend, which takes no leave.
-  assert.equal(trips[1].leave, 0);
-  assert.equal(trips[1].depart, '2026-12-25');
-  assert.deepEqual(trips[1].holidays, ['성탄절']);
-});
-
-test('without fares the trips that take the least leave come first', () => {
-  const trips = recommend({ routes, fares: [], holidays, today }, december);
-  assert.ok(trips.length > 0);
-  for (let i = 1; i < trips.length; i++) {
-    assert.ok(trips[i - 1].leave <= trips[i].leave, `${trips[i - 1].depart} before ${trips[i].depart}`);
-  }
-  assert.ok(trips.every((t) => t.fare === null));
 });
 
 test('a fare brings in a trip on a route whose days are not known', () => {
   const fares = [{ route: 'ICN-KMQ', depart: '2026-11-20', return: '2026-11-22', price: 250000, seen: today }];
-  const filter = { from: '2026-11-01', to: '2026-11-30', minNights: 1, maxNights: 6, sort: 'best' };
+  const filter = { from: '2026-11-01', to: '2026-11-30', minNights: 1, maxNights: 6 };
   const trips = recommend({ routes, fares, holidays, today }, filter);
   assert.deepEqual(trips.filter((t) => t.route === 'ICN-KMQ').map((t) => t.depart), ['2026-11-20']);
-  assert.equal(trips[0].route, 'ICN-KMQ');
 });
 
 test('filters on city, leave and budget', () => {
@@ -127,7 +120,7 @@ test('filters on city, leave and budget', () => {
 });
 
 test('the trips that already left are not offered', () => {
-  const filter = { from: '2026-10-01', to: '2026-10-31', minNights: 2, maxNights: 2, sort: 'date' };
+  const filter = { from: '2026-10-01', to: '2026-10-31', minNights: 2, maxNights: 2 };
   const trips = recommend({ routes, fares: [], holidays, today }, filter);
   assert.ok(trips.length > 0);
   assert.ok(trips.every((t) => t.depart >= today));

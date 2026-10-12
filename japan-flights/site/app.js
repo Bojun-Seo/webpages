@@ -83,7 +83,6 @@ function readFilter() {
     maxLeave: leave === 'any' ? null : Number(leave),
     maxPrice: budget > 0 ? budget * 10000 : null,
     cities: state.cities.size ? state.cities : null,
-    sort: $('sort').value,
   };
 }
 
@@ -122,8 +121,7 @@ function renderTrips() {
     : '';
   const hint = $('hint');
   hint.hidden = data.fareCount > 0 || trips.length === 0;
-  hint.textContent = '아직 확인된 운임이 없어 연차가 적게 드는 일정부터 보여 줍니다. '
-    + '일정마다 있는 링크로 실시간 가격을 확인하세요.';
+  hint.textContent = '아직 확인된 운임이 없습니다. 일정마다 있는 링크로 실시간 가격을 확인하세요.';
 
   const list = $('trips');
   list.replaceChildren(...trips.slice(0, state.shown).map(tripRow));
@@ -223,7 +221,7 @@ async function main() {
     el('option', { value: 'all' }, '전체 기간'),
     ...state.data.months.map((m) => el('option', { value: m }, monthLabel(m))));
 
-  for (const id of ['month', 'nights', 'leave', 'sort']) $(id).addEventListener('change', update);
+  for (const id of ['month', 'nights', 'leave']) $(id).addEventListener('change', update);
   $('budget').addEventListener('input', update);
   $('filters').addEventListener('submit', (event) => event.preventDefault());
   $('more').addEventListener('click', () => {
