@@ -74,10 +74,7 @@ export function pickFares(response, route, seen) {
   if (!response || response.success === false || !Array.isArray(response.data)) return [];
   const abroad = route.utcOffset ?? KOREA;
   return response.data
-    .filter((t) => t.airline && (t.transfers || 0) <= 1 && (t.return_transfers || 0) <= 1
-      && t.departure_at && t.return_at && t.price > 0
-      && (!t.origin_airport || t.origin_airport === route.origin)
-      && (!t.destination_airport || t.destination_airport === route.dest))
+    .filter((t) => !leftOut(t, route))
     .map((t) => {
       const bags = checkedBags(t.link);
       const fare = {
@@ -104,6 +101,35 @@ export function pickFares(response, route, seen) {
       }
       return fare;
     });
+}
+
+// Why a ticket in an answer for `route` does not count, for the log: it
+// lacks what a fare needs, connects more than once a way, or flies between
+// other airports. Null for a ticket that counts.
+export function leftOut(t, route) {
+  if (!t.airline || !t.departure_at || !t.return_at || !(t.price > 0)) return 'incomplete';
+  if ((t.transfers || 0) > 1 || (t.return_transfers || 0) > 1) return 'connections';
+  if ((t.origin_airport && t.origin_airport !== route.origin)
+    || (t.destination_airport && t.destination_airport !== route.dest)) {
+    return `${t.origin_airport || route.origin}-${t.destination_airport || route.dest}`;
+  }
+  return null;
+}
+
+// What became of the tickets in the answers for one route, for the log:
+// "312 tickets: 150 between other airports (ICN-NRT 140), 40 connecting
+// more than once, 100 not of 2 to 6 nights, 22 landing late".
+function ticketTally(counts) {
+  const others = Object.entries(counts.others).sort((a, b) => b[1] - a[1]);
+  const parts = [
+    others.length && `${others.reduce((n, [, k]) => n + k, 0)} between other airports `
+      + `(${others.slice(0, 3).map(([pair, k]) => `${pair} ${k}`).join(', ')})`,
+    counts.connections && `${counts.connections} connecting more than once`,
+    counts.incomplete && `${counts.incomplete} incomplete`,
+    counts.nights && `${counts.nights} not of ${TRIP_NIGHTS[0]} to ${TRIP_NIGHTS.at(-1)} nights`,
+    counts.late && `${counts.late} landing late`,
+  ].filter(Boolean);
+  return `${counts.tickets} tickets${parts.length ? `: ${parts.join(', ')}` : ''}`;
 }
 
 // The fares the page could offer: the cheapest for each route, pair of
@@ -202,6 +228,7 @@ async function main(argv) {
   let shown = false;
   for (const route of routes) {
     const before = fares.length;
+    const counts = { tickets: 0, others: {}, connections: 0, incomplete: 0, nights: 0, late: 0 };
     for (const out of months) {
       // Ask for returns in the same month and the next, so a trip over a
       // month's end (New Year's) is not missed.
@@ -213,12 +240,21 @@ async function main(argv) {
             console.log(`Ticket fields: ${Object.keys(response.data[0]).join(', ')}`);
             shown = true;
           }
+          if (response?.success === false) {
+            console.warn(`${route.id} ${out}/${back}: ${response.error || 'the answer says it failed'}`);
+          }
           if (response?.data?.length >= LIMIT) {
             console.warn(`${route.id} ${out}/${back}: the answer reached the limit of ${LIMIT} tickets`);
           }
+          for (const t of Array.isArray(response?.data) ? response.data : []) {
+            counts.tickets++;
+            const why = leftOut(t, route);
+            if (why && why.includes('-')) counts.others[why] = (counts.others[why] || 0) + 1;
+            else if (why) counts[why]++;
+          }
           for (const fare of pickFares(response, route, seen)) {
-            if (!TRIP_NIGHTS.includes(daysBetween(fare.depart, fare.return))) continue;
-            if (landsLate(route, fare)) late++;
+            if (!TRIP_NIGHTS.includes(daysBetween(fare.depart, fare.return))) counts.nights++;
+            else if (landsLate(route, fare)) counts.late++;
             else fares.push(fare);
           }
           ok++;
@@ -228,7 +264,8 @@ async function main(argv) {
         }
       }
     }
-    console.log(`${route.id}: ${tally(fares.slice(before))}`);
+    console.log(`${route.id}: ${tally(fares.slice(before))} from ${ticketTally(counts)}`);
+    late += counts.late;
   }
 
   fares = keepCheapest(fares);
