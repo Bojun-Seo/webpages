@@ -131,15 +131,16 @@ Schedules change every season (late March and late October). Everything is in `s
   AeroSpace Administration publishes each June. A substitute holiday is named after the holiday it
   stands in for.
 - `baggage.json`: what a checked bag bought in advance costs one way, in won, for a bag a fare does
-  not include. `airlines` gives an airline's own `fee`, with the `kg` it buys, its `source` and
-  `approx` when the fee is converted or otherwise rough; `usual` gives the fee to each destination
-  country (`country` in `routes.json`) for the airlines without one, always shown as approximate.
-  `included` names the airlines whose economy fares always include a checked bag on these routes,
-  Korean Air, Asiana, JAL, ANA and Ethiopian, so that the few fares of theirs Aviasales marks
-  without one get no fee. The page counts one bag for each person on their fares, and since the
-  usual fee is a low-cost airline's, shows a bag beyond that as 요금 미확인 (fee not known) and adds
-  nothing for it. Add an airline when the deploy log names it among the fares without a checked
-  bag.
+  not include. `airlines` gives an airline's own `fee`, one for all its routes or one for each
+  destination country (`{ "JP": 35000, "TW": 45000 }`), with the `kg` it buys, its `source` and
+  `approx` when the fee is converted or otherwise rough; a country it gives none for, and an airline
+  without one, take the `usual` fee to that country (`country` in `routes.json`), always shown as
+  approximate. `included` names the airlines whose economy fares always include a checked bag on
+  these routes, Korean Air, Asiana, JAL, ANA and Ethiopian, so that the few fares of theirs
+  Aviasales marks without one get no fee. The page counts one bag for each person on their fares,
+  and since the usual fee is a low-cost airline's, shows a bag beyond that as 요금 미확인 (fee not known)
+  and adds nothing for it. Add an airline when the deploy log counts fares of its without a checked
+  bag, the first of its three numbers there.
 - `fares.json`: see above.
 
 The tests check that every route has the fields the page reads and that the 2027 holidays add up

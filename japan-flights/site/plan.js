@@ -166,12 +166,13 @@ export const DEFAULT_PARTY = { people: 1, bags: 1 };
 
 // What `party`, its `people` checking `bags` bags between them, pays for
 // the bags `fare` on `route` does not include (`count`), each both ways:
-// twice the one-way fee baggage.json gives the airline, or failing that the
-// usual fee to the destination's country, which is a guess and so `approx`,
-// as an airline's own fee may also be. The usual fee is a low-cost
-// airline's, so it is not used for one that always includes a bag; the fee
-// is `unknown` then, and when baggage.json gives neither. `included` is the
-// bags the fare includes for each person.
+// twice the one-way fee baggage.json gives the airline, for all its routes
+// or for the destination's country, or failing that the usual fee to that
+// country, which is a guess and so `approx`, as an airline's own fee may
+// also be. The usual fee is a low-cost airline's, so it is not used for one
+// that always includes a bag; the fee is `unknown` then, and when
+// baggage.json gives neither. `included` is the bags the fare includes for
+// each person.
 export function bagFee(fare, route, baggage, party = DEFAULT_PARTY) {
   const included = fare ? bagsIncluded(fare, baggage) : 0;
   const count = fare ? Math.max(0, party.bags - party.people * included) : 0;
@@ -179,7 +180,8 @@ export function bagFee(fare, route, baggage, party = DEFAULT_PARTY) {
   if (count === 0) return fee;
   const airline = airlineOf(fare);
   const own = baggage && baggage.airlines && baggage.airlines[airline];
-  if (own) return { ...fee, amount: 2 * count * own.fee, approx: Boolean(own.approx) };
+  const ownFee = own && (typeof own.fee === 'object' ? own.fee[route.country] : own.fee);
+  if (ownFee) return { ...fee, amount: 2 * count * ownFee, approx: Boolean(own.approx) };
   const usual = !alwaysIncludesBag(airline, baggage) && baggage && baggage.usual
     && baggage.usual[route.country];
   if (usual) return { ...fee, amount: 2 * count * usual, approx: true };

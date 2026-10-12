@@ -242,11 +242,16 @@ test('each cabin with a fare gets its own trip, and the cabins picked narrow the
 
 test('baggage.json has a usual fee for every country flown to, and a fee with a source for each airline', () => {
   const baggage = data('baggage.json');
-  for (const r of routes) assert.ok(baggage.usual[r.country] > 0, r.id);
+  const countries = new Set(routes.map((r) => r.country));
+  for (const country of countries) assert.ok(baggage.usual[country] > 0, country);
   for (const code of baggage.included) assert.ok(/^[A-Z0-9]{2}$/.test(code) && !(code in baggage.airlines), code);
   for (const [code, airline] of Object.entries(baggage.airlines)) {
     assert.match(code, /^[A-Z0-9]{2}$/);
-    assert.ok(Number.isInteger(airline.fee) && airline.fee > 0 && airline.source.url, code);
+    const fees = typeof airline.fee === 'object' ? Object.entries(airline.fee) : [[null, airline.fee]];
+    assert.ok(fees.length > 0 && airline.source.url, code);
+    for (const [country, fee] of fees) {
+      assert.ok(Number.isInteger(fee) && fee > 0 && (country === null || countries.has(country)), `${code} ${country}`);
+    }
   }
 });
 
@@ -265,6 +270,11 @@ test('the bag fee follows the airline, then the country of the destination', () 
   assert.deepEqual(fee('MM', 'ICN-HND', 0), { amount: 90000, approx: true, unknown: false });
   assert.deepEqual(fee('IT', 'ICN-TPE', 0), { amount: 0, approx: false, unknown: true });
   assert.deepEqual(fee('IT', 'ICN-TPE', 0, null), { amount: 0, approx: false, unknown: true });
+  // An airline's fee can differ by country; a country it gives none for takes the usual fee.
+  const byCountry = { ...baggage, airlines: { '7C': { fee: { JP: 35000, HK: 50000 } } } };
+  assert.deepEqual(fee('7C', 'ICN-NRT', 0, byCountry), { amount: 70000, approx: false, unknown: false });
+  assert.deepEqual(fee('7C', 'ICN-HKG', 0, byCountry), { amount: 100000, approx: false, unknown: false });
+  assert.deepEqual(fee('7C', 'ICN-TPE', 0, { ...byCountry, usual: { TW: 59000 } }), { amount: 118000, approx: true, unknown: false });
 });
 
 test('a fare without a checked bag costs a bag each way, and the cheapest all in is offered', () => {
