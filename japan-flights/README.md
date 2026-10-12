@@ -4,8 +4,9 @@ A static page that recommends nonstop round trips from Seoul Incheon and Gimpo t
 Osaka, Fukuoka and the other main cities, and regional airports such as Oita, Hiroshima and Aomori.
 It knows the days Korean Air flies each route and lists the round trips that schedule allows; other
 airlines' trips come from the fares known for them. It counts the days of leave each trip takes
-against a Monday, Tuesday and Thursday work week and Korean public holidays, and puts trips with a
-known fare first, cheapest first. GitHub Pages serves it; there is no server.
+against a Monday, Tuesday and Thursday work week and Korean public holidays, and puts the trips that
+take the least leave first, then those with a known fare, cheapest first. GitHub Pages serves it;
+there is no server.
 
 The page is in Korean. It is not affiliated with any airline.
 
@@ -36,8 +37,9 @@ the page:
    without them from the route's flight times;
 4. attaches the cheapest known fare for the route and dates among the airlines picked, and names
    its airline;
-5. lists the trips with a known fare first, cheapest first, then the rest by departure date,
-   soonest first; on the same day, the shorter trip first.
+5. lists the trips that take the least leave first; among those, the trips with a known fare
+   first, cheapest first, then the rest by departure date, soonest first; on the same day, the
+   shorter trip first.
 
 Every trip links to Naver, Google Flights, Skyscanner and KAYAK searches with the route and dates
 filled in, for the live price; the KAYAK search asks for the trip's airline. Below the list, a card
