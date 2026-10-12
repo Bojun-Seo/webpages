@@ -126,24 +126,27 @@ test('each trip carries its Friday and flight time marks', () => {
   assert.deepEqual(marks('ICN-KIJ', '2026-12-21', '2026-12-23'), [false, true, true]);
 });
 
-test('trips come soonest first, and the cheapest fare for the dates is kept', () => {
+test('known fares come first, the cheapest first, then the soonest trips', () => {
   const fares = [
     { route: 'ICN-AOJ', depart: '2026-12-01', return: '2026-12-03', price: 310000, seen: today },
     { route: 'ICN-AOJ', depart: '2026-12-01', return: '2026-12-03', price: 290000, seen: today },
+    { route: 'ICN-OIT', depart: '2026-12-25', return: '2026-12-27', price: 250000, seen: today },
     { route: 'ICN-OIT', depart: '2026-10-01', return: '2026-10-03', price: 90000, seen: today },
     { route: 'ICN-XXX', depart: '2026-12-02', return: '2026-12-04', price: 80000, seen: today },
   ];
   const trips = recommend({ routes, fares, holidays, today }, december);
-  assert.ok(trips.length > 0);
-  for (let i = 1; i < trips.length; i++) {
-    const [a, b] = [trips[i - 1], trips[i]];
+  // The trip that has left and the unknown route's fare are dropped; the cheaper
+  // of the two Aomori fares is kept.
+  assert.deepEqual(trips.filter((t) => t.fare).map((t) => `${t.route} ${t.depart} ${t.fare.price}`),
+    ['ICN-OIT 2026-12-25 250000', 'ICN-AOJ 2026-12-01 290000']);
+  assert.deepEqual(trips.slice(0, 2).map((t) => t.route), ['ICN-OIT', 'ICN-AOJ']);
+  const rest = trips.slice(2);
+  assert.ok(rest.length > 0 && rest.every((t) => t.fare === null));
+  for (let i = 1; i < rest.length; i++) {
+    const [a, b] = [rest[i - 1], rest[i]];
     assert.ok(a.depart < b.depart || (a.depart === b.depart && a.nights <= b.nights),
       `${a.route} ${a.depart} ${a.nights} before ${b.route} ${b.depart} ${b.nights}`);
   }
-  // Nagasaki and Niigata also fly 1 to 3 December; the trip with a fare leads the day.
-  assert.equal(trips[0].route, 'ICN-AOJ');
-  assert.equal(trips[0].fare.price, 290000);
-  assert.equal(trips.filter((t) => t.fare).length, 1);
 });
 
 test('a fare brings in a trip on a route whose days are not known', () => {
