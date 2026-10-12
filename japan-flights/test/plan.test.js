@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  addDays, airlineOf, dayOf, fliesOn, flightMarks, flightTimes, leaveFor, monthsAhead, recommend,
-  roundTrips, searchLinks, timetableDays,
+  addDays, airlineOf, dayOf, fliesOn, flightMarks, leaveFor, monthsAhead, recommend, roundTrips,
+  searchLinks,
 } from '../site/plan.js';
 
 const data = (name) => JSON.parse(readFileSync(new URL(`../site/data/${name}`, import.meta.url)));
@@ -26,7 +26,7 @@ test('every route has the fields the page reads', () => {
     assert.equal(r.id, `${r.origin}-${r.dest}`);
     assert.ok(!ids.has(r.id), `${r.id} appears twice`);
     ids.add(r.id);
-    assert.ok(r.city && r.region && r.sources.length > 0, r.id);
+    assert.ok(r.city && r.sources.length > 0, r.id);
     for (const p of r.periods) {
       assert.ok(p.from <= p.to, `${r.id} ${p.from}`);
       assert.ok(p.days === 'daily' || p.days.every((d) => /^(mon|tue|wed|thu|fri|sat|sun)$/.test(d)));
@@ -41,15 +41,6 @@ test('every route has the fields the page reads', () => {
   }
 });
 
-test('a route card gives the flight times as the timetable writes them', () => {
-  assert.equal(flightTimes(route('ICN-HIJ')),
-    'KE2183 인천 10:35 → 히로시마 12:15 · KE2184 히로시마 13:25 → 인천 15:25');
-  assert.equal(flightTimes(route('ICN-OIT')), '인천 09:15 → 오이타 10:50 · 오이타 12:00 → 인천 13:45');
-  const gimpo = { ...route('GMP-HND'),
-    flights: { out: { departs: '08:00', arrives: '10:20' }, back: { departs: '11:30', arrives: '14:00' } } };
-  assert.equal(flightTimes(gimpo), '김포 08:00 → 도쿄 하네다 10:20 · 도쿄 하네다 11:30 → 김포 14:00');
-});
-
 test('Oita flies Monday, Wednesday, Friday and Sunday within its season', () => {
   const oita = route('ICN-OIT');
   assert.equal(fliesOn(oita, '2026-10-25'), true); // Sunday, the first day
@@ -57,8 +48,6 @@ test('Oita flies Monday, Wednesday, Friday and Sunday within its season', () => 
   assert.equal(fliesOn(oita, '2026-10-27'), false); // a Tuesday
   assert.equal(fliesOn(oita, '2027-03-26'), true); // Friday, the last day
   assert.equal(fliesOn(oita, '2027-03-28'), false); // the Sunday after
-  assert.equal(timetableDays(oita.periods[0]), '1.3.5.7');
-  assert.equal(timetableDays(route('ICN-KIJ').periods[0]), '1234567');
 });
 
 test('a round trip needs a flight at both ends', () => {

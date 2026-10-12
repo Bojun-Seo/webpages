@@ -2,8 +2,7 @@
 // The working out lives in plan.js.
 
 import {
-  DAY_NAMES, WEEK, airlineOf, daysBetween, dayOf, flightTimes, lastDayOfMonth, monthsAhead,
-  recommend, searchLinks, timetableDays, weeklyFlights,
+  DAY_NAMES, airlineOf, daysBetween, dayOf, lastDayOfMonth, monthsAhead, recommend, searchLinks,
 } from './plan.js';
 
 const PAGE_SIZE = 30;
@@ -151,40 +150,6 @@ function renderTrips() {
   more.textContent = `더 보기 (${(trips.length - state.shown).toLocaleString('ko-KR')}개 남음)`;
 }
 
-function weekStrip(period) {
-  const flies = (day) => period.days === 'daily' || period.days.includes(day);
-  const names = WEEK.filter(flies).map((day) => DAY_NAMES[day]).join('·');
-  return el('span', { class: 'week', role: 'img', 'aria-label': `운항 요일 ${names}` },
-    WEEK.map((day) => el('span', { class: flies(day) ? 'on' : null, 'aria-hidden': 'true' }, DAY_NAMES[day])));
-}
-
-function routeCard(route) {
-  const { fares, today } = state.data;
-  const periods = route.periods.filter((p) => p.to >= today);
-  const priced = [...new Set(fares.filter((f) => f.route === route.id && f.depart >= today).map(airlineOf))];
-  return el('article', { class: 'route' },
-    el('header', null,
-      el('h3', null, route.city, el('span', { class: 'code' }, `${route.origin}→${route.dest}`)),
-      route.tag && el('span', { class: 'badge' }, route.tag)),
-    el('p', { class: 'region' }, route.region),
-    el('p', { class: 'about' }, route.about),
-    periods.length > 0 && el('p', { class: 'times' }, '대한항공 운항 요일'),
-    periods.map((p) => el('div', { class: 'period' },
-      el('span', { class: 'range' }, `${shortDate(p.from)} – ${shortDate(p.to)}`),
-      weekStrip(p),
-      el('span', { class: 'freq' }, `주 ${weeklyFlights(p)}회 · ${timetableDays(p)}`))),
-    route.note && el('p', { class: 'note' }, route.note),
-    route.flights && el('p', { class: 'times' }, flightTimes(route)),
-    route.aircraft && el('p', { class: 'aircraft' }, route.aircraft),
-    priced.length > 0 && el('p', { class: 'times' }, `운임이 확인된 항공사 · ${priced.map(airlineName).join(', ')}`),
-    el('p', { class: 'sources' }, '출처 ',
-      route.sources.map((s, i) => [i > 0 && ' · ', link(s.url, s.title)])));
-}
-
-function renderRoutes() {
-  $('routes').replaceChildren(...state.data.routes.map(routeCard));
-}
-
 // A row of toggle chips for `picked`, a Set that stays empty for "all".
 function renderChips(box, allLabel, picked, options) {
   const chip = (label, pressed, onclick) =>
@@ -271,7 +236,6 @@ async function main() {
     renderTrips();
   });
 
-  renderRoutes();
   update();
 }
 

@@ -45,10 +45,7 @@ page:
    shorter trip first.
 
 Every trip links to Naver, Google Flights, Skyscanner and KAYAK searches with the route and dates
-filled in, for the live price; the KAYAK search asks for the trip's airline. Below the list, a card
-per route shows Korean Air's days of operation in airline timetable notation (`1.3.5.7` is Monday,
-Wednesday, Friday and Sunday), flight times, aircraft, the airlines with known fares and the
-announcement the schedule came from.
+filled in, for the live price; the KAYAK search asks for the trip's airline.
 
 ## Where the fares come from
 
@@ -109,8 +106,7 @@ Schedules change every season (late March and late October). Everything is in `s
   around abroad the same day. A route whose days are not known keeps `periods` empty and says why in
   `note`. `flights`, where known, gives the flight `out` and the flight `back`, each with `departs`
   and `arrives` in local 24-hour time (`"09:15"`) and the flight `number` where the source names it.
-  The route card shows them, and they decide 저녁 출발 and 오전 도착. Add the source of every change to
-  `sources`, and move `updated` on.
+  They decide 저녁 출발 and 오전 도착. Add the source of every change to `sources`, and move `updated` on.
 - `holidays.json`: public holidays by date, through 2027, from the 월력요항 that the Korea
   AeroSpace Administration publishes each June. A substitute holiday is named after the holiday it
   stands in for.
@@ -147,9 +143,9 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   appear in recommendations only through a fare.
 - The main routes (Tokyo Narita and Haneda, Osaka, Nagoya, Fukuoka, Sapporo and Okinawa) were added
   on 12 October 2026 as flying daily. Only Narita, Osaka and Okinawa have a source for the winter
-  season; for the others the page assumes the summer's daily service goes on, and their cards say
-  so. Their flight times are not listed, since only summer times could be found, so they get
-  neither 저녁 출발 nor 오전 도착.
+  season; for the others the page assumes the summer's daily service goes on, and their notes in
+  `routes.json` say so. Their flight times are not listed, since only summer times could be found,
+  so they get neither 저녁 출발 nor 오전 도착.
 - Hakodate, Takamatsu, Matsuyama, Yonago, Shizuoka, Tokushima, Kitakyushu, Saga, Miyakojima and
   Ishigaki, which Korean Air does not fly, and Gimpo–Nagoya, which only Peach flies, were added on
   12 October 2026 for the fares of the airlines that do; Yonago's only source is a summary of
@@ -159,14 +155,15 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   with Korean Air's days and marked 전세편.
 - Taipei Taoyuan, Taichung and Hong Kong fly daily on Korean Air. Taoyuan's winter flights are on
   file; Taichung's daily service returns on 25 October 2026 with no end date given, so the page
-  assumes it lasts the season; Hong Kong's winter season is assumed. Their cards say so. Taipei
-  Songshan, Kaohsiung (from Incheon and from Gimpo) and Macau come through fares only: Korean Air
-  does not fly the first two, and its daily Macau service from July 2024 was not confirmed for 2026.
+  assumes it lasts the season; Hong Kong's winter season is assumed. Their notes in `routes.json`
+  say so. Taipei Songshan, Kaohsiung (from Incheon and from Gimpo) and Macau come through fares
+  only: Korean Air does not fly the first two, and its daily Macau service from July 2024 was not
+  confirmed for 2026.
 - On 12 October 2026 the routes were checked against press reports, airline filings and airport
   pages for every Japanese and Taiwanese airport with scheduled flights from Incheon or Gimpo.
   Routes flown only by charter, such as Toyama, Ube and Kushiro, and routes from other Korean
   airports are left out. Many of those sources could be read only as search-result excerpts, so the
-  frequencies on the cards are worth checking before booking.
+  frequencies in the notes may be off.
 - Gimpo–Haneda was added on 12 October 2026 as flying daily; for Gimpo–Kansai only Asiana's daily
   winter service was found, so Korean Air's days are not given and the route comes only through
   fares.
