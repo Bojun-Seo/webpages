@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>일본 항공권</title>
-<meta name="description" content="인천 출발 일본 직항 노선에서 왕복이 되는 날짜를 찾고, 연차가 적게 드는 일정과 확인된 운임을 함께 보여 주는 개인 페이지">
+<meta name="description" content="인천·김포 출발 일본 직항 노선에서 왕복이 되는 날짜를 찾고, 연차가 적게 드는 일정과 확인된 운임을 함께 보여 주는 개인 페이지">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
@@ -14,7 +14,7 @@
 <body>
 <div class="wrap" lang="ko">
   <header class="masthead">
-    <p class="eyebrow">ICN → 일본 · 직항 왕복</p>
+    <p class="eyebrow">인천·김포 → 일본 · 직항 왕복</p>
     <h1>일본 항공권</h1>
     <p class="lede">도쿄·오사카부터 주 몇 회만 뜨는 지방 노선까지 왕복이 되는 날짜를 찾아, 빨간 날을 끼워 연차를 아끼는 일정과 확인된 운임을 함께 보여 줍니다.</p>
     <p class="status" id="status">불러오는 중…</p>
@@ -22,6 +22,14 @@
 
   <form id="filters" class="filters" aria-label="일정 조건">
     <div class="controls">
+      <label class="field">
+        <span>출발 공항</span>
+        <select id="origin">
+          <option value="all">인천·김포</option>
+          <option value="ICN">인천</option>
+          <option value="GMP">김포</option>
+        </select>
+      </label>
       <label class="field">
         <span>출발 시기</span>
         <select id="month"><option value="all">전체 기간</option></select>
