@@ -27,8 +27,9 @@ Friday and Sunday), so on those most pairs of dates are not a round trip at all.
 month, trip length, leave, budget, Korean airport, destinations and airlines the visitor picks, the
 page:
 
-1. lists every round trip with a Korean Air flight at both ends, within the schedule periods in
-   `data/routes.json`, and every trip a known fare of one of the airlines picked proves;
+1. lists every round trip of two to six nights, or of the lengths picked among them, with a Korean
+   Air flight at both ends, within the schedule periods in `data/routes.json`, and every such trip a
+   known fare of one of the airlines picked proves; a trip of one night is never offered;
 2. counts the leave each takes: the workdays from departure to the day the flight back lands that
    are not public holidays, both ends included, except a landing day when the flight lands before
    noon. A flight back that leaves late at night lands the next day, so the day it leaves counts

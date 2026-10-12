@@ -2,11 +2,11 @@
 // The working out lives in plan.js.
 
 import {
-  DAY_NAMES, airlineOf, daysBetween, dayOf, lastDayOfMonth, monthsAhead, recommend, searchLinks,
+  DAY_NAMES, TRIP_NIGHTS, airlineOf, daysBetween, dayOf, lastDayOfMonth, monthsAhead, recommend,
+  searchLinks,
 } from './plan.js';
 
 const PAGE_SIZE = 30;
-const NIGHTS = { '1-2': [1, 2], '2-3': [2, 3], '3-4': [3, 4], '4-5': [4, 5], any: [1, 6] };
 
 // Names for the airlines that fly these routes; any other shows its code.
 const AIRLINE_NAMES = {
@@ -79,19 +79,19 @@ function link(href, text, cls) {
   return el('a', { href, target: '_blank', rel: 'noopener', class: cls }, text);
 }
 
-const state = { data: null, cities: new Set(), airlines: new Set(), trips: [], shown: PAGE_SIZE };
+const state = {
+  data: null, nights: new Set(), cities: new Set(), airlines: new Set(), trips: [], shown: PAGE_SIZE,
+};
 
 function readFilter() {
   const { data } = state;
   const month = $('month').value;
-  const [minNights, maxNights] = NIGHTS[$('nights').value];
   const leave = $('leave').value;
   const budget = Number($('budget').value);
   return {
     from: month === 'all' ? data.today : `${month}-01`,
     to: month === 'all' ? lastDayOfMonth(data.months.at(-1)) : lastDayOfMonth(month),
-    minNights,
-    maxNights,
+    nights: state.nights.size ? state.nights : null,
     maxLeave: leave === 'any' ? null : Number(leave),
     maxPrice: budget > 0 ? budget * 10000 : null,
     origins: $('origin').value === 'all' ? null : new Set([$('origin').value]),
@@ -163,6 +163,11 @@ function renderChips(box, allLabel, picked, options) {
     })));
 }
 
+function renderNights() {
+  renderChips($('nights'), `${TRIP_NIGHTS[0]}~${TRIP_NIGHTS.at(-1)}박 전체`, state.nights,
+    TRIP_NIGHTS.map((n) => ({ value: n, label: `${n}박` })));
+}
+
 // One chip per destination airport, whichever Korean airport its routes leave.
 function renderCities() {
   const airports = new Map();
@@ -181,6 +186,7 @@ function renderAirlines() {
 function update() {
   state.shown = PAGE_SIZE;
   state.trips = recommend(state.data, readFilter());
+  renderNights();
   renderCities();
   renderAirlines();
   renderTrips();
@@ -228,7 +234,7 @@ async function main() {
     el('option', { value: 'all' }, '전체 기간'),
     ...state.data.months.map((m) => el('option', { value: m }, monthLabel(m))));
 
-  for (const id of ['origin', 'month', 'nights', 'leave']) $(id).addEventListener('change', update);
+  for (const id of ['origin', 'month', 'leave']) $(id).addEventListener('change', update);
   $('budget').addEventListener('input', update);
   $('filters').addEventListener('submit', (event) => event.preventDefault());
   $('more').addEventListener('click', () => {

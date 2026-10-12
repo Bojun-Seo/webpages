@@ -35,16 +35,6 @@
         <select id="month"><option value="all">전체 기간</option></select>
       </label>
       <label class="field">
-        <span>여행 기간</span>
-        <select id="nights">
-          <option value="any" selected>상관없음 (1~6박)</option>
-          <option value="1-2">1~2박</option>
-          <option value="2-3">2~3박</option>
-          <option value="3-4">3~4박</option>
-          <option value="4-5">4~5박</option>
-        </select>
-      </label>
-      <label class="field">
         <span>연차</span>
         <select id="leave">
           <option value="any">상관없음</option>
@@ -58,6 +48,7 @@
         <input id="budget" type="number" inputmode="numeric" min="0" step="1" placeholder="제한 없음">
       </label>
     </div>
+    <div class="chips" id="nights" role="group" aria-label="여행 기간"></div>
     <div class="chips" id="cities" role="group" aria-label="도시"></div>
     <div class="chips" id="airlines" role="group" aria-label="항공사"></div>
     <p class="fine">예산을 넣으면 가격이 확인된 일정만 남습니다. 연차가 적게 드는 일정을 먼저, 같은 연차라면 가격이 확인된 일정을 싼 순서로, 나머지는 출발일이 가까운 순서로 보여 줍니다. 대한항공은 운항 요일로 일정을 찾고, 다른 항공사는 운임이 확인된 일정만 나옵니다.</p>
