@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { localDate, monthsFrom, pickFares } from '../tools/fetch-fares.js';
+import { keepCheapest, localDate, localTime, monthsFrom, pickFares } from '../tools/fetch-fares.js';
 
 const oita = { id: 'ICN-OIT', origin: 'ICN', dest: 'OIT' };
 
@@ -33,27 +33,43 @@ test('a timestamp becomes the local date in Korea and Japan', () => {
   assert.equal(localDate('2026-11-13T14:59:00Z'), '2026-11-13');
 });
 
+test('a timestamp and some minutes after it become the local time', () => {
+  assert.equal(localTime('2026-11-13T09:15:00+09:00'), '09:15');
+  assert.equal(localTime('2026-11-12T23:20:00Z'), '08:20');
+  assert.equal(localTime('2026-11-15T12:00:00+09:00', 115), '13:55');
+});
+
 test('months run on from the current one, across a year', () => {
   assert.deepEqual(monthsFrom('2026-11-30', 3), ['2026-11', '2026-12', '2027-01']);
 });
 
-test('only Korean Air nonstop round trips are kept', () => {
+test("every airline's nonstop round trips are kept, with their times", () => {
   const response = {
     success: true,
     currency: 'krw',
     data: [
       ticket({}),
-      ticket({ airline: '7C', price: 150000 }),
+      ticket({ airline: '7C', price: 150000, departure_at: '2026-11-13T18:40:00+09:00', duration_back: 95 }),
       ticket({ transfers: 1, price: 180000 }),
       ticket({ return_transfers: 1, price: 190000 }),
       ticket({ return_at: undefined, price: 120000 }),
+      ticket({ airline: undefined, price: 110000 }),
       ticket({ departure_at: '2026-11-12T23:20:00Z', return_at: '2026-11-16T02:35:00Z', price: 251000.4 }),
     ],
   };
+  const fare = (fields) => ({ route: 'ICN-OIT', seen: '2026-10-11', source: 'Aviasales', ...fields });
   assert.deepEqual(pickFares(response, oita, '2026-10-11'), [
-    { route: 'ICN-OIT', depart: '2026-11-13', return: '2026-11-15', price: 236500, seen: '2026-10-11', source: 'Aviasales' },
-    { route: 'ICN-OIT', depart: '2026-11-13', return: '2026-11-16', price: 251000, seen: '2026-10-11', source: 'Aviasales' },
+    fare({ airline: 'KE', depart: '2026-11-13', return: '2026-11-15', price: 236500, departs: '09:15' }),
+    fare({ airline: '7C', depart: '2026-11-13', return: '2026-11-15', price: 150000, departs: '18:40', arrives: '13:35' }),
+    fare({ airline: 'KE', depart: '2026-11-13', return: '2026-11-16', price: 251000, departs: '08:20' }),
   ]);
+});
+
+test('only the cheapest fare for each route, pair of dates and airline is kept', () => {
+  const fare = (airline, price, ret = '2026-11-15') =>
+    ({ route: 'ICN-OIT', airline, depart: '2026-11-13', return: ret, price });
+  assert.deepEqual(keepCheapest([fare('KE', 300000), fare('7C', 150000), fare('KE', 280000), fare('KE', 260000, '2026-11-16')]),
+    [fare('KE', 280000), fare('7C', 150000), fare('KE', 260000, '2026-11-16')]);
 });
 
 test('an error response yields no fares', () => {

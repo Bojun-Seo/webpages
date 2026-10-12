@@ -51,13 +51,12 @@ Amadeus closed its free Self-Service APIs on 17 July 2026. That leaves two sourc
 | File | Written by | What it holds |
 |---|---|---|
 | `site/data/fares.json` | you, by hand | fares you saw yourself, kept in the repository |
-| `site/data/live-fares.json` | the workflow, at each deploy | Korean Air nonstop fares that Aviasales users found in the last 48 hours, from the [Travelpayouts Data API](https://support.travelpayouts.com/hc/en-us/articles/203956163-Aviasales-Data-API) |
+| `site/data/live-fares.json` | the workflow, at each deploy | nonstop fares of every airline that Aviasales users found in the last 48 hours, from the [Travelpayouts Data API](https://support.travelpayouts.com/hc/en-us/articles/203956163-Aviasales-Data-API): the cheapest for each route, pair of dates and airline, with the time the flight out leaves and, when the API gives the return flight's duration, the time the flight back lands |
 
 `live-fares.json` is never committed; the workflow fetches it into the build. Without a token the
 workflow writes an empty one and the page says live fares are not set up. Aviasales data comes from
-its own users' searches, so regional routes may have few fares or none. The fetcher is tested
-against the documented response format only: the API could not be reached from where this was
-written.
+its own users' searches, so regional routes may have few fares or none. The tests use the response
+format the API documents; each run logs the fields a real ticket has, to check it against.
 
 A hand-written fare looks like this. `airline` is the airline's two-letter code (`KE`, `7C`, `LJ`
 ...), and a fare without one counts as Korean Air's; `price` is the round trip for one adult, in
