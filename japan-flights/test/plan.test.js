@@ -233,8 +233,10 @@ test('each cabin with a fare gets its own trip, and the cabins picked narrow the
     .map((t) => `${t.cabin} ${t.airline} ${t.fare ? t.fare.price : '?'}`);
   assert.deepEqual(rows({}), ['economy MM 180000', 'business KE 690000', 'first NH 990000']);
   assert.deepEqual(rows({ cabins: new Set(['business', 'first']) }), ['business KE 690000', 'first NH 990000']);
-  // Korean Air's days alone say nothing of business: without economy, only trips with a fare are left.
-  assert.ok(recommend(ctx, { ...november, cabins: new Set(['business']) }).every((t) => t.fare && t.cabin === 'business'));
+  // Without economy, Korean Air's days bring in trips in business, without a fare; first has only fares.
+  const business = recommend(ctx, { ...november, cabins: new Set(['business']) });
+  assert.ok(business.every((t) => t.cabin === 'business') && business.some((t) => !t.fare));
+  assert.ok(recommend(ctx, { ...november, cabins: new Set(['first']) }).every((t) => t.fare && t.cabin === 'first'));
   assert.ok(recommend(ctx, november).some((t) => !t.fare && t.cabin === 'economy'));
 });
 
