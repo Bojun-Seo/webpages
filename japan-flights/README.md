@@ -89,8 +89,10 @@ Schedules change every season (late March and late October). Everything is in `s
 - `routes.json`: one entry per route. `periods` lists the stretches whose days are known, each
   with `from`, `to` and `days` (`"daily"`, or a list such as `["mon", "wed", "fri", "sun"]`); the
   same days serve both directions, since each route turns around in Japan the same day. A route
-  whose days are not known keeps `periods` empty and says why in `note`. Add the source of every
-  change to `sources`, and move `updated` on.
+  whose days are not known keeps `periods` empty and says why in `note`. `flights`, where known,
+  gives the flight `out` and the flight `back`, each with `departs` and `arrives` in local 24-hour
+  time (`"09:15"`) and the flight `number` where the source names it; the route card shows them.
+  Add the source of every change to `sources`, and move `updated` on.
 - `holidays.json`: public holidays by date, through 2027, from the 월력요항 that the Korea
   AeroSpace Administration publishes each June. A substitute holiday is named after the holiday it
   stands in for.

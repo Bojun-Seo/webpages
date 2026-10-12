@@ -12,7 +12,10 @@
       "periods": [
         { "from": "2026-10-25", "to": "2027-03-26", "days": ["mon", "wed", "fri", "sun"] }
       ],
-      "times": "인천 09:15 → 오이타 10:50 · 오이타 12:00 → 인천 13:45",
+      "flights": {
+        "out": { "departs": "09:15", "arrives": "10:50" },
+        "back": { "departs": "12:00", "arrives": "13:45" }
+      },
       "aircraft": "A321neo",
       "sources": [
         { "title": "뉴스핌 (2026-09-11)", "url": "https://www.newspim.com/news/view/20260911000744" }
@@ -47,7 +50,10 @@
       "periods": [
         { "from": "2026-12-23", "to": "2027-03-27", "days": "daily" }
       ],
-      "times": "KE2183 인천 10:35 → 히로시마 12:15 · KE2184 히로시마 13:25 → 인천 15:25",
+      "flights": {
+        "out": { "number": "KE2183", "departs": "10:35", "arrives": "12:15" },
+        "back": { "number": "KE2184", "departs": "13:25", "arrives": "15:25" }
+      },
       "aircraft": "A321neo",
       "sources": [
         { "title": "Aviation Wire (2026-08-24)", "url": "https://www.aviationwire.jp/archives/349303" }
@@ -63,7 +69,10 @@
       "periods": [
         { "from": "2026-06-01", "to": "2027-03-27", "days": "daily" }
       ],
-      "times": "KE2197 인천 08:20 → 니가타 10:25 · KE2198 니가타 11:35 → 인천 14:05",
+      "flights": {
+        "out": { "number": "KE2197", "departs": "08:20", "arrives": "10:25" },
+        "back": { "number": "KE2198", "departs": "11:35", "arrives": "14:05" }
+      },
       "aircraft": "B737-8 (12월까지), B737-800 (1월부터)",
       "sources": [
         { "title": "니가타현 발표 (2026 동계)", "url": "https://www.pref.niigata.lg.jp/uploaded/attachment/509406.pdf" }
@@ -80,7 +89,10 @@
         { "from": "2026-03-29", "to": "2026-10-24", "days": ["mon", "wed", "thu", "fri", "sun"] },
         { "from": "2026-10-25", "to": "2027-03-27", "days": ["tue", "thu", "fri", "sat", "sun"] }
       ],
-      "times": "인천 10:05 → 아오모리 12:40 · 아오모리 13:50 → 인천 16:50",
+      "flights": {
+        "out": { "departs": "10:05", "arrives": "12:40" },
+        "back": { "departs": "13:50", "arrives": "16:50" }
+      },
       "aircraft": "B787-8",
       "sources": [
         { "title": "아오모리현 발표 (2026-09)", "url": "https://www.pref.aomori.lg.jp/release/2026/81360.html" }
