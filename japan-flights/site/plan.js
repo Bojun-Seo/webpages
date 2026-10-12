@@ -171,17 +171,20 @@ export function cabinOf(fare) {
 }
 
 // Whether `airline`'s fares always include a checked bag here (`included`
-// in baggage.json), though Aviasales marks a few of theirs without.
-function alwaysIncludesBag(airline, baggage) {
-  return Boolean(baggage && baggage.included && baggage.included.includes(airline));
+// in baggage.json), or to `country` (`includedTo`), though Aviasales marks a
+// few of theirs without.
+function alwaysIncludesBag(airline, country, baggage) {
+  if (!baggage) return false;
+  return Boolean((baggage.included && baggage.included.includes(airline))
+    || (baggage.includedTo && baggage.includedTo[airline] && baggage.includedTo[airline].includes(country)));
 }
 
-// The checked bags `fare` includes for each person: as many as it says
-// (`bags`), but one for an airline that always includes one, and one for a
-// fare that does not say.
-export function bagsIncluded(fare, baggage) {
+// The checked bags `fare` to `country` includes for each person: as many
+// as it says (`bags`), but one for an airline that always includes one
+// there, and one for a fare that does not say.
+export function bagsIncluded(fare, country, baggage) {
   if (fare.bags > 0) return fare.bags;
-  return fare.bags === 0 && !alwaysIncludesBag(airlineOf(fare), baggage) ? 0 : 1;
+  return fare.bags === 0 && !alwaysIncludesBag(airlineOf(fare), country, baggage) ? 0 : 1;
 }
 
 // Whom the page prices a trip for when not told otherwise: one person
@@ -198,7 +201,7 @@ export const DEFAULT_PARTY = { people: 1, bags: 1 };
 // baggage.json gives neither. `included` is the bags the fare includes for
 // each person.
 export function bagFee(fare, route, baggage, party = DEFAULT_PARTY) {
-  const included = fare ? bagsIncluded(fare, baggage) : 0;
+  const included = fare ? bagsIncluded(fare, route.country, baggage) : 0;
   const count = fare ? Math.max(0, party.bags - party.people * included) : 0;
   const fee = { amount: 0, count, included, approx: false, unknown: false };
   if (count === 0) return fee;
@@ -206,7 +209,7 @@ export function bagFee(fare, route, baggage, party = DEFAULT_PARTY) {
   const own = baggage && baggage.airlines && baggage.airlines[airline];
   const ownFee = own && (typeof own.fee === 'object' ? own.fee[route.country] : own.fee);
   if (ownFee) return { ...fee, amount: 2 * count * ownFee, approx: Boolean(own.approx) };
-  const usual = !alwaysIncludesBag(airline, baggage) && baggage && baggage.usual
+  const usual = !alwaysIncludesBag(airline, route.country, baggage) && baggage && baggage.usual
     && baggage.usual[route.country];
   if (usual) return { ...fee, amount: 2 * count * usual, approx: true };
   return { ...fee, unknown: true };

@@ -5,7 +5,7 @@ A collection of web pages built for personal use, published with GitHub Pages at
 
 | Directory | Page | Description |
 |---|---|---|
-| [`japan-flights/`](japan-flights/) | [Japan, Taiwan, Hong Kong and Macau Flights](https://bojun-seo.github.io/webpages/japan-flights/) | Recommends round trips, nonstop or with one connection, from Seoul and Cheongju to Japan, Taiwan, Hong Kong and Macau |
+| [`japan-flights/`](japan-flights/) | [Short-Haul Flights](https://bojun-seo.github.io/webpages/japan-flights/) | Recommends round trips, nonstop or with one connection, from Seoul and Cheongju to Japan, Taiwan, Hong Kong, Macau, Vietnam, Bangkok, Guam and Saipan |
 
 ## Publishing
 
