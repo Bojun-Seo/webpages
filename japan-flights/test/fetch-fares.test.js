@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  bagTally, checkedBags, keepCheapest, localDate, localTime, monthsFrom, pickFares,
+  bagTally, checkedBags, keepCheapest, leftOut, localDate, localTime, monthsFrom, pickFares,
 } from '../tools/fetch-fares.js';
 
 const oita = { id: 'ICN-OIT', origin: 'ICN', dest: 'OIT' };
@@ -113,6 +113,9 @@ test("a ticket counts only between the route's own airports", () => {
     data: [tokyo('ICN', 'NRT', 200000), tokyo('GMP', 'HND', 310000), tokyo('ICN', 'HND', 250000), tokyo('GMP', 'NRT', 220000)],
   };
   assert.deepEqual(pickFares(response, haneda, '2026-10-11').map((f) => f.price), [310000]);
+  assert.deepEqual(response.data.map((t) => leftOut(t, haneda)), ['ICN-NRT', null, 'ICN-HND', 'GMP-NRT']);
+  assert.equal(leftOut(ticket({ transfers: 2 }), oita), 'connections');
+  assert.equal(leftOut(ticket({ price: 0 }), oita), 'incomplete');
 });
 
 test('only the cheapest fare for each route, pair of dates and airline is kept', () => {
