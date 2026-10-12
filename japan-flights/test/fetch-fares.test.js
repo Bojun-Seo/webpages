@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  keepCheapest, localDate, localTime, monthsFrom, pickFares, repeatsEconomy,
+  checkedBags, keepCheapest, localDate, localTime, monthsFrom, pickFares, repeatsEconomy,
 } from '../tools/fetch-fares.js';
 
 const oita = { id: 'ICN-OIT', origin: 'ICN', dest: 'OIT' };
@@ -107,6 +107,27 @@ test('only the cheapest fare for each route, pair of dates, airline and cabin is
   assert.deepEqual(keepCheapest([fare('KE', 300000), fare('7C', 150000), fare('KE', 280000), fare('KE', 260000, '2026-11-16'),
     fare('KE', 790000, '2026-11-15', 'business'), fare('KE', 820000, '2026-11-15', 'business')]),
   [fare('KE', 280000), fare('7C', 150000), fare('KE', 260000, '2026-11-16'), fare('KE', 790000, '2026-11-15', 'business')]);
+});
+
+// The link of a real ticket, which says in its static_fare_key what the fare includes.
+const link = (bags) => '/search/ICN1410NRT22101?t=TW17920086001792017600000150ICNNRT_09b1_14980'
+  + `&static_fare_key=TY%7CP1_JW%7CH1%7C${bags}%7CCH0%7CR0%7CTBC1&expected_price_currency=krw`;
+
+test('the link of a ticket tells whether its fare includes a checked bag', () => {
+  assert.equal(checkedBags(link('L0')), 0);
+  assert.equal(checkedBags(link('L1_1_15')), 1);
+  assert.equal(checkedBags(link('L1_2_0')), 2);
+  assert.equal(checkedBags('/search/ICN1410NRT22101'), null);
+  assert.equal(checkedBags(undefined), null);
+  const response = { success: true, data: [ticket({ link: link('L0') }), ticket({ link: link('L1_1_15'), price: 260000 })] };
+  assert.deepEqual(pickFares(response, oita, '2026-10-11').map((f) => f.bags), [0, undefined]);
+});
+
+test('the cheapest fare with a checked bag is kept apart from the cheapest without', () => {
+  const fare = (price, bags) => ({ route: 'ICN-OIT', airline: 'MM', depart: '2026-11-13', return: '2026-11-15', price,
+    ...(bags === 0 ? { bags } : {}) });
+  assert.deepEqual(keepCheapest([fare(120000, 0), fare(110000, 0), fare(190000), fare(170000)]),
+    [fare(110000, 0), fare(170000)]);
 });
 
 test('a fare in business or first says so, and economy goes unsaid', () => {

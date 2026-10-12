@@ -1,0 +1,22 @@
+{
+  "updated": "2026-10-12",
+  "usual": { "JP": 45000, "TW": 59000, "HK": 59000, "MO": 59000 },
+  "usualSources": [
+    { "title": "진에어 사전 구매 수하물 (일본·중국 45,000원)", "url": "https://www.jinair.com/addService/onlineBaggage?snsLang=en_US&ctrCd=USA" },
+    { "title": "HK Express 수하물 요금표 (2026-03)", "url": "https://www.hkexpress.com/-/media/Plan/Extras/Baggage/BaggageFee/202603PriceTable-Baggage-EN.pdf" },
+    { "title": "인사이트 (2026-09-23, 제주항공 공항 구매 일본 75,000원)", "url": "https://www.insight.co.kr/news/574944" }
+  ],
+  "airlines": {
+    "UO": {
+      "fee": 59000,
+      "kg": 20,
+      "source": { "title": "HK Express 수하물 요금표 (2026-03, 예약 시 구매)", "url": "https://www.hkexpress.com/-/media/Plan/Extras/Baggage/BaggageFee/202603PriceTable-Baggage-EN.pdf" }
+    },
+    "ZG": {
+      "fee": 37000,
+      "approx": true,
+      "note": "1개 4,000엔을 원으로 어림한 값",
+      "source": { "title": "Trip.com ZIPAIR 안내", "url": "https://jp.trip.com/flights/airline-zg/zipair/" }
+    }
+  }
+}

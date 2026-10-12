@@ -122,7 +122,11 @@ function tripRow(trip) {
   ];
   const price = trip.fare
     ? el('div', { class: 'price' },
-      el('strong', null, won(trip.fare.price)),
+      el('strong', null, won(trip.total)),
+      // The amount keeps to one line, so a narrow column breaks the line after 가격.
+      trip.bagFee > 0 && el('small', { class: 'bag-fee' },
+        `왕복 위탁수하물 가격 ${trip.bagFeeApprox ? '약\u00a0' : ''}${won(trip.bagFee)}\u00a0포함`),
+      trip.bagFeeUnknown && el('small', { class: 'bag-fee' }, '위탁수하물 별도'),
       el('span', null, `${airlineName(trip.airline)} · ${seenLabel(trip.fare.seen || data.today, data.today)}`))
     : el('div', { class: 'price price-unknown' }, el('strong', null, '가격 미확인'),
       el('span', null, `${airlineName(trip.airline)} · 검색 링크로 확인`));
@@ -221,8 +225,9 @@ function statusLine(routesDoc, manual, live) {
 }
 
 async function main() {
-  const [routesDoc, manualDoc, live, holidaysDoc] = await Promise.all([
+  const [routesDoc, manualDoc, live, holidaysDoc, baggage] = await Promise.all([
     load('data/routes.json'), load('data/fares.json'), load('data/live-fares.json'), load('data/holidays.json'),
+    load('data/baggage.json'),
   ]);
   if (!routesDoc) {
     $('status').textContent = 'data/routes.json을 읽지 못했습니다. 파일을 직접 열었다면 README의 로컬 실행 방법을 따라 주세요.';
@@ -236,6 +241,7 @@ async function main() {
     routes,
     fares,
     holidays: holidaysDoc?.dates || {},
+    baggage,
     today,
     byId: new Map(routes.map((r) => [r.id, r])),
     months: monthsAhead(routes, today),

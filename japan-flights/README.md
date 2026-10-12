@@ -40,9 +40,11 @@ picks, the page:
    leaves), from the fare's own times, or for a Korean Air trip without them from the route's
    flight times;
 4. for each cabin picked, economy, business or first, attaches the cheapest known fare for the route
-   and dates among the airlines picked, as a trip of its own, and names its airline and cabin.
-   Korean Air's days say nothing of its business or first seats, so they bring in trips without a
-   fare only when economy is picked;
+   and dates among the airlines picked, as a trip of its own, and names its airline and cabin. A
+   fare without a checked bag costs its price and the fee for a bag each way from
+   `data/baggage.json`, shown under the price; it is chosen, sorted and held to the budget by that
+   total. Korean Air's days say nothing of its business or first seats, so they bring in trips
+   without a fare only when economy is picked;
 5. lists the trips that take the least leave first; among those, the trips with a known fare
    first, cheapest first, then the rest by departure date, soonest first; on the same day, the
    shorter trip first.
@@ -60,22 +62,27 @@ Amadeus closed its free Self-Service APIs on 17 July 2026. That leaves two sourc
 | File | Written by | What it holds |
 |---|---|---|
 | `site/data/fares.json` | you, by hand | fares you saw yourself, kept in the repository |
-| `site/data/live-fares.json` | the workflow, at each deploy | nonstop fares of every airline that Aviasales users found in the last 48 hours, from the [Travelpayouts Data API](https://support.travelpayouts.com/hc/en-us/articles/203956163-Aviasales-Data-API): the cheapest for each route, pair of dates, airline and cabin (economy, business and first), with the time the flight out leaves and, when the API gives the return flight's duration, the time the flight back lands and, if it lands after midnight, the day |
+| `site/data/live-fares.json` | the workflow, at each deploy | nonstop fares of every airline that Aviasales users found in the last 48 hours, from the [Travelpayouts Data API](https://support.travelpayouts.com/hc/en-us/articles/203956163-Aviasales-Data-API): the cheapest for each route, pair of dates, airline and cabin (economy, business and first), with and without a checked bag, with the time the flight out leaves and, when the API gives the return flight's duration, the time the flight back lands and, if it lands after midnight, the day |
 
 `live-fares.json` is never committed; the workflow fetches it into the build. Without a token the
 workflow writes an empty one and the page says live fares are not set up. Aviasales data comes from
 its own users' searches, so regional routes may have few fares or none. A ticket counts only on the
-route between the airports it names. `prices_for_dates` documents no cabin, but the fetcher asks for
-business and first with `trip_class` (`1` and `2`), as the API's older methods take it; an answer
-for business or first whose tickets are mostly those of the economy answer for the same months is
-dropped, since that is what the API would give if it paid the class no heed, and the log counts such
-answers and shows the first ticket in each cabin. The tests use the response format the API
-documents; each run logs the fields a real ticket has, to check it against.
+route between the airports it names. The `static_fare_key` in its link says what its fare includes:
+`L0` for no checked bag, `L1_1_15` for one bag of 15 kg, and so on. A fare without one is marked
+`bags: 0`, and the cheapest such fare is kept apart from the cheapest with a bag, so that the page
+can weigh the first with its bag fee against the second; the log counts the fares without a bag by
+airline. `prices_for_dates` documents no cabin, but the fetcher asks for business and first with
+`trip_class` (`1` and `2`), as the API's older methods take it; an answer for business or first
+whose tickets are mostly those of the economy answer for the same months is dropped, since that is
+what the API would give if it paid the class no heed, and the log counts such answers and shows the
+first ticket in each cabin. The tests use the response format the API documents; each run logs the
+fields a real ticket has, to check it against.
 
 A hand-written fare looks like this. `airline` is the airline's two-letter code (`KE`, `7C`, `LJ`
 ...), and a fare without one counts as Korean Air's; `cabin` is `business` or `first` for those
-cabins, and a fare without one is economy; `price` is the round trip for one adult, in won; `seen`
-is when you saw it, and the page shows how long ago that was.
+cabins, and a fare without one is economy; `bags` is `0` for a fare without a checked bag; `price`
+is the round trip for one adult, in won; `seen` is when you saw it, and the page shows how long ago
+that was.
 
 ```json
 {
@@ -109,17 +116,23 @@ a route whose days are not known yet.
 Schedules change every season (late March and late October). Everything is in `site/data/`:
 
 - `routes.json`: one entry per route, from Incheon (`ICN`) or Gimpo (`GMP`); the city chips group
-  routes by the airport they fly to. A destination outside UTC+9 gives `utcOffset` (Taiwan, Hong
-  Kong and Macau: `8`), so the fetcher gives the flight back its local date. `periods` lists the
-  stretches whose days are known, each with `from`, `to` and `days` (`"daily"`, or a list such as
-  `["mon", "wed", "fri", "sun"]`); the same days serve both directions, since each route turns
-  around abroad the same day. A route whose days are not known keeps `periods` empty and says why in
-  `note`. `flights`, where known, gives the flight `out` and the flight `back`, each with `departs`
-  and `arrives` in local 24-hour time (`"09:15"`) and the flight `number` where the source names it.
+  routes by the airport they fly to. `country` is the destination's country (`JP`, `TW`, `HK` or
+  `MO`), which bag fees go by. A destination outside UTC+9 gives `utcOffset` (Taiwan, Hong Kong and
+  Macau: `8`), so the fetcher gives the flight back its local date. `periods` lists the stretches
+  whose days are known, each with `from`, `to` and `days` (`"daily"`, or a list such as `["mon",
+  "wed", "fri", "sun"]`); the same days serve both directions, since each route turns around abroad
+  the same day. A route whose days are not known keeps `periods` empty and says why in `note`.
+  `flights`, where known, gives the flight `out` and the flight `back`, each with `departs` and
+  `arrives` in local 24-hour time (`"09:15"`) and the flight `number` where the source names it.
   They decide 저녁 출발 and 오전 도착. Add the source of every change to `sources`, and move `updated` on.
 - `holidays.json`: public holidays by date, through 2027, from the 월력요항 that the Korea
   AeroSpace Administration publishes each June. A substitute holiday is named after the holiday it
   stands in for.
+- `baggage.json`: what a checked bag bought in advance costs one way, in won, for a fare without
+  one. `airlines` gives an airline's own `fee`, with the `kg` it buys, its `source` and `approx`
+  when the fee is converted or otherwise rough; `usual` gives the fee to each destination country
+  (`country` in `routes.json`) for the airlines without one, always shown as approximate. Add an
+  airline when the deploy log names it among the fares without a checked bag.
 - `fares.json`: see above.
 
 The tests check that every route has the fields the page reads and that the 2027 holidays add up
@@ -187,4 +200,6 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   morning and land back in the afternoon, so only a fare's own times can mark a trip either way.
 - Prices are for one adult, in economy unless the trip is marked 비즈니스 or 퍼스트, and may differ from
   what a booking finally costs. Business and first fares are only as many as the searches Aviasales
-  users make for them.
+  users make for them. Only HK Express's bag fee comes from the airline itself, and ZIPAIR's from a
+  travel site; the others are the usual fees in `baggage.json`, from Jin Air's advance price to
+  Japan and HK Express's, and the page marks them 약.

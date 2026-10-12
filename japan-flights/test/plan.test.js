@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  addDays, airlineOf, dayOf, fliesOn, flightMarks, leaveFor, monthsAhead, recommend, roundTrips,
-  searchLinks,
+  addDays, airlineOf, bagFee, dayOf, fliesOn, flightMarks, leaveFor, monthsAhead, recommend,
+  roundTrips, searchLinks,
 } from '../site/plan.js';
 
 const data = (name) => JSON.parse(readFileSync(new URL(`../site/data/${name}`, import.meta.url)));
@@ -27,6 +27,7 @@ test('every route has the fields the page reads', () => {
     assert.ok(!ids.has(r.id), `${r.id} appears twice`);
     ids.add(r.id);
     assert.ok(r.city && r.sources.length > 0, r.id);
+    assert.match(r.country, /^(JP|TW|HK|MO)$/, r.id);
     for (const p of r.periods) {
       assert.ok(p.from <= p.to, `${r.id} ${p.from}`);
       assert.ok(p.days === 'daily' || p.days.every((d) => /^(mon|tue|wed|thu|fri|sat|sun)$/.test(d)));
@@ -235,6 +236,44 @@ test('each cabin with a fare gets its own trip, and the cabins picked narrow the
   // Korean Air's days alone say nothing of business: without economy, only trips with a fare are left.
   assert.ok(recommend(ctx, { ...november, cabins: new Set(['business']) }).every((t) => t.fare && t.cabin === 'business'));
   assert.ok(recommend(ctx, november).some((t) => !t.fare && t.cabin === 'economy'));
+});
+
+test('baggage.json has a usual fee for every country flown to, and a fee with a source for each airline', () => {
+  const baggage = data('baggage.json');
+  for (const r of routes) assert.ok(baggage.usual[r.country] > 0, r.id);
+  for (const [code, airline] of Object.entries(baggage.airlines)) {
+    assert.match(code, /^[A-Z0-9]{2}$/);
+    assert.ok(Number.isInteger(airline.fee) && airline.fee > 0 && airline.source.url, code);
+  }
+});
+
+test('the bag fee follows the airline, then the country of the destination', () => {
+  const baggage = { usual: { JP: 45000, HK: 59000 }, airlines: { UO: { fee: 59000 }, ZG: { fee: 37000, approx: true } } };
+  const fee = (airline, id, bags, data = baggage) => bagFee({ airline, ...(bags === 0 ? { bags } : {}) }, route(id), data);
+  assert.deepEqual(fee('KE', 'ICN-NRT'), { amount: 0, approx: false, unknown: false });
+  assert.deepEqual(fee('UO', 'ICN-HKG', 0), { amount: 118000, approx: false, unknown: false });
+  assert.deepEqual(fee('ZG', 'ICN-NRT', 0), { amount: 74000, approx: true, unknown: false });
+  assert.deepEqual(fee('MM', 'ICN-HND', 0), { amount: 90000, approx: true, unknown: false });
+  assert.deepEqual(fee('IT', 'ICN-TPE', 0), { amount: 0, approx: false, unknown: true });
+  assert.deepEqual(fee('IT', 'ICN-TPE', 0, null), { amount: 0, approx: false, unknown: true });
+});
+
+test('a fare without a checked bag costs a bag each way, and the cheapest all in is offered', () => {
+  const baggage = { usual: { JP: 45000 }, airlines: {} };
+  const fare = (airline, price, bags) => ({ route: 'ICN-NRT', airline, depart: '2026-11-20', return: '2026-11-22',
+    price, seen: today, ...(bags === 0 ? { bags } : {}) });
+  const november = { from: '2026-11-01', to: '2026-11-30', cities: new Set(['NRT']), origins: new Set(['ICN']) };
+  const row = (fares, filter = november) => recommend({ routes, fares, holidays, today, baggage }, filter)
+    .find((t) => t.depart === '2026-11-20' && t.return === '2026-11-22' && t.fare);
+  // Peach without a bag, 120,000 and 2 × 45,000, comes to 210,000 and beats Jeju Air's 230,000 with one.
+  let t = row([fare('MM', 120000, 0), fare('7C', 230000)]);
+  assert.deepEqual([t.airline, t.fare.price, t.bagFee, t.total, t.bagFeeApprox], ['MM', 120000, 90000, 210000, true]);
+  // At 150,000 it would come to 240,000, so Jeju Air's fare, which needs nothing added, is offered.
+  t = row([fare('MM', 150000, 0), fare('7C', 230000)]);
+  assert.deepEqual([t.airline, t.bagFee, t.total], ['7C', 0, 230000]);
+  // The budget holds the total.
+  assert.equal(row([fare('MM', 120000, 0)], { ...november, maxPrice: 200000 }), undefined);
+  assert.equal(row([fare('MM', 120000, 0)], { ...november, maxPrice: 210000 }).total, 210000);
 });
 
 test('a city takes in every Korean airport, and the airport picked narrows it', () => {

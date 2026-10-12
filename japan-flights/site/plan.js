@@ -146,6 +146,20 @@ export function cabinOf(fare) {
   return fare.cabin || 'economy';
 }
 
+// What checking one bag each way adds to `fare` on `route`. Nothing when
+// the fare includes a checked bag or does not say; else twice the one-way
+// fee baggage.json gives the airline, or failing that the usual fee to the
+// destination's country, which is a guess and so `approx`, as an airline's
+// own fee may also be. `unknown` when baggage.json gives neither.
+export function bagFee(fare, route, baggage) {
+  if (!fare || fare.bags !== 0) return { amount: 0, approx: false, unknown: false };
+  const own = baggage && baggage.airlines && baggage.airlines[airlineOf(fare)];
+  if (own) return { amount: 2 * own.fee, approx: Boolean(own.approx), unknown: false };
+  const usual = baggage && baggage.usual && baggage.usual[route.country];
+  if (usual) return { amount: 2 * usual, approx: true, unknown: false };
+  return { amount: 0, approx: false, unknown: true };
+}
+
 // The marks a trip's flights earn: from the fare's own times where it has
 // them, else from the route's times when the trip is Korean Air's. Another
 // airline's fare without times earns neither.
@@ -165,20 +179,21 @@ function tripKey(trip) {
 }
 
 // The cheapest fare for each route, pair of dates and cabin, among trips
-// that have not left yet.
-export function cheapestFares(fares, today) {
+// that have not left yet, by what `cost` makes of each: its price unless
+// told otherwise.
+export function cheapestFares(fares, today, cost = (fare) => fare.price) {
   const best = new Map();
   for (const fare of fares) {
     if (!(fare.depart >= today && fare.return > fare.depart && fare.price > 0)) continue;
     const key = `${tripKey(fare)} ${cabinOf(fare)}`;
     const held = best.get(key);
-    if (!held || fare.price < held.price) best.set(key, fare);
+    if (!held || cost(fare) < cost(held)) best.set(key, fare);
   }
   return best;
 }
 
 function priceOf(trip) {
-  return trip.fare ? trip.fare.price : Infinity;
+  return trip.fare ? trip.total : Infinity;
 }
 
 function byNumber(a, b) {
@@ -202,7 +217,9 @@ function byLeaveFareDate(a, b) {
 // the airlines asked for, each with its cheapest fare there, its airline and
 // cabin, the day its flight back lands, its leave, the holidays it spans and
 // the marks its flight times earn: the least leave first, then known fares,
-// the cheapest first, then the soonest departure. The schedules are Korean
+// the cheapest first, then the soonest departure. A fare without a checked
+// bag costs its price and a bag each way (`bagFee`, `total`), and is chosen,
+// sorted and held to the budget by that. The schedules are Korean
 // Air's, so another airline's trip comes only from a fare; they say nothing
 // of business or first, so they bring in trips without a fare only when
 // economy is asked for, as economy.
@@ -214,7 +231,7 @@ function byLeaveFareDate(a, b) {
 // codes), `cities` (a Set of destination airport codes), `airlines` (a Set
 // of airline codes) and `cabins` (a Set of CABINS) are left out to mean no
 // limit.
-export function recommend({ routes, fares, holidays, today }, filter) {
+export function recommend({ routes, fares, holidays, today, baggage }, filter) {
   const from = filter.from > today ? filter.from : today;
   const nights = new Set(TRIP_NIGHTS.filter((n) => !filter.nights || filter.nights.has(n)));
   const wanted = (route) => (!filter.origins || filter.origins.has(route.origin))
@@ -222,8 +239,10 @@ export function recommend({ routes, fares, holidays, today }, filter) {
   const flown = (airline) => !filter.airlines || filter.airlines.has(airline);
   const seated = (cabin) => !filter.cabins || filter.cabins.has(cabin);
   const byId = new Map(routes.map((route) => [route.id, route]));
+  const feeOf = (fare) => bagFee(fare, fare && byId.get(fare.route), baggage);
   const cheapest = cheapestFares(fares.filter((fare) => byId.has(fare.route)
-    && wanted(byId.get(fare.route)) && flown(airlineOf(fare)) && seated(cabinOf(fare))), today);
+    && wanted(byId.get(fare.route)) && flown(airlineOf(fare)) && seated(cabinOf(fare))), today,
+  (fare) => fare.price + feeOf(fare).amount);
   const faresOf = new Map();
   for (const fare of cheapest.values()) {
     const key = tripKey(fare);
@@ -252,10 +271,13 @@ export function recommend({ routes, fares, holidays, today }, filter) {
       // A flight back that leaves late at night lands the next day.
       const lands = (fare && fare.lands) || trip.return;
       const { leave, holidays: names } = leaveFor(trip.depart, lands, holidays, marks);
+      const fee = feeOf(fare);
+      const total = fare ? fare.price + fee.amount : null;
       if (filter.maxLeave != null && leave > filter.maxLeave) continue;
-      if (filter.maxPrice != null && !(fare && fare.price <= filter.maxPrice)) continue;
+      if (filter.maxPrice != null && !(fare && total <= filter.maxPrice)) continue;
       out.push({
         ...trip, fare, airline: fare ? airlineOf(fare) : 'KE', cabin: fare ? cabinOf(fare) : 'economy',
+        total, bagFee: fee.amount, bagFeeApprox: fee.approx, bagFeeUnknown: fee.unknown,
         lands, leave, holidays: names, ...marks,
       });
     }
