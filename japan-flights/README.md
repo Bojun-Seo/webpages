@@ -28,13 +28,15 @@ page:
 
 1. lists every round trip with a Korean Air flight at both ends, within the schedule periods in
    `data/routes.json`, and every trip a known fare of one of the airlines picked proves;
-2. counts the leave each takes: the workdays from departure to return that are not public
-   holidays, both ends included, except a return day whose flight back lands before noon. The
-   workdays are Monday, Tuesday and Thursday, the week of the person the page was made for;
-   `WORKDAYS` in `site/plan.js` sets them;
+2. counts the leave each takes: the workdays from departure to the day the flight back lands that
+   are not public holidays, both ends included, except a landing day when the flight lands before
+   noon. A flight back that leaves late at night lands the next day, so the day it leaves counts
+   too. The workdays are Monday, Tuesday and Thursday, the week of the person the page was made
+   for; `WORKDAYS` in `site/plan.js` sets them;
 3. marks the trips whose flight out leaves Korea at 4 p.m. or later (저녁 출발) or whose flight
-   back lands there before noon (오전 도착), from the fare's own times, or for a Korean Air trip
-   without them from the route's flight times;
+   back lands there before noon (오전 도착, or 다음 날 오전 도착 when it lands the day after it
+   leaves), from the fare's own times, or for a Korean Air trip without them from the route's
+   flight times;
 4. attaches the cheapest known fare for the route and dates among the airlines picked, and names
    its airline;
 5. lists the trips that take the least leave first; among those, the trips with a known fare
@@ -56,7 +58,7 @@ Amadeus closed its free Self-Service APIs on 17 July 2026. That leaves two sourc
 | File | Written by | What it holds |
 |---|---|---|
 | `site/data/fares.json` | you, by hand | fares you saw yourself, kept in the repository |
-| `site/data/live-fares.json` | the workflow, at each deploy | nonstop fares of every airline that Aviasales users found in the last 48 hours, from the [Travelpayouts Data API](https://support.travelpayouts.com/hc/en-us/articles/203956163-Aviasales-Data-API): the cheapest for each route, pair of dates and airline, with the time the flight out leaves and, when the API gives the return flight's duration, the time the flight back lands |
+| `site/data/live-fares.json` | the workflow, at each deploy | nonstop fares of every airline that Aviasales users found in the last 48 hours, from the [Travelpayouts Data API](https://support.travelpayouts.com/hc/en-us/articles/203956163-Aviasales-Data-API): the cheapest for each route, pair of dates and airline, with the time the flight out leaves and, when the API gives the return flight's duration, the time the flight back lands and, if it lands after midnight, the day |
 
 `live-fares.json` is never committed; the workflow fetches it into the build. Without a token the
 workflow writes an empty one and the page says live fares are not set up. Aviasales data comes from

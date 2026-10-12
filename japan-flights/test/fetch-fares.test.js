@@ -40,10 +40,24 @@ test('the flight back takes the local date where it leaves', () => {
   assert.equal(localDate('2026-11-15T23:30:00+08:00'), '2026-11-16'); // what Korea's clock says
 });
 
-test('a timestamp and some minutes after it become the local time', () => {
+test('a flight back that lands after midnight gives the day it lands', () => {
+  const hongKong = { id: 'ICN-HKG', origin: 'ICN', dest: 'HKG', utcOffset: 8 };
+  const response = {
+    success: true,
+    data: [
+      ticket({ return_at: '2026-11-15T23:30:00+08:00', duration_back: 215 }),
+      ticket({ return_at: '2026-11-15T15:00:00+08:00', duration_back: 215 }),
+    ],
+  };
+  const [late, day] = pickFares(response, hongKong, '2026-10-11');
+  assert.deepEqual([late.return, late.arrives, late.lands], ['2026-11-15', '04:05', '2026-11-16']);
+  assert.deepEqual([day.return, day.arrives, 'lands' in day], ['2026-11-15', '19:35', false]);
+});
+
+test('a timestamp becomes the local time in Korea', () => {
   assert.equal(localTime('2026-11-13T09:15:00+09:00'), '09:15');
   assert.equal(localTime('2026-11-12T23:20:00Z'), '08:20');
-  assert.equal(localTime('2026-11-15T12:00:00+09:00', 115), '13:55');
+  assert.equal(localTime('2026-11-15T23:30:00+08:00'), '00:30');
 });
 
 test('months run on from the current one, across a year', () => {

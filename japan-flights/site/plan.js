@@ -113,17 +113,17 @@ function holidayDays(holidays) {
   return days;
 }
 
-// The leave a trip takes: the workdays from departure to return that are
-// not public holidays, both ends included as whole days, except that the
-// return day takes none when the flight back lands before noon
-// (`morningArrival`), since there is still time to go to work. Also gives
-// the holidays the trip spans, a substitute day under the name of the
-// holiday it stands in for.
-export function leaveFor(depart, ret, holidays, { morningArrival = false } = {}) {
+// The leave a trip takes: the workdays from departure to the day the
+// flight back lands that are not public holidays, both ends included as
+// whole days, except that the landing day takes none when the flight lands
+// before noon (`morningArrival`), since there is still time to go to work.
+// Also gives the holidays the trip spans, a substitute day under the name
+// of the holiday it stands in for.
+export function leaveFor(depart, lands, holidays, { morningArrival = false } = {}) {
   const named = holidayDays(holidays);
   let leave = 0;
   const names = [];
-  const last = dayNumber(ret);
+  const last = dayNumber(lands);
   for (let day = dayNumber(depart); day <= last; day++) {
     const name = named.get(day);
     if (name) {
@@ -209,11 +209,11 @@ function byLeaveFareDate(a, b) {
 }
 
 // The trips that match `filter`, each with the cheapest known fare among
-// the airlines asked for and its airline, its leave, the holidays it spans
-// and the marks its flight times earn: the least leave first, then known
-// fares, the cheapest first, then the soonest departure. The
-// schedules are Korean Air's, so another airline's trip comes only from a
-// fare.
+// the airlines asked for and its airline, the day its flight back lands,
+// its leave, the holidays it spans and the marks its flight times earn:
+// the least leave first, then known fares, the cheapest first, then the
+// soonest departure. The schedules are Korean Air's, so another airline's
+// trip comes only from a fare.
 //
 // filter: { from, to, minNights, maxNights, maxLeave, maxPrice, origins, cities, airlines }
 // `from` and `to` bound the departure date; `maxLeave`, `maxPrice`,
@@ -248,11 +248,13 @@ export function recommend({ routes, fares, holidays, today }, filter) {
   for (const [key, trip] of trips) {
     const fare = cheapest.get(key) || null;
     const marks = marksFor(byId.get(trip.route), fare);
-    const { leave, holidays: names } = leaveFor(trip.depart, trip.return, holidays, marks);
+    // A flight back that leaves late at night lands the next day.
+    const lands = (fare && fare.lands) || trip.return;
+    const { leave, holidays: names } = leaveFor(trip.depart, lands, holidays, marks);
     if (filter.maxLeave != null && leave > filter.maxLeave) continue;
     if (filter.maxPrice != null && !(fare && fare.price <= filter.maxPrice)) continue;
     out.push({
-      ...trip, fare, airline: fare ? airlineOf(fare) : 'KE', leave, holidays: names, ...marks,
+      ...trip, fare, airline: fare ? airlineOf(fare) : 'KE', lands, leave, holidays: names, ...marks,
     });
   }
   return out.sort(byLeaveFareDate);
