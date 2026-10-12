@@ -84,20 +84,43 @@ export function roundTrips(route, from, to, minNights, maxNights) {
   return trips;
 }
 
+// Leave and Fridays are counted by day number, days since 1 January 1970,
+// so that thousands of trips need no date strings built day by day.
+function dayNumber(date) {
+  return toUTC(date) / DAY_MS;
+}
+
+// 0 for Sunday to 6 for Saturday; day 0 was a Thursday.
+function weekday(day) {
+  return (day + 4) % 7;
+}
+
+const holidaysByDay = new WeakMap();
+
+// The holidays by day number, worked out once for each holidays object.
+function holidayDays(holidays) {
+  let days = holidaysByDay.get(holidays);
+  if (!days) {
+    days = new Map(Object.entries(holidays).map(([date, name]) => [dayNumber(date), name]));
+    holidaysByDay.set(holidays, days);
+  }
+  return days;
+}
+
 // The leave a trip takes: weekdays from departure to return, both ends
-// included, that are not public holidays. The flights leave Incheon in the
-// morning and land back in the afternoon, so neither end is a free day.
-// Also gives the holidays the trip spans, a substitute day under the name
-// of the holiday it stands in for.
+// included as whole days, that are not public holidays. Also gives the
+// holidays the trip spans, a substitute day under the name of the holiday
+// it stands in for.
 export function leaveFor(depart, ret, holidays) {
+  const named = holidayDays(holidays);
   let leave = 0;
   const names = [];
-  for (let date = depart; date <= ret; date = addDays(date, 1)) {
-    const name = holidays[date];
+  for (let day = dayNumber(depart), last = dayNumber(ret); day <= last; day++) {
+    const name = named.get(day);
     if (name) {
       const shown = name.replace(/ 대체공휴일$/, '');
       if (!names.includes(shown)) names.push(shown);
-    } else if (dayOf(date) !== 'sat' && dayOf(date) !== 'sun') {
+    } else if (weekday(day) !== 0 && weekday(day) !== 6) {
       leave++;
     }
   }
@@ -106,10 +129,8 @@ export function leaveFor(depart, ret, holidays) {
 
 // Whether a trip spans a Friday, departure and return days included.
 export function spansFriday(depart, ret) {
-  for (let date = depart; date <= ret; date = addDays(date, 1)) {
-    if (dayOf(date) === 'fri') return true;
-  }
-  return false;
+  const first = dayNumber(depart);
+  return (5 - weekday(first) + 7) % 7 <= dayNumber(ret) - first;
 }
 
 // Whether a route's flight out leaves Incheon at 4 p.m. or later, and
