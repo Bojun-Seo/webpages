@@ -1,10 +1,10 @@
 # Japan Flights
 
-A static page that recommends Korean Air round trips from Seoul Incheon to Japan's regional
-airports (Oita, Nagasaki, Hiroshima, Niigata, Aomori and others). It knows the days each route
-flies, lists the round trips the schedule allows, counts the days of leave each trip takes against
-Korean public holidays, and puts trips with a known fare first, cheapest first. GitHub Pages serves
-it; there is no server.
+A static page that recommends Korean Air round trips from Seoul Incheon to Japan: Tokyo, Osaka,
+Fukuoka and the other main cities, and regional airports such as Oita, Hiroshima and Aomori. It
+knows the days each route flies, lists the round trips the schedule allows, counts the days of leave
+each trip takes against Korean public holidays, and puts trips with a known fare first, cheapest
+first. GitHub Pages serves it; there is no server.
 
 The page is in Korean. It is not affiliated with Korean Air.
 
@@ -19,9 +19,9 @@ The page is in Korean. It is not affiliated with Korean Air.
 
 ## What it does
 
-Regional routes fly a few days a week (Oita: Monday, Wednesday, Friday and Sunday), so most pairs
-of dates are not a round trip at all. For the departure month, trip length, leave and budget the
-visitor picks, the page:
+The main routes fly every day, but regional ones fly a few days a week (Oita: Monday, Wednesday,
+Friday and Sunday), so on those most pairs of dates are not a round trip at all. For the departure
+month, trip length, leave and budget the visitor picks, the page:
 
 1. lists every round trip with a flight at both ends, within the schedule periods in
    `data/routes.json`;
@@ -81,8 +81,8 @@ a route whose days are not known yet.
    demand. The [top-level README](../README.md#publishing) says how the site is put together.
 3. For live fares, sign up at [Travelpayouts](https://www.travelpayouts.com/), copy the API token
    from its developer settings, and add it as the repository secret `TRAVELPAYOUTS_TOKEN`
-   (**Settings → Secrets and variables → Actions**). The fetch makes about 130 queries, a little
-   over a second apart, so it adds two to three minutes to a deploy. A failed fetch does not stop
+   (**Settings → Secrets and variables → Actions**). The fetch makes about 220 queries, a little
+   over a second apart, so it adds about four minutes to a deploy. A failed fetch does not stop
    the page from publishing.
 
 ## Update the data
@@ -131,11 +131,16 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   Kumamoto, Kagoshima and Okayama had not announced their winter days by then, and Sendai and
   Miyazaki join Korean Air only when Asiana merges into it on 17 December 2026; those routes
   appear in recommendations only through a fare.
+- The main routes (Tokyo Narita and Haneda, Osaka, Nagoya, Fukuoka, Sapporo and Okinawa) were added
+  on 12 October 2026 as flying daily. Only Narita, Osaka and Okinawa have a source for the winter
+  season; for the others the page assumes the summer's daily service goes on, and their cards say
+  so. Their flight times are not listed, since only summer times could be found, so they get
+  neither 저녁 출발 nor 오전 도착.
 - The search links follow URL formats the sites do not document, and any of them can change. The
   KAYAK link asks for Korean Air nonstop flights; the others show every airline.
 - Leave counts the departure and return days as whole days even for a trip marked 저녁 출발 or
   오전 도착, and counts only Korean public holidays, not company holidays.
 - A route lists one set of flight times, the latest its sources give, and 저녁 출발 and 오전 도착
-  follow them even for a trip in another season. The Korean Air routes here all leave Incheon in
-  the morning and land back in the afternoon, so no trip is marked either way yet.
+  follow them even for a trip in another season. The routes with times all leave Incheon in the
+  morning and land back in the afternoon, so no trip is marked either way yet.
 - Prices are for one adult in economy and may differ from what a booking finally costs.

@@ -1,6 +1,120 @@
 {
-  "updated": "2026-10-11",
+  "updated": "2026-10-12",
   "routes": [
+    {
+      "id": "ICN-NRT",
+      "origin": "ICN",
+      "dest": "NRT",
+      "city": "도쿄 나리타",
+      "region": "간토 · 지바현",
+      "about": "도쿄 도심까지 열차로 1시간 안팎",
+      "periods": [
+        { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
+        { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
+      ],
+      "sources": [
+        { "title": "sky-budget (2026-03-13)", "url": "https://sky-budget.com/2026/03/13/korean-air-increase-nrt-icn-apr2026/" },
+        { "title": "AeroRoutes (2026-09-02)", "url": "https://www.aeroroutes.com/eng/260902-keoznw26int" }
+      ]
+    },
+    {
+      "id": "ICN-HND",
+      "origin": "ICN",
+      "dest": "HND",
+      "city": "도쿄 하네다",
+      "region": "간토 · 도쿄도",
+      "about": "인천에서 밤에 떠나 하네다에서 새벽에 돌아오는 심야편",
+      "periods": [
+        { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
+        { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
+      ],
+      "note": "하루 1회 심야편입니다. 10월 25일부터의 동계 일정은 아직 확인하지 못해, 하계처럼 매일 운항한다고 보고 넣었습니다.",
+      "sources": [
+        { "title": "ゆかりたび (인천-하네다 심야편)", "url": "https://yukaritabi.com/tips/lab/haneda-incheon-midnight-flight/" },
+        { "title": "나무위키 인천-하네다 항공노선", "url": "https://namu.wiki/w/%EC%9D%B8%EC%B2%9C-%ED%95%98%EB%84%A4%EB%8B%A4%20%ED%95%AD%EA%B3%B5%EB%85%B8%EC%84%A0" }
+      ]
+    },
+    {
+      "id": "ICN-KIX",
+      "origin": "ICN",
+      "dest": "KIX",
+      "city": "오사카",
+      "region": "간사이 · 오사카부",
+      "about": "도톤보리와 오사카성, 교토·나라로 가는 길",
+      "periods": [
+        { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
+        { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
+      ],
+      "sources": [
+        { "title": "Aviation Wire (2026-02)", "url": "https://www.aviationwire.jp/archives/337915" },
+        { "title": "AeroRoutes (2026-09-02)", "url": "https://www.aeroroutes.com/eng/260902-keoznw26int" }
+      ]
+    },
+    {
+      "id": "ICN-NGO",
+      "origin": "ICN",
+      "dest": "NGO",
+      "city": "나고야",
+      "region": "주부 · 아이치현",
+      "about": "나고야성과 지브리 파크, 다카야마로 가는 길",
+      "periods": [
+        { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
+        { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
+      ],
+      "note": "하계는 주 21회 운항했습니다. 10월 25일부터의 동계 일정은 아직 확인하지 못해, 하계처럼 매일 운항한다고 보고 넣었습니다.",
+      "sources": [
+        { "title": "주부국제공항 2026 하계 스케줄 (2026-03-27)", "url": "https://www.centrair.jp/corporate/newsroom/__icsFiles/afieldfile/2026/03/27/JP_2026_summer_schedule_web.pdf" }
+      ]
+    },
+    {
+      "id": "ICN-FUK",
+      "origin": "ICN",
+      "dest": "FUK",
+      "city": "후쿠오카",
+      "region": "규슈 · 후쿠오카현",
+      "about": "하카타 야타이와 다자이후 텐만구",
+      "periods": [
+        { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
+        { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
+      ],
+      "note": "하계는 하루 여러 회 운항했습니다. 10월 25일부터의 동계 일정은 아직 확인하지 못해, 하계처럼 매일 운항한다고 보고 넣었습니다.",
+      "sources": [
+        { "title": "Travel Voice (2026-02)", "url": "https://www.travelvoice.jp/english/korean-air-will-considerably-extend-flight-networks-to-local-cities-in-japan-in-this-summer" },
+        { "title": "나무위키 인천-후쿠오카 항공노선", "url": "https://namu.wiki/w/%EC%9D%B8%EC%B2%9C-%ED%9B%84%EC%BF%A0%EC%98%A4%EC%B9%B4%20%ED%95%AD%EA%B3%B5%EB%85%B8%EC%84%A0" }
+      ]
+    },
+    {
+      "id": "ICN-CTS",
+      "origin": "ICN",
+      "dest": "CTS",
+      "city": "삿포로",
+      "region": "홋카이도",
+      "about": "눈축제와 오타루 운하, 비에이·후라노",
+      "periods": [
+        { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
+        { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
+      ],
+      "note": "하계는 하루 여러 회 운항했습니다. 10월 25일부터의 동계 일정은 아직 확인하지 못해, 하계처럼 매일 운항한다고 보고 넣었습니다.",
+      "sources": [
+        { "title": "Travel Voice (2026-02)", "url": "https://www.travelvoice.jp/english/korean-air-will-considerably-extend-flight-networks-to-local-cities-in-japan-in-this-summer" }
+      ]
+    },
+    {
+      "id": "ICN-OKA",
+      "origin": "ICN",
+      "dest": "OKA",
+      "city": "오키나와",
+      "region": "오키나와현",
+      "about": "나하 국제거리와 추라우미 수족관",
+      "periods": [
+        { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
+        { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
+      ],
+      "sources": [
+        { "title": "Travel Voice (2026-02)", "url": "https://www.travelvoice.jp/english/korean-air-will-considerably-extend-flight-networks-to-local-cities-in-japan-in-this-summer" },
+        { "title": "AeroRoutes (2026-09-02)", "url": "https://www.aeroroutes.com/eng/260902-keoznw26int" }
+      ]
+    },
     {
       "id": "ICN-OIT",
       "origin": "ICN",
