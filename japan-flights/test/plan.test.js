@@ -253,7 +253,10 @@ test('baggage.json has a usual fee for every country flown to, and a fee with a 
 test('the bag fee follows the airline, then the country of the destination', () => {
   const baggage = { included: ['KE'], usual: { JP: 45000, HK: 59000 },
     airlines: { UO: { fee: 59000 }, ZG: { fee: 37000, approx: true } } };
-  const fee = (airline, id, bags, data = baggage) => bagFee({ airline, ...(bags === 0 ? { bags } : {}) }, route(id), data);
+  const fee = (airline, id, bags, data = baggage) => {
+    const { amount, approx, unknown } = bagFee({ airline, ...(bags === 0 ? { bags } : {}) }, route(id), data);
+    return { amount, approx, unknown };
+  };
   assert.deepEqual(fee('KE', 'ICN-NRT'), { amount: 0, approx: false, unknown: false });
   // Korean Air's fares include a bag, whatever Aviasales says.
   assert.deepEqual(fee('KE', 'ICN-NRT', 0), { amount: 0, approx: false, unknown: false });
@@ -273,13 +276,51 @@ test('a fare without a checked bag costs a bag each way, and the cheapest all in
     .find((t) => t.depart === '2026-11-20' && t.return === '2026-11-22' && t.fare);
   // Peach without a bag, 120,000 and 2 × 45,000, comes to 210,000 and beats Jeju Air's 230,000 with one.
   let t = row([fare('MM', 120000, 0), fare('7C', 230000)]);
-  assert.deepEqual([t.airline, t.fare.price, t.bagFee, t.total, t.bagFeeApprox], ['MM', 120000, 90000, 210000, true]);
+  assert.deepEqual([t.airline, t.fare.price, t.bag.amount, t.total, t.bag.approx], ['MM', 120000, 90000, 210000, true]);
   // At 150,000 it would come to 240,000, so Jeju Air's fare, which needs nothing added, is offered.
   t = row([fare('MM', 150000, 0), fare('7C', 230000)]);
-  assert.deepEqual([t.airline, t.bagFee, t.total], ['7C', 0, 230000]);
+  assert.deepEqual([t.airline, t.bag.amount, t.total], ['7C', 0, 230000]);
   // The budget holds the total.
   assert.equal(row([fare('MM', 120000, 0)], { ...november, maxPrice: 200000 }), undefined);
   assert.equal(row([fare('MM', 120000, 0)], { ...november, maxPrice: 210000 }).total, 210000);
+});
+
+test('a party pays a fare each and the fee for each bag its fares do not include', () => {
+  const baggage = { included: ['KE'], usual: { JP: 45000 }, airlines: {} };
+  const fee = (fare, people, bags) => {
+    const { amount, count, included, unknown } = bagFee(fare, route('ICN-NRT'), baggage, { people, bags });
+    return [amount, count, included, unknown];
+  };
+  const peach = { airline: 'MM', bags: 0 };
+  const jeju = { airline: '7C' };
+  // Two people with one bag between them: one bag both ways on a fare without one.
+  assert.deepEqual(fee(peach, 2, 1), [90000, 1, 0, false]);
+  assert.deepEqual(fee(peach, 2, 2), [180000, 2, 0, false]);
+  assert.deepEqual(fee(peach, 1, 0), [0, 0, 0, false]);
+  // A fare with a bag includes one for each person; a bag more costs the same fee.
+  assert.deepEqual(fee(jeju, 2, 2), [0, 0, 1, false]);
+  assert.deepEqual(fee(jeju, 1, 2), [90000, 1, 1, false]);
+  assert.deepEqual(fee({ ...jeju, bags: 2 }, 1, 2), [0, 0, 2, false]);
+  // Korean Air includes one each, whatever Aviasales says; a bag more has no known fee.
+  assert.deepEqual(fee({ airline: 'KE', bags: 0 }, 2, 2), [0, 0, 1, false]);
+  assert.deepEqual(fee({ airline: 'KE', bags: 0 }, 1, 2), [0, 1, 1, true]);
+
+  const fare = (airline, price, bags) => ({ route: 'ICN-NRT', airline, depart: '2026-11-20', return: '2026-11-22',
+    price, seen: today, ...(bags === 0 ? { bags } : {}) });
+  const fares = [fare('MM', 120000, 0), fare('7C', 155000)];
+  const november = { from: '2026-11-01', to: '2026-11-30', cities: new Set(['NRT']), origins: new Set(['ICN']) };
+  const row = (party, filter = november) => recommend({ routes, fares, holidays, today, baggage }, { ...filter, party })
+    .find((t) => t.depart === '2026-11-20' && t.return === '2026-11-22' && t.fare);
+  const offer = (t) => [t.airline, t.total, t.bag.count];
+  // One person with a bag: Jeju Air's 155,000 beats Peach's 120,000 and 90,000.
+  assert.deepEqual(offer(row({ people: 1, bags: 1 })), ['7C', 155000, 0]);
+  // Three people sharing a bag: Peach's 3 × 120,000 and 90,000 beat Jeju Air's 3 × 155,000.
+  assert.deepEqual(offer(row({ people: 3, bags: 1 })), ['MM', 450000, 1]);
+  // No bag at all: the cheaper fare as it is.
+  assert.deepEqual(offer(row({ people: 1, bags: 0 })), ['MM', 120000, 0]);
+  // The budget holds the party's total.
+  assert.equal(row({ people: 3, bags: 1 }, { ...november, maxPrice: 449999 }), undefined);
+  assert.equal(row({ people: 3, bags: 1 }, { ...november, maxPrice: 450000 }).total, 450000);
 });
 
 test('a city takes in every Korean airport, and the airport picked narrows it', () => {
@@ -345,4 +386,13 @@ test('search links ask for the cabin of the fare', () => {
   assert.match(links.Google, /through%202026-12-27%20in%20business%20class/);
   assert.match(links['카약'], /\/2026-12-27\/business\?sort=/);
   assert.match(searchLinks(route('ICN-OIT'), '2026-12-25', '2026-12-27', 'KE', 'first')[0].url, /fareType=F$/);
+});
+
+test('search links ask for as many adults as there are people', () => {
+  const links = Object.fromEntries(
+    searchLinks(route('ICN-OIT'), '2026-12-25', '2026-12-27', 'KE', 'business', 2).map((l) => [l.name, l.url]));
+  assert.match(links['네이버'], /\?adult=2&/);
+  assert.match(links['스카이스캐너'], /\?adultsv2=2&/);
+  assert.match(links.Google, /in%20business%20class%20for%202%20adults&/);
+  assert.match(links['카약'], /\/2026-12-27\/business\/2adults\?sort=/);
 });

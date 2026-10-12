@@ -25,7 +25,7 @@ The page is in Korean. It is not affiliated with any airline.
 The main routes fly every day, but regional ones fly a few days a week (Oita: Monday, Wednesday,
 Friday and Sunday), so on those most pairs of dates are not a round trip at all. For the departure
 month, trip length, leave, budget, Korean airport, cabins, destinations and airlines the visitor
-picks, the page:
+picks, and the number of people and of checked bags between them, one each unless picked, the page:
 
 1. lists every round trip of two to six nights, or of the lengths picked among them, with a Korean
    Air flight at both ends, within the schedule periods in `data/routes.json`, and every such trip a
@@ -41,17 +41,19 @@ picks, the page:
    flight times;
 4. for each cabin picked, economy, business or first, attaches the cheapest known fare for the route
    and dates among the airlines picked, as a trip of its own, and names its airline and cabin. A
-   fare without a checked bag costs its price and the fee for a bag each way from
-   `data/baggage.json`, shown under the price; it is chosen, sorted and held to the budget by that
-   total. A trip without a fare, from Korean Air's days, is offered in the cheaper cabin picked of
-   economy and business, but never in first, which Korean Air hardly sells on these routes;
+   fare costs its price for each person, and the fee from `data/baggage.json` both ways for each bag
+   it does not include, shown under the price: a fare with a checked bag includes one for each
+   person, a fare without one none. Two people with one bag thus pay two fares, and the fee for one
+   bag only on a fare without one. The fare is chosen, sorted and held to the budget by that total.
+   A trip without a fare, from Korean Air's days, is offered in the cheaper cabin picked of economy
+   and business, but never in first, which Korean Air hardly sells on these routes;
 5. lists the trips that take the least leave first; among those, the trips with a known fare
    first, cheapest first, then the rest by departure date, soonest first; on the same day, the
    shorter trip first.
 
 Every trip links to Naver, Google Flights, Skyscanner and KAYAK searches with the route and dates
-filled in, for the live price; each asks for the trip's cabin, and the KAYAK search for its airline
-too.
+filled in, for the live price; each asks for the trip's cabin and for as many adults as there are
+people, and the KAYAK search for its airline too.
 
 ## Where the fares come from
 
@@ -79,9 +81,9 @@ documents; each run logs the fields a real ticket has, to check it against.
 
 A hand-written fare looks like this. `airline` is the airline's two-letter code (`KE`, `7C`, `LJ`
 ...), and a fare without one counts as Korean Air's; `cabin` is `business` or `first` for those
-cabins, and a fare without one is economy; `bags` is `0` for a fare without a checked bag; `price`
-is the round trip for one adult, in won; `seen` is when you saw it, and the page shows how long ago
-that was.
+cabins, and a fare without one is economy; `bags` is the number of checked bags the fare includes
+for each person, `0` for none, and a fare without it includes one; `price` is the round trip for one
+adult, in won; `seen` is when you saw it, and the page shows how long ago that was.
 
 ```json
 {
@@ -126,13 +128,16 @@ Schedules change every season (late March and late October). Everything is in `s
 - `holidays.json`: public holidays by date, through 2027, from the 월력요항 that the Korea
   AeroSpace Administration publishes each June. A substitute holiday is named after the holiday it
   stands in for.
-- `baggage.json`: what a checked bag bought in advance costs one way, in won, for a fare without
-  one. `airlines` gives an airline's own `fee`, with the `kg` it buys, its `source` and `approx`
-  when the fee is converted or otherwise rough; `usual` gives the fee to each destination country
-  (`country` in `routes.json`) for the airlines without one, always shown as approximate. `included`
-  names the airlines whose economy fares always include a checked bag on these routes, Korean Air,
-  Asiana, JAL, ANA and Ethiopian, so that the few fares of theirs Aviasales marks without one get no
-  fee. Add an airline when the deploy log names it among the fares without a checked bag.
+- `baggage.json`: what a checked bag bought in advance costs one way, in won, for a bag a fare does
+  not include. `airlines` gives an airline's own `fee`, with the `kg` it buys, its `source` and
+  `approx` when the fee is converted or otherwise rough; `usual` gives the fee to each destination
+  country (`country` in `routes.json`) for the airlines without one, always shown as approximate.
+  `included` names the airlines whose economy fares always include a checked bag on these routes,
+  Korean Air, Asiana, JAL, ANA and Ethiopian, so that the few fares of theirs Aviasales marks
+  without one get no fee. The page counts one bag for each person on their fares, and since the
+  usual fee is a low-cost airline's, shows a bag beyond that as 요금 미확인 (fee not known) and adds
+  nothing for it. Add an airline when the deploy log names it among the fares without a checked
+  bag.
 - `fares.json`: see above.
 
 The tests check that every route has the fields the page reads and that the 2027 holidays add up
@@ -202,8 +207,12 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
 - A route lists one set of flight times, the latest its sources give, and 저녁 출발 and 오전 도착
   follow them even for a trip in another season. The routes with times all leave Incheon in the
   morning and land back in the afternoon, so only a fare's own times can mark a trip either way.
-- Prices are for one adult, in economy unless the trip is marked 비즈니스 or 퍼스트, and may differ from
-  what a booking finally costs. Business and first fares come only from `fares.json`, since the API
-  gives economy alone. Only HK Express's bag fee comes from the airline itself, and ZIPAIR's from a
-  travel site; the others are the usual fees in `baggage.json`, from Jin Air's advance price to
-  Japan and HK Express's, and the page marks them 약.
+- Prices are a fare for each person picked, all as adults, in economy unless the trip is marked 비즈니스
+  or 퍼스트, and may differ from what a booking finally costs. Business and first fares come only from
+  `fares.json`, since the API gives economy alone. Only HK Express's bag fee comes from the airline
+  itself, and ZIPAIR's from a travel site; the others are the usual fees in `baggage.json`, from Jin
+  Air's advance price to Japan and HK Express's, and the page marks them 약. A second bag for one
+  person is charged the same as the first, though an airline may charge more. A fare with a checked
+  bag counts as including one for each person. Only Korean Air and Asiana say so on their own sites;
+  JAL and ANA have given two in economy, and ANA's Basic fares, sold on some routes since November
+  2024, can include none.

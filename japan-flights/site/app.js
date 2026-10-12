@@ -2,11 +2,16 @@
 // The working out lives in plan.js.
 
 import {
-  CABINS, DAY_NAMES, TRIP_NIGHTS, airlineOf, daysBetween, dayOf, lastDayOfMonth, monthsAhead,
-  recommend, searchLinks,
+  CABINS, DAY_NAMES, DEFAULT_PARTY, TRIP_NIGHTS, airlineOf, daysBetween, dayOf, lastDayOfMonth,
+  monthsAhead, recommend, searchLinks,
 } from './plan.js';
 
 const PAGE_SIZE = 30;
+
+// The most people and checked bags the selects offer; booking sites take up
+// to nine adults.
+const MAX_PEOPLE = 9;
+const MAX_BAGS = 9;
 
 // Names for the airlines that fly these routes; any other shows its code.
 const AIRLINE_NAMES = {
@@ -83,6 +88,7 @@ function link(href, text, cls) {
 
 const state = {
   data: null,
+  party: DEFAULT_PARTY,
   nights: new Set(),
   cabins: new Set(),
   cities: new Set(),
@@ -106,7 +112,18 @@ function readFilter() {
     cities: state.cities.size ? state.cities : null,
     airlines: state.airlines.size ? state.airlines : null,
     cabins: state.cabins.size ? state.cabins : null,
+    party: { people: Number($('people').value), bags: Number($('bags').value) },
   };
+}
+
+// The line under a price that says what it adds for checked bags,
+// "왕복 위탁수하물 가격 약 90,000원 포함", with the number of bags when it is
+// more than one, and 추가 when they come on top of bags the fare includes.
+// The amount keeps to one line, so a narrow column breaks the line after 가격.
+function bagLine(bag) {
+  const bags = `${bag.included ? '추가 ' : ''}위탁수하물${bag.count > 1 ? ` ${bag.count}개` : ''}`;
+  if (bag.unknown) return `${bags} 요금 미확인`;
+  return `왕복 ${bags} 가격 ${bag.approx ? '약\u00a0' : ''}${won(bag.amount)}\u00a0포함`;
 }
 
 function tripRow(trip) {
@@ -123,10 +140,7 @@ function tripRow(trip) {
   const price = trip.fare
     ? el('div', { class: 'price' },
       el('strong', null, won(trip.total)),
-      // The amount keeps to one line, so a narrow column breaks the line after 가격.
-      trip.bagFee > 0 && el('small', { class: 'bag-fee' },
-        `왕복 위탁수하물 가격 ${trip.bagFeeApprox ? '약\u00a0' : ''}${won(trip.bagFee)}\u00a0포함`),
-      trip.bagFeeUnknown && el('small', { class: 'bag-fee' }, '위탁수하물 별도'),
+      trip.bag.count > 0 && el('small', { class: 'bag-fee' }, bagLine(trip.bag)),
       el('span', null, `${airlineName(trip.airline)} · ${seenLabel(trip.fare.seen || data.today, data.today)}`))
     : el('div', { class: 'price price-unknown' }, el('strong', null, '가격 미확인'),
       el('span', null, `${airlineName(trip.airline)} · 검색 링크로 확인`));
@@ -140,16 +154,18 @@ function tripRow(trip) {
     el('div', { class: 'badges' }, badges),
     price,
     el('div', { class: 'links' },
-      searchLinks(route, trip.depart, trip.return, trip.airline, trip.cabin)
+      searchLinks(route, trip.depart, trip.return, trip.airline, trip.cabin, state.party.people)
         .map((l) => link(l.url, l.name))));
 }
 
 function renderTrips() {
-  const { data, trips } = state;
+  const { data, trips, party } = state;
   const priced = trips.filter((t) => t.fare).length;
   $('summary').textContent = trips.length
-    ? `조건에 맞는 일정 ${trips.length.toLocaleString('ko-KR')}개 · 가격 확인 ${priced}개`
+    ? `조건에 맞는 일정 ${trips.length.toLocaleString('ko-KR')}개 · 가격 확인 ${priced}개 · `
+      + `${party.people}명·위탁수하물 ${party.bags ? `${party.bags}개` : '없음'} 기준`
     : '';
+  $('price-head').textContent = `${party.people}인 왕복`;
   const hint = $('hint');
   hint.hidden = data.fareCount > 0 || trips.length === 0;
   hint.textContent = '아직 확인된 운임이 없습니다. 일정마다 있는 링크로 실시간 가격을 확인하세요.';
@@ -205,7 +221,9 @@ function renderAirlines() {
 
 function update() {
   state.shown = PAGE_SIZE;
-  state.trips = recommend(state.data, readFilter());
+  const filter = readFilter();
+  state.party = filter.party;
+  state.trips = recommend(state.data, filter);
   renderNights();
   renderCabins();
   renderCities();
@@ -256,8 +274,12 @@ async function main() {
   $('month').replaceChildren(
     el('option', { value: 'all' }, '전체 기간'),
     ...state.data.months.map((m) => el('option', { value: m }, monthLabel(m))));
+  const counts = (from, to, label, picked) => Array.from({ length: to - from + 1 }, (_, i) =>
+    el('option', { value: from + i, selected: from + i === picked }, label(from + i)));
+  $('people').replaceChildren(...counts(1, MAX_PEOPLE, (n) => `${n}명`, DEFAULT_PARTY.people));
+  $('bags').replaceChildren(...counts(0, MAX_BAGS, (n) => (n ? `${n}개` : '없음'), DEFAULT_PARTY.bags));
 
-  for (const id of ['origin', 'month', 'leave']) $(id).addEventListener('change', update);
+  for (const id of ['origin', 'month', 'leave', 'people', 'bags']) $(id).addEventListener('change', update);
   $('budget').addEventListener('input', update);
   $('filters').addEventListener('submit', (event) => event.preventDefault());
   $('more').addEventListener('click', () => {
