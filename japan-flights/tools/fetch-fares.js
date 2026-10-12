@@ -18,18 +18,21 @@ import { parseArgs } from 'node:util';
 const API = 'https://api.travelpayouts.com/aviasales/v3/prices_for_dates';
 const PAUSE_MS = 1100;
 
-// Korea and Japan both keep UTC+9 all year, so one offset gives the local
-// date and time at either end, whatever offset the API writes its times in.
-function local(ms) {
-  return new Date(ms + 9 * 3600e3).toISOString();
+// Local dates and times, whatever offset the API writes its times in.
+// Korea and Japan keep UTC+9 all year, and Taiwan, Hong Kong and Macau
+// UTC+8; a route outside UTC+9 says so in `utcOffset`.
+const KOREA = 9;
+
+function local(ms, offset) {
+  return new Date(ms + offset * 3600e3).toISOString();
 }
 
-export function localDate(timestamp) {
-  return local(Date.parse(timestamp)).slice(0, 10);
+export function localDate(timestamp, offset = KOREA) {
+  return local(Date.parse(timestamp), offset).slice(0, 10);
 }
 
 export function localTime(timestamp, plusMinutes = 0) {
-  return local(Date.parse(timestamp) + plusMinutes * 60e3).slice(11, 16);
+  return local(Date.parse(timestamp) + plusMinutes * 60e3, KOREA).slice(11, 16);
 }
 
 export function monthsFrom(today, count) {
@@ -41,8 +44,9 @@ export function monthsFrom(today, count) {
 }
 
 // The nonstop round trips in one API response for `route`, of every
-// airline. `departs` is when the flight out leaves; `arrives`, when the
-// flight back lands, is known only if the response gives its duration.
+// airline. The dates are each flight's local date of departure. `departs`
+// is when the flight out leaves Korea; `arrives`, when the flight back lands
+// there, is known only if the response gives its duration.
 export function pickFares(response, route, seen) {
   if (!response || response.success === false || !Array.isArray(response.data)) return [];
   return response.data
@@ -52,7 +56,7 @@ export function pickFares(response, route, seen) {
       route: route.id,
       airline: t.airline,
       depart: localDate(t.departure_at),
-      return: localDate(t.return_at),
+      return: localDate(t.return_at, route.utcOffset ?? KOREA),
       price: Math.round(t.price),
       seen,
       source: 'Aviasales',

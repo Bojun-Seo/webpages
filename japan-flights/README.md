@@ -1,12 +1,12 @@
-# Japan Flights
+# Japan, Taiwan, Hong Kong and Macau Flights
 
-A static page that recommends nonstop round trips from Seoul Incheon and Gimpo to Japan: Tokyo,
-Osaka, Fukuoka and the other main cities, and regional airports such as Oita, Hiroshima and Aomori.
-It knows the days Korean Air flies each route and lists the round trips that schedule allows; other
-airlines' trips come from the fares known for them. It counts the days of leave each trip takes
-against a Monday, Tuesday and Thursday work week and Korean public holidays, and puts the trips that
-take the least leave first, then those with a known fare, cheapest first. GitHub Pages serves it;
-there is no server.
+A static page that recommends nonstop round trips from Seoul Incheon and Gimpo to Japan, Taiwan,
+Hong Kong and Macau: Tokyo, Osaka, Fukuoka and the other main Japanese cities, regional airports
+such as Oita, Hiroshima and Aomori, Taipei, Kaohsiung, Hong Kong and Macau. It knows the days Korean
+Air flies each route and lists the round trips that schedule allows; other airlines' trips come from
+the fares known for them. It counts the days of leave each trip takes against a Monday, Tuesday and
+Thursday work week and Korean public holidays, and puts the trips that take the least leave first,
+then those with a known fare, cheapest first. GitHub Pages serves it; there is no server.
 
 The page is in Korean. It is not affiliated with any airline.
 
@@ -23,8 +23,8 @@ The page is in Korean. It is not affiliated with any airline.
 
 The main routes fly every day, but regional ones fly a few days a week (Oita: Monday, Wednesday,
 Friday and Sunday), so on those most pairs of dates are not a round trip at all. For the departure
-month, trip length, leave, budget, Korean airport, Japanese cities and airlines the visitor picks,
-the page:
+month, trip length, leave, budget, Korean airport, destinations and airlines the visitor picks, the
+page:
 
 1. lists every round trip with a Korean Air flight at both ends, within the schedule periods in
    `data/routes.json`, and every trip a known fare of one of the airlines picked proves;
@@ -89,8 +89,8 @@ a route whose days are not known yet.
    demand. The [top-level README](../README.md#publishing) says how the site is put together.
 3. For live fares, sign up at [Travelpayouts](https://www.travelpayouts.com/), copy the API token
    from its developer settings, and add it as the repository secret `TRAVELPAYOUTS_TOKEN`
-   (**Settings → Secrets and variables → Actions**). The fetch makes about 290 queries, a little
-   over a second apart, so it adds about six minutes to a deploy. A failed fetch does not stop
+   (**Settings → Secrets and variables → Actions**). The fetch makes about 350 queries, a little
+   over a second apart, so it adds about seven minutes to a deploy. A failed fetch does not stop
    the page from publishing.
 
 ## Update the data
@@ -98,14 +98,15 @@ a route whose days are not known yet.
 Schedules change every season (late March and late October). Everything is in `site/data/`:
 
 - `routes.json`: one entry per route, from Incheon (`ICN`) or Gimpo (`GMP`); the city chips group
-  routes by the Japanese airport. `periods` lists the stretches whose days are known, each
-  with `from`, `to` and `days` (`"daily"`, or a list such as `["mon", "wed", "fri", "sun"]`); the
-  same days serve both directions, since each route turns around in Japan the same day. A route
-  whose days are not known keeps `periods` empty and says why in `note`. `flights`, where known,
-  gives the flight `out` and the flight `back`, each with `departs` and `arrives` in local 24-hour
-  time (`"09:15"`) and the flight `number` where the source names it. The route card shows them,
-  and they decide 저녁 출발 and 오전 도착. Add the source of every change to `sources`, and move
-  `updated` on.
+  routes by the airport they fly to. A destination outside UTC+9 gives `utcOffset` (Taiwan, Hong
+  Kong and Macau: `8`), so the fetcher gives the flight back its local date. `periods` lists the
+  stretches whose days are known, each with `from`, `to` and `days` (`"daily"`, or a list such as
+  `["mon", "wed", "fri", "sun"]`); the same days serve both directions, since each route turns
+  around abroad the same day. A route whose days are not known keeps `periods` empty and says why in
+  `note`. `flights`, where known, gives the flight `out` and the flight `back`, each with `departs`
+  and `arrives` in local 24-hour time (`"09:15"`) and the flight `number` where the source names it.
+  The route card shows them, and they decide 저녁 출발 and 오전 도착. Add the source of every change to
+  `sources`, and move `updated` on.
 - `holidays.json`: public holidays by date, through 2027, from the 월력요항 that the Korea
   AeroSpace Administration publishes each June. A substitute holiday is named after the holiday it
   stands in for.
@@ -148,6 +149,10 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
 - Hakodate, Takamatsu, Matsuyama and Yonago, which Korean Air does not fly, were added on 12 October
   2026 for the fares of the airlines that do; Yonago's only source is a summary of routes. Other
   destinations only other airlines fly are not listed yet, so their fares are not fetched.
+- Taipei Taoyuan and Hong Kong were added on 12 October 2026 as flying daily on Korean Air, whose
+  route pages had October fares; their winter season is assumed, and their cards say so. Taipei
+  Songshan, Kaohsiung and Macau come through fares only: Korean Air does not fly the first two, and
+  its daily Macau service from July 2024 was not confirmed for 2026.
 - Gimpo–Haneda was added on 12 October 2026 as flying daily; for Gimpo–Kansai only Asiana's daily
   winter service was found, so Korean Air's days are not given and the route comes only through
   fares.

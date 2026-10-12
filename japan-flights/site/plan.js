@@ -44,7 +44,7 @@ function periodFlies(period, day) {
 }
 
 // Whether `route` has flights on `date`. Every one of these routes turns
-// around in Japan the same day, so the flights out and back share days.
+// around abroad the same day, so the flights out and back share days.
 export function fliesOn(route, date) {
   const period = periodOn(route, date);
   return period ? periodFlies(period, dayOf(date)) : false;
@@ -136,8 +136,8 @@ export function leaveFor(depart, ret, holidays, { morningArrival = false } = {})
   return { leave, holidays: names };
 }
 
-// Times are 'HH:MM' on the clock Korea and Japan share, so they compare as
-// strings.
+// Times are 'HH:MM', so they compare as strings. The marks read only times
+// in Korea: when the flight out leaves and when the flight back lands.
 const EVENING = '16:00';
 const NOON = '12:00';
 
@@ -217,7 +217,7 @@ function byLeaveFareDate(a, b) {
 //
 // filter: { from, to, minNights, maxNights, maxLeave, maxPrice, origins, cities, airlines }
 // `from` and `to` bound the departure date; `maxLeave`, `maxPrice`,
-// `origins` (a Set of Korean airport codes), `cities` (a Set of Japanese
+// `origins` (a Set of Korean airport codes), `cities` (a Set of destination
 // airport codes) and `airlines` (a Set of airline codes) are left out to
 // mean no limit.
 export function recommend({ routes, fares, holidays, today }, filter) {

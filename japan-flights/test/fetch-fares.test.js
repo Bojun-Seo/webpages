@@ -33,6 +33,13 @@ test('a timestamp becomes the local date in Korea and Japan', () => {
   assert.equal(localDate('2026-11-13T14:59:00Z'), '2026-11-13');
 });
 
+test('the flight back takes the local date where it leaves', () => {
+  const hongKong = { id: 'ICN-HKG', origin: 'ICN', dest: 'HKG', utcOffset: 8 };
+  const late = { success: true, data: [ticket({ return_at: '2026-11-15T23:30:00+08:00' })] };
+  assert.equal(pickFares(late, hongKong, '2026-10-11')[0].return, '2026-11-15');
+  assert.equal(localDate('2026-11-15T23:30:00+08:00'), '2026-11-16'); // what Korea's clock says
+});
+
 test('a timestamp and some minutes after it become the local time', () => {
   assert.equal(localTime('2026-11-13T09:15:00+09:00'), '09:15');
   assert.equal(localTime('2026-11-12T23:20:00Z'), '08:20');
