@@ -151,16 +151,17 @@ function byString(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-// The soonest departure first; on the same day, the shorter trip, then the
-// cheaper known fare.
-function byDate(a, b) {
-  return byString(a.depart, b.depart) || a.nights - b.nights
-    || byNumber(priceOf(a), priceOf(b)) || byString(a.route, b.route);
+// Trips with a known fare first, the cheapest first; then the soonest
+// departure, and on the same day the shorter trip.
+function byFareThenDate(a, b) {
+  return byNumber(priceOf(a), priceOf(b)) || byString(a.depart, b.depart) || a.nights - b.nights
+    || byString(a.route, b.route);
 }
 
 // The trips that match `filter`, each with its leave, the holidays it
 // spans, whether it spans a Friday, the marks its flight times earn and
-// the cheapest known fare, the soonest departure first.
+// the cheapest known fare: known fares first, the cheapest first, then the
+// soonest departure.
 //
 // filter: { from, to, minNights, maxNights, maxLeave, maxPrice, cities }
 // `from` and `to` bound the departure date; `maxLeave`, `maxPrice` and
@@ -197,7 +198,7 @@ export function recommend({ routes, fares, holidays, today }, filter) {
       ...flightMarks(byId.get(trip.route)),
     });
   }
-  return out.sort(byDate);
+  return out.sort(byFareThenDate);
 }
 
 // The months from today's to the last one any route has a schedule for.

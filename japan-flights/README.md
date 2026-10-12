@@ -2,9 +2,9 @@
 
 A static page that recommends Korean Air round trips from Seoul Incheon to Japan's regional
 airports (Oita, Nagasaki, Hiroshima, Niigata, Aomori and others). It knows the days each route
-flies, lists the round trips the schedule allows, soonest first, counts the days of leave each trip
-takes against Korean public holidays, and shows the fares it knows. GitHub Pages serves it; there
-is no server.
+flies, lists the round trips the schedule allows, counts the days of leave each trip takes against
+Korean public holidays, and puts trips with a known fare first, cheapest first. GitHub Pages serves
+it; there is no server.
 
 The page is in Korean. It is not affiliated with Korean Air.
 
@@ -31,7 +31,8 @@ visitor picks, the page:
    whose flight out leaves Incheon at 4 p.m. or later (저녁 출발) or whose flight back lands
    there before noon (오전 도착);
 4. attaches the cheapest known fare for the route and dates;
-5. lists them by departure date, soonest first; on the same day, the shorter trip first.
+5. lists the trips with a known fare first, cheapest first, then the rest by departure date,
+   soonest first; on the same day, the shorter trip first.
 
 Every trip links to Naver, Google Flights, Skyscanner and KAYAK searches with the route and dates
 filled in, for the live price. Below the list, a card per route shows its days of operation in
