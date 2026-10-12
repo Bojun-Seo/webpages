@@ -35,6 +35,22 @@
       ]
     },
     {
+      "id": "GMP-HND",
+      "origin": "GMP",
+      "dest": "HND",
+      "city": "도쿄 하네다",
+      "region": "간토 · 도쿄도",
+      "about": "도심에서 가까운 김포와 하네다를 잇는 노선",
+      "periods": [
+        { "from": "2026-03-29", "to": "2026-10-24", "days": "daily" },
+        { "from": "2026-10-25", "to": "2027-03-27", "days": "daily" }
+      ],
+      "sources": [
+        { "title": "AeroRoutes (2026-09-02)", "url": "https://www.aeroroutes.com/eng/260902-keoznw26int" },
+        { "title": "나무위키 김포-하네다 항공노선", "url": "https://namu.wiki/w/%EA%B9%80%ED%8F%AC-%ED%95%98%EB%84%A4%EB%8B%A4%20%ED%95%AD%EA%B3%B5%EB%85%B8%EC%84%A0" }
+      ]
+    },
+    {
       "id": "ICN-KIX",
       "origin": "ICN",
       "dest": "KIX",
@@ -48,6 +64,19 @@
       "sources": [
         { "title": "Aviation Wire (2026-02)", "url": "https://www.aviationwire.jp/archives/337915" },
         { "title": "AeroRoutes (2026-09-02)", "url": "https://www.aeroroutes.com/eng/260902-keoznw26int" }
+      ]
+    },
+    {
+      "id": "GMP-KIX",
+      "origin": "GMP",
+      "dest": "KIX",
+      "city": "오사카",
+      "region": "간사이 · 오사카부",
+      "about": "도톤보리와 오사카성, 교토·나라로 가는 길",
+      "periods": [],
+      "note": "대한항공의 운항 여부와 요일은 확인하지 못했습니다. 아시아나항공은 동계에도 매일 운항하며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "아시아나항공 2026 동계 한일노선 스케줄", "url": "https://m.flyasiana.com/C/JP/KO/customer/notice/detail?id=CM202608270002530228" }
       ]
     },
     {

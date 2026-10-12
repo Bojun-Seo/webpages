@@ -95,6 +95,7 @@ function readFilter() {
     maxNights,
     maxLeave: leave === 'any' ? null : Number(leave),
     maxPrice: budget > 0 ? budget * 10000 : null,
+    origins: $('origin').value === 'all' ? null : new Set([$('origin').value]),
     cities: state.cities.size ? state.cities : null,
     airlines: state.airlines.size ? state.airlines : null,
   };
@@ -164,7 +165,7 @@ function routeCard(route) {
   const priced = [...new Set(fares.filter((f) => f.route === route.id && f.depart >= today).map(airlineOf))];
   return el('article', { class: 'route' },
     el('header', null,
-      el('h3', null, route.city, el('span', { class: 'code' }, route.dest)),
+      el('h3', null, route.city, el('span', { class: 'code' }, `${route.origin}→${route.dest}`)),
       route.tag && el('span', { class: 'badge' }, route.tag)),
     el('p', { class: 'region' }, route.region),
     el('p', { class: 'about' }, route.about),
@@ -198,9 +199,14 @@ function renderChips(box, allLabel, picked, options) {
     })));
 }
 
+// One chip per Japanese airport, whichever Korean airport its routes leave.
 function renderCities() {
+  const airports = new Map();
+  for (const route of state.data.routes) {
+    if (!airports.has(route.dest)) airports.set(route.dest, route.city);
+  }
   renderChips($('cities'), '모든 도시', state.cities,
-    state.data.routes.map((route) => ({ value: route.id, label: route.city })));
+    [...airports].map(([value, label]) => ({ value, label })));
 }
 
 function renderAirlines() {
@@ -258,7 +264,7 @@ async function main() {
     el('option', { value: 'all' }, '전체 기간'),
     ...state.data.months.map((m) => el('option', { value: m }, monthLabel(m))));
 
-  for (const id of ['month', 'nights', 'leave']) $(id).addEventListener('change', update);
+  for (const id of ['origin', 'month', 'nights', 'leave']) $(id).addEventListener('change', update);
   $('budget').addEventListener('input', update);
   $('filters').addEventListener('submit', (event) => event.preventDefault());
   $('more').addEventListener('click', () => {

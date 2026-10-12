@@ -1,11 +1,11 @@
 # Japan Flights
 
-A static page that recommends nonstop round trips from Seoul Incheon to Japan: Tokyo, Osaka,
-Fukuoka and the other main cities, and regional airports such as Oita, Hiroshima and Aomori. It
-knows the days Korean Air flies each route and lists the round trips that schedule allows; other
+A static page that recommends nonstop round trips from Seoul Incheon and Gimpo to Japan: Tokyo,
+Osaka, Fukuoka and the other main cities, and regional airports such as Oita, Hiroshima and Aomori.
+It knows the days Korean Air flies each route and lists the round trips that schedule allows; other
 airlines' trips come from the fares known for them. It counts the days of leave each trip takes
-against Korean public holidays, and puts trips with a known fare first, cheapest first. GitHub
-Pages serves it; there is no server.
+against Korean public holidays, and puts trips with a known fare first, cheapest first. GitHub Pages
+serves it; there is no server.
 
 The page is in Korean. It is not affiliated with any airline.
 
@@ -22,7 +22,8 @@ The page is in Korean. It is not affiliated with any airline.
 
 The main routes fly every day, but regional ones fly a few days a week (Oita: Monday, Wednesday,
 Friday and Sunday), so on those most pairs of dates are not a round trip at all. For the departure
-month, trip length, leave, budget, cities and airlines the visitor picks, the page:
+month, trip length, leave, budget, Korean airport, Japanese cities and airlines the visitor picks,
+the page:
 
 1. lists every round trip with a Korean Air flight at both ends, within the schedule periods in
    `data/routes.json`, and every trip a known fare of one of the airlines picked proves;
@@ -92,7 +93,8 @@ a route whose days are not known yet.
 
 Schedules change every season (late March and late October). Everything is in `site/data/`:
 
-- `routes.json`: one entry per route. `periods` lists the stretches whose days are known, each
+- `routes.json`: one entry per route, from Incheon (`ICN`) or Gimpo (`GMP`); the city chips group
+  routes by the Japanese airport. `periods` lists the stretches whose days are known, each
   with `from`, `to` and `days` (`"daily"`, or a list such as `["mon", "wed", "fri", "sun"]`); the
   same days serve both directions, since each route turns around in Japan the same day. A route
   whose days are not known keeps `periods` empty and says why in `note`. `flights`, where known,
@@ -139,11 +141,14 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   season; for the others the page assumes the summer's daily service goes on, and their cards say
   so. Their flight times are not listed, since only summer times could be found, so they get
   neither 저녁 출발 nor 오전 도착.
+- Gimpo–Haneda was added on 12 October 2026 as flying daily; for Gimpo–Kansai only Asiana's daily
+  winter service was found, so Korean Air's days are not given and the route comes only through
+  fares.
 - The search links follow URL formats the sites do not document, and any of them can change. The
-  KAYAK link asks for Korean Air nonstop flights; the others show every airline.
+  KAYAK link asks for the trip's airline, nonstop; the others show every airline.
 - Leave counts the departure and return days as whole days even for a trip marked 저녁 출발 or
   오전 도착, and counts only Korean public holidays, not company holidays.
 - A route lists one set of flight times, the latest its sources give, and 저녁 출발 and 오전 도착
   follow them even for a trip in another season. The routes with times all leave Incheon in the
-  morning and land back in the afternoon, so no trip is marked either way yet.
+  morning and land back in the afternoon, so only a fare's own times can mark a trip either way.
 - Prices are for one adult in economy and may differ from what a booking finally costs.

@@ -5,7 +5,7 @@ A collection of web pages built for personal use, published with GitHub Pages at
 
 | Directory | Page | Description |
 |---|---|---|
-| [`japan-flights/`](japan-flights/) | [Japan Flights](https://bojun-seo.github.io/webpages/japan-flights/) | Recommends Korean Air round trips to Japan |
+| [`japan-flights/`](japan-flights/) | [Japan Flights](https://bojun-seo.github.io/webpages/japan-flights/) | Recommends nonstop round trips from Seoul to Japan |
 
 ## Publishing
 
