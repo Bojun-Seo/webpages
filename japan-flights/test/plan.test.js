@@ -51,7 +51,7 @@ test('Oita flies Monday, Wednesday, Friday and Sunday within its season', () => 
 });
 
 test('a round trip needs a flight at both ends', () => {
-  const trips = roundTrips(route('ICN-OIT'), '2026-12-21', '2026-12-27', 2, 3);
+  const trips = roundTrips(route('ICN-OIT'), '2026-12-21', '2026-12-27', [2, 3]);
   assert.deepEqual(trips.map((t) => `${t.depart}>${t.return}`), [
     '2026-12-21>2026-12-23', // Monday to Wednesday
     '2026-12-23>2026-12-25', // Wednesday to Friday
@@ -62,9 +62,22 @@ test('a round trip needs a flight at both ends', () => {
 });
 
 test('a round trip may cross from one season into the next', () => {
-  const trips = roundTrips(route('ICN-AOJ'), '2026-10-22', '2026-10-22', 3, 3);
+  const trips = roundTrips(route('ICN-AOJ'), '2026-10-22', '2026-10-22', [3]);
   // Thursday in summer (Mon/Wed/Thu/Fri/Sun) to Sunday in winter (Tue/Thu-Sun).
   assert.deepEqual(trips.map((t) => t.return), ['2026-10-25']);
+});
+
+test('trips run two to six nights, never one, and the lengths picked narrow them', () => {
+  const fares = [1, 2].map((nights) => ({ route: 'ICN-KMQ', depart: '2026-11-20',
+    return: addDays('2026-11-20', nights), price: 200000, seen: today }));
+  const ctx = { routes, fares, holidays, today };
+  const november = { from: '2026-11-01', to: '2026-11-30' };
+  const lengths = (filter) => [...new Set(recommend(ctx, { ...november, ...filter }).map((t) => t.nights))]
+    .sort((a, b) => a - b);
+  assert.deepEqual(lengths({}), [2, 3, 4, 5, 6]);
+  assert.deepEqual(lengths({ nights: new Set([3, 5]) }), [3, 5]);
+  assert.deepEqual(lengths({ nights: new Set([1, 4]) }), [4]);
+  assert.deepEqual(recommend(ctx, { ...november, cities: new Set(['KMQ']) }).map((t) => t.nights), [2]);
 });
 
 test('leave counts the Mondays, Tuesdays and Thursdays that are not holidays', () => {
@@ -84,7 +97,7 @@ test('a flight back that lands before noon frees the return day', () => {
   const fares = [{ route: 'ICN-HND', airline: 'KE', depart: '2026-11-13', return: '2026-11-16', price: 300000,
     seen: today, departs: '20:30', arrives: '04:35' }];
   const trips = recommend({ routes, fares, holidays, today },
-    { from: '2026-11-01', to: '2026-11-30', minNights: 3, maxNights: 3, origins: new Set(['ICN']), cities: new Set(['HND']) });
+    { from: '2026-11-01', to: '2026-11-30', nights: new Set([3]), origins: new Set(['ICN']), cities: new Set(['HND']) });
   const leave = (depart) => trips.find((t) => t.depart === depart).leave;
   assert.equal(leave('2026-11-13'), 0);
   assert.equal(leave('2026-11-20'), 1); // the same days without a known arrival
@@ -96,7 +109,7 @@ test('a flight back that lands after midnight frees the day it lands, not the da
     price: 400000, seen: today, departs: '10:00', arrives: '04:05', lands });
   const fares = [fare('2026-11-22', '2026-11-23'), fare('2026-11-23', '2026-11-24')];
   const trips = recommend({ routes, fares, holidays, today },
-    { from: '2026-11-01', to: '2026-11-30', minNights: 1, maxNights: 6, airlines: new Set(['CX']) });
+    { from: '2026-11-01', to: '2026-11-30', airlines: new Set(['CX']) });
   const trip = (ret) => trips.find((t) => t.return === ret);
   assert.deepEqual([trip('2026-11-22').lands, trip('2026-11-22').leave], ['2026-11-23', 0]); // back Monday morning
   assert.deepEqual([trip('2026-11-23').lands, trip('2026-11-23').leave], ['2026-11-24', 1]); // Monday away
@@ -121,7 +134,7 @@ test('an evening departure leaves Incheon at 4 p.m. or later, a morning arrival 
   assert.deepEqual(flightMarks(route('ICN-OIT')), { eveningDeparture: false, morningArrival: false });
 });
 
-const december = { from: '2026-12-01', to: '2026-12-31', minNights: 2, maxNights: 3 };
+const december = { from: '2026-12-01', to: '2026-12-31', nights: new Set([2, 3]) };
 
 test('each trip carries the marks its flight times earn', () => {
   const late = {
@@ -219,7 +232,7 @@ test('a city takes in every Korean airport, and the airport picked narrows it', 
 
 test('a fare brings in a trip on a route whose days are not known', () => {
   const fares = [{ route: 'ICN-KMQ', depart: '2026-11-20', return: '2026-11-22', price: 250000, seen: today }];
-  const filter = { from: '2026-11-01', to: '2026-11-30', minNights: 1, maxNights: 6 };
+  const filter = { from: '2026-11-01', to: '2026-11-30' };
   const trips = recommend({ routes, fares, holidays, today }, filter);
   assert.deepEqual(trips.filter((t) => t.route === 'ICN-KMQ').map((t) => t.depart), ['2026-11-20']);
 });
@@ -239,7 +252,7 @@ test('filters on city, leave and budget', () => {
 });
 
 test('the trips that already left are not offered', () => {
-  const filter = { from: '2026-10-01', to: '2026-10-31', minNights: 2, maxNights: 2 };
+  const filter = { from: '2026-10-01', to: '2026-10-31', nights: new Set([2]) };
   const trips = recommend({ routes, fares: [], holidays, today }, filter);
   assert.ok(trips.length > 0);
   assert.ok(trips.every((t) => t.depart >= today));

@@ -49,15 +49,19 @@ export function fliesOn(route, date) {
   return period ? periodFlies(period, dayOf(date)) : false;
 }
 
+// The trip lengths the page offers, in nights. It never offers a trip of
+// one night.
+export const TRIP_NIGHTS = [2, 3, 4, 5, 6];
+
 // Every round trip on `route` leaving between `from` and `to` that stays
-// `minNights` to `maxNights` nights with a flight at both ends.
-export function roundTrips(route, from, to, minNights, maxNights) {
+// one of `nights`, numbers of nights, with a flight at both ends.
+export function roundTrips(route, from, to, nights) {
   const trips = [];
   for (let out = from; out <= to; out = addDays(out, 1)) {
     if (!fliesOn(route, out)) continue;
-    for (let nights = minNights; nights <= maxNights; nights++) {
-      const back = addDays(out, nights);
-      if (fliesOn(route, back)) trips.push({ route: route.id, depart: out, return: back, nights });
+    for (const n of nights) {
+      const back = addDays(out, n);
+      if (fliesOn(route, back)) trips.push({ route: route.id, depart: out, return: back, nights: n });
     }
   }
   return trips;
@@ -192,13 +196,15 @@ function byLeaveFareDate(a, b) {
 // soonest departure. The schedules are Korean Air's, so another airline's
 // trip comes only from a fare.
 //
-// filter: { from, to, minNights, maxNights, maxLeave, maxPrice, origins, cities, airlines }
-// `from` and `to` bound the departure date; `maxLeave`, `maxPrice`,
-// `origins` (a Set of Korean airport codes), `cities` (a Set of destination
-// airport codes) and `airlines` (a Set of airline codes) are left out to
-// mean no limit.
+// filter: { from, to, nights, maxLeave, maxPrice, origins, cities, airlines }
+// `from` and `to` bound the departure date. `nights` (a Set of trip lengths
+// in nights) is left out to mean all of TRIP_NIGHTS, and no other length is
+// ever offered; `maxLeave`, `maxPrice`, `origins` (a Set of Korean airport
+// codes), `cities` (a Set of destination airport codes) and `airlines` (a
+// Set of airline codes) are left out to mean no limit.
 export function recommend({ routes, fares, holidays, today }, filter) {
   const from = filter.from > today ? filter.from : today;
+  const nights = new Set(TRIP_NIGHTS.filter((n) => !filter.nights || filter.nights.has(n)));
   const wanted = (route) => (!filter.origins || filter.origins.has(route.origin))
     && (!filter.cities || filter.cities.has(route.dest));
   const flown = (airline) => !filter.airlines || filter.airlines.has(airline);
@@ -209,16 +215,15 @@ export function recommend({ routes, fares, holidays, today }, filter) {
   const trips = new Map();
   for (const route of flown('KE') ? routes : []) {
     if (!wanted(route)) continue;
-    for (const trip of roundTrips(route, from, filter.to, filter.minNights, filter.maxNights)) {
+    for (const trip of roundTrips(route, from, filter.to, nights)) {
       trips.set(tripKey(trip), trip);
     }
   }
   // A fare proves a flight even where the schedule is not known.
   for (const [key, fare] of cheapest) {
-    const nights = daysBetween(fare.depart, fare.return);
-    if (trips.has(key) || fare.depart < from || fare.depart > filter.to
-      || nights < filter.minNights || nights > filter.maxNights) continue;
-    trips.set(key, { route: fare.route, depart: fare.depart, return: fare.return, nights });
+    const n = daysBetween(fare.depart, fare.return);
+    if (trips.has(key) || fare.depart < from || fare.depart > filter.to || !nights.has(n)) continue;
+    trips.set(key, { route: fare.route, depart: fare.depart, return: fare.return, nights: n });
   }
 
   const out = [];
