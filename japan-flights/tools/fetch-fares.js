@@ -140,19 +140,23 @@ async function main(argv) {
   let ok = 0;
   let failed = 0;
   // The API's own documentation is all the tests check the format against,
-  // so the log names the fields a real ticket has, once a run.
+  // so the log names the fields a real ticket has, once a run, and shows
+  // the first ticket each route gets with the airlines of its fares.
   let shown = false;
   for (const route of routes) {
-    for (const [i, out] of months.entries()) {
+    const before = fares.length;
+    let first = null;
+    for (const out of months) {
       // Ask for returns in the same month and the next, so a trip over a
       // month's end (New Year's) is not missed.
       for (const back of [out, monthsFrom(`${out}-01`, 2)[1]]) {
         if (ok + failed > 0) await new Promise((resolve) => setTimeout(resolve, PAUSE_MS));
         try {
           const response = await query(route, out, back, token);
-          if (!shown && response?.data?.length) {
-            console.log(`Ticket fields: ${Object.keys(response.data[0]).join(', ')}`);
+          if (response?.data?.length) {
+            if (!shown) console.log(`Ticket fields: ${Object.keys(response.data[0]).join(', ')}`);
             shown = true;
+            first ??= response.data[0];
           }
           fares.push(...pickFares(response, route, seen));
           ok++;
@@ -161,8 +165,10 @@ async function main(argv) {
           console.warn(`${route.id} ${out}/${back}: ${error.message}`);
         }
       }
-      if (i === months.length - 1) console.log(`${route.id}: ${fares.length} fares so far`);
     }
+    const airlines = [...new Set(fares.slice(before).map((f) => f.airline))].sort().join(', ');
+    console.log(`${route.id}: ${fares.length - before} fares${airlines ? ` (${airlines})` : ''}`);
+    if (first) console.log(`  first ticket: ${JSON.stringify(first)}`);
   }
 
   fares = keepCheapest(fares);
