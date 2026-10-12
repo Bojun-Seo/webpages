@@ -107,7 +107,6 @@ function tripRow(trip) {
   const badges = [
     el('span', { class: `badge ${trip.leave === 0 ? 'badge-good' : ''}` }, `연차 ${trip.leave}일`),
     ...trip.holidays.map((name) => el('span', { class: 'badge badge-holiday' }, name)),
-    trip.friday && el('span', { class: 'badge' }, '금요일 포함'),
     trip.eveningDeparture && el('span', { class: 'badge' }, '저녁 출발'),
     trip.morningArrival && el('span', { class: 'badge' }, '오전 도착'),
     route.tag && el('span', { class: 'badge' }, route.tag),

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   addDays, airlineOf, dayOf, fliesOn, flightMarks, flightTimes, leaveFor, monthsAhead, recommend,
-  roundTrips, searchLinks, spansFriday, timetableDays,
+  roundTrips, searchLinks, timetableDays,
 } from '../site/plan.js';
 
 const data = (name) => JSON.parse(readFileSync(new URL(`../site/data/${name}`, import.meta.url)));
@@ -92,14 +92,6 @@ test('the 2027 holidays leave 119 days off in a five-day week, as the official c
   assert.equal(off, 119);
 });
 
-test('a trip spans a Friday if it leaves, returns or stays over on one', () => {
-  assert.equal(spansFriday('2026-12-25', '2026-12-27'), true); // Friday to Sunday
-  assert.equal(spansFriday('2026-12-23', '2026-12-25'), true); // Wednesday to Friday
-  assert.equal(spansFriday('2026-12-24', '2026-12-26'), true); // Thursday to Saturday
-  assert.equal(spansFriday('2026-12-21', '2026-12-24'), false); // Monday to Thursday
-  assert.equal(spansFriday('2026-12-26', '2026-12-31'), false); // Saturday to Thursday
-});
-
 test('an evening departure leaves Incheon at 4 p.m. or later, a morning arrival lands before noon', () => {
   const times = (departs, arrives) => ({
     flights: { out: { departs, arrives: '19:00' }, back: { departs: '08:00', arrives } },
@@ -113,7 +105,7 @@ test('an evening departure leaves Incheon at 4 p.m. or later, a morning arrival 
 
 const december = { from: '2026-12-01', to: '2026-12-31', minNights: 2, maxNights: 3 };
 
-test('each trip carries its Friday and flight time marks', () => {
+test('each trip carries the marks its flight times earn', () => {
   const late = {
     ...route('ICN-KIJ'),
     flights: { out: { departs: '18:00', arrives: '20:05' }, back: { departs: '08:30', arrives: '10:50' } },
@@ -122,11 +114,10 @@ test('each trip carries its Friday and flight time marks', () => {
   const trips = recommend(ctx, { ...december, cities: new Set(['OIT', 'KIJ']) });
   const marks = (id, depart, ret) => {
     const t = trips.find((x) => x.route === id && x.depart === depart && x.return === ret);
-    return [t.friday, t.eveningDeparture, t.morningArrival];
+    return [t.eveningDeparture, t.morningArrival];
   };
-  assert.deepEqual(marks('ICN-OIT', '2026-12-25', '2026-12-27'), [true, false, false]);
-  assert.deepEqual(marks('ICN-OIT', '2026-12-21', '2026-12-23'), [false, false, false]);
-  assert.deepEqual(marks('ICN-KIJ', '2026-12-21', '2026-12-23'), [false, true, true]);
+  assert.deepEqual(marks('ICN-OIT', '2026-12-25', '2026-12-27'), [false, false]);
+  assert.deepEqual(marks('ICN-KIJ', '2026-12-21', '2026-12-23'), [true, true]);
 });
 
 test('known fares come first, the cheapest first, then the soonest trips', () => {
