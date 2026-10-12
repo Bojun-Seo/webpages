@@ -199,6 +199,7 @@ h2 { font-size: 1.25rem; font-weight: 600; }
 }
 .badge-good { background: var(--good-soft); color: var(--good); font-weight: 600; }
 .badge-holiday { background: var(--holiday-soft); color: var(--holiday); }
+.badge-cabin { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .price { grid-area: price; display: grid; justify-items: end; align-content: start; text-align: right; }
 .price strong {
   font-family: var(--font-data);

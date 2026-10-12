@@ -2,8 +2,8 @@
 // The working out lives in plan.js.
 
 import {
-  DAY_NAMES, TRIP_NIGHTS, airlineOf, daysBetween, dayOf, lastDayOfMonth, monthsAhead, recommend,
-  searchLinks,
+  CABINS, DAY_NAMES, TRIP_NIGHTS, airlineOf, daysBetween, dayOf, lastDayOfMonth, monthsAhead,
+  recommend, searchLinks,
 } from './plan.js';
 
 const PAGE_SIZE = 30;
@@ -16,6 +16,8 @@ const AIRLINE_NAMES = {
   GK: '젯스타재팬', ET: '에티오피아항공', BR: '에바항공', CI: '중화항공', JX: '스타럭스항공',
   IT: '타이거에어 타이완', CX: '캐세이퍼시픽', UO: '홍콩익스프레스', HX: '홍콩항공', NX: '에어마카오', TR: '스쿠트',
 };
+
+const CABIN_NAMES = { economy: '이코노미', business: '비즈니스', first: '퍼스트' };
 
 function airlineName(code) {
   return AIRLINE_NAMES[code] || code;
@@ -80,7 +82,13 @@ function link(href, text, cls) {
 }
 
 const state = {
-  data: null, nights: new Set(), cities: new Set(), airlines: new Set(), trips: [], shown: PAGE_SIZE,
+  data: null,
+  nights: new Set(),
+  cabins: new Set(),
+  cities: new Set(),
+  airlines: new Set(),
+  trips: [],
+  shown: PAGE_SIZE,
 };
 
 function readFilter() {
@@ -97,6 +105,7 @@ function readFilter() {
     origins: $('origin').value === 'all' ? null : new Set([$('origin').value]),
     cities: state.cities.size ? state.cities : null,
     airlines: state.airlines.size ? state.airlines : null,
+    cabins: state.cabins.size ? state.cabins : null,
   };
 }
 
@@ -105,6 +114,7 @@ function tripRow(trip) {
   const route = data.byId.get(trip.route);
   const badges = [
     el('span', { class: `badge ${trip.leave === 0 ? 'badge-good' : ''}` }, `연차 ${trip.leave}일`),
+    trip.cabin !== 'economy' && el('span', { class: 'badge badge-cabin' }, CABIN_NAMES[trip.cabin]),
     ...trip.holidays.map((name) => el('span', { class: 'badge badge-holiday' }, name)),
     trip.eveningDeparture && el('span', { class: 'badge' }, '저녁 출발'),
     trip.morningArrival && el('span', { class: 'badge' }, trip.lands > trip.return ? '다음 날 오전 도착' : '오전 도착'),
@@ -126,7 +136,8 @@ function tripRow(trip) {
     el('div', { class: 'badges' }, badges),
     price,
     el('div', { class: 'links' },
-      searchLinks(route, trip.depart, trip.return, trip.airline).map((l) => link(l.url, l.name))));
+      searchLinks(route, trip.depart, trip.return, trip.airline, trip.cabin)
+        .map((l) => link(l.url, l.name))));
 }
 
 function renderTrips() {
@@ -168,6 +179,11 @@ function renderNights() {
     TRIP_NIGHTS.map((n) => ({ value: n, label: `${n}박` })));
 }
 
+function renderCabins() {
+  renderChips($('cabins'), '모든 좌석', state.cabins,
+    CABINS.map((cabin) => ({ value: cabin, label: CABIN_NAMES[cabin] })));
+}
+
 // One chip per destination airport, whichever Korean airport its routes leave.
 function renderCities() {
   const airports = new Map();
@@ -187,6 +203,7 @@ function update() {
   state.shown = PAGE_SIZE;
   state.trips = recommend(state.data, readFilter());
   renderNights();
+  renderCabins();
   renderCities();
   renderAirlines();
   renderTrips();
