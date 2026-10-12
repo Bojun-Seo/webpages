@@ -49,14 +49,13 @@ export function monthsFrom(today, count) {
 }
 
 // The nonstop round trips in one API response for `route`, of every
-// airline. The API answers for the cities the airports serve, Seoul for
-// both Incheon and Gimpo and Tokyo for both Narita and Haneda, so a ticket
-// counts only when it flies between the route's own airports. The dates
-// are each flight's local date of departure. `departs`
-// is when the flight out leaves Korea; `arrives`, when the flight back lands
-// there, is known only if the response gives its duration, and `lands`
-// gives the day too when it is not the date the flight left on, as for a
-// flight that leaves late at night.
+// airline. A ticket names its cities (SEL, TYO) as well as its airports,
+// and counts only when it flies between the route's own airports. The dates
+// are each flight's local date of departure. `departs` is when the flight
+// out leaves Korea; `arrives`, when the flight back lands there, is known
+// only if the response gives its duration, and `lands` gives the day too
+// when it is not the date the flight left on, as for a flight that leaves
+// late at night.
 export function pickFares(response, route, seen) {
   if (!response || response.success === false || !Array.isArray(response.data)) return [];
   return response.data
@@ -140,12 +139,11 @@ async function main(argv) {
   let ok = 0;
   let failed = 0;
   // The API's own documentation is all the tests check the format against,
-  // so the log names the fields a real ticket has, once a run, and shows
-  // the first ticket each route gets with the airlines of its fares.
+  // so the log names the fields a real ticket has, once a run, and the
+  // airlines of each route's fares.
   let shown = false;
   for (const route of routes) {
     const before = fares.length;
-    let first = null;
     for (const out of months) {
       // Ask for returns in the same month and the next, so a trip over a
       // month's end (New Year's) is not missed.
@@ -153,10 +151,9 @@ async function main(argv) {
         if (ok + failed > 0) await new Promise((resolve) => setTimeout(resolve, PAUSE_MS));
         try {
           const response = await query(route, out, back, token);
-          if (response?.data?.length) {
-            if (!shown) console.log(`Ticket fields: ${Object.keys(response.data[0]).join(', ')}`);
+          if (!shown && response?.data?.length) {
+            console.log(`Ticket fields: ${Object.keys(response.data[0]).join(', ')}`);
             shown = true;
-            first ??= response.data[0];
           }
           fares.push(...pickFares(response, route, seen));
           ok++;
@@ -168,7 +165,6 @@ async function main(argv) {
     }
     const airlines = [...new Set(fares.slice(before).map((f) => f.airline))].sort().join(', ');
     console.log(`${route.id}: ${fares.length - before} fares${airlines ? ` (${airlines})` : ''}`);
-    if (first) console.log(`  first ticket: ${JSON.stringify(first)}`);
   }
 
   fares = keepCheapest(fares);
