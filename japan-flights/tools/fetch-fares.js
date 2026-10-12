@@ -61,7 +61,8 @@ export function monthsFrom(today, count) {
 // out leaves Korea; `arrives`, when the flight back lands there, is known
 // only if the response gives its duration, and `lands` gives the day too
 // when it is not the date the flight left on, as for a flight that leaves
-// late at night. A fare in business or first says so in `cabin`.
+// late at night. A fare in business or first says so in `cabin`, and a
+// fare without a checked bag in `bags`.
 export function pickFares(response, route, seen, cabin = 'economy') {
   if (!response || response.success === false || !Array.isArray(response.data)) return [];
   return response.data
@@ -80,6 +81,7 @@ export function pickFares(response, route, seen, cabin = 'economy') {
         source: 'Aviasales',
         departs: localTime(t.departure_at),
         ...(cabin === 'economy' ? {} : { cabin }),
+        ...(checkedBags(t.link) === 0 ? { bags: 0 } : {}),
       };
       if (Number.isFinite(t.duration_back)) {
         const back = landing(t.return_at, t.duration_back);
@@ -90,16 +92,29 @@ export function pickFares(response, route, seen, cabin = 'economy') {
     });
 }
 
-// The cheapest fare for each route, pair of dates, airline and cabin; the
-// page needs no other.
+// The cheapest fare for each route, pair of dates, airline and cabin, and
+// the cheapest of those with a checked bag apart from those without, since
+// the page adds the bag's fee to the second; it needs no other.
 export function keepCheapest(fares) {
   const best = new Map();
   for (const fare of fares) {
-    const key = `${fare.route} ${fare.depart} ${fare.return} ${fare.airline} ${fare.cabin || 'economy'}`;
+    const key = `${fare.route} ${fare.depart} ${fare.return} ${fare.airline} ${fare.cabin || 'economy'}`
+      + (fare.bags === 0 ? ' no bag' : '');
     const held = best.get(key);
     if (!held || fare.price < held.price) best.set(key, fare);
   }
   return [...best.values()];
+}
+
+// The checked bags a ticket's fare includes, from the `static_fare_key` its
+// link carries: its `L` part reads "L0" for none, "L1_1_15" for one bag of
+// 15 kg and "L1_2_0" for two. Null when the link does not say.
+export function checkedBags(link) {
+  const query = String(link || '').split('?')[1];
+  const key = query && new URLSearchParams(query).get('static_fare_key');
+  const part = key && key.split('|').find((p) => /^L\d/.test(p));
+  if (!part) return null;
+  return part === 'L0' ? 0 : Number(part.split('_')[1] || 1);
 }
 
 // Whether the tickets an answer for business or first gives are mostly
@@ -217,6 +232,10 @@ async function main(argv) {
   await write({ updated: new Date().toISOString(), source: 'Aviasales', fares });
   console.log(`Wrote ${fares.length} fares, ${tally(fares)}, from ${ok} queries `
     + `(${failed} failed) to ${values.out}.`);
+  const bagless = {};
+  for (const fare of fares) if (fare.bags === 0) bagless[fare.airline] = (bagless[fare.airline] || 0) + 1;
+  console.log(`Fares without a checked bag: ${Object.entries(bagless).sort()
+    .map(([airline, n]) => `${airline} ${n}`).join(', ') || 'none'}.`);
   if (repeated.business + repeated.first > 0) {
     console.log(`Dropped as repeats of economy: ${repeated.business} answers in business, `
       + `${repeated.first} in first.`);
