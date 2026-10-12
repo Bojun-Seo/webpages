@@ -17,6 +17,19 @@
       ]
     },
     {
+      "id": "CJJ-NRT",
+      "origin": "CJJ",
+      "dest": "NRT",
+      "city": "도쿄 나리타",
+      "country": "JP",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 에어로케이가 매일 운항하며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "뉴시스 (2026-02-04, 에어로케이 청주 노선)", "url": "https://mobile.newsis.com/view/NISX20260204_0003502241" },
+        { "title": "오비히로 공항 (2026-07)", "url": "https://www.hokkaido-airports.com/ko/obihiro/info/20260708-4881.html" }
+      ]
+    },
+    {
       "id": "ICN-HND",
       "origin": "ICN",
       "dest": "HND",
@@ -75,6 +88,19 @@
       ]
     },
     {
+      "id": "CJJ-KIX",
+      "origin": "CJJ",
+      "dest": "KIX",
+      "city": "오사카",
+      "country": "JP",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 에어로케이가 매일 운항하며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "뉴시스 (2026-02-04, 에어로케이 청주 노선)", "url": "https://mobile.newsis.com/view/NISX20260204_0003502241" },
+        { "title": "Trip.com RF306", "url": "https://kr.trip.com/flights/status-rf306/" }
+      ]
+    },
+    {
       "id": "ICN-NGO",
       "origin": "ICN",
       "dest": "NGO",
@@ -103,6 +129,19 @@
       ]
     },
     {
+      "id": "CJJ-NGO",
+      "origin": "CJJ",
+      "dest": "NGO",
+      "city": "나고야",
+      "country": "JP",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 에어로케이가 매일 운항하며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "뉴시스 (2026-02-04, 에어로케이 청주 노선)", "url": "https://mobile.newsis.com/view/NISX20260204_0003502241" },
+        { "title": "Japan Aviation Hub (청주-나고야 취항)", "url": "https://japanaviationhub.com/?p=4796" }
+      ]
+    },
+    {
       "id": "ICN-FUK",
       "origin": "ICN",
       "dest": "FUK",
@@ -116,6 +155,19 @@
       "sources": [
         { "title": "Travel Voice (2026-02)", "url": "https://www.travelvoice.jp/english/korean-air-will-considerably-extend-flight-networks-to-local-cities-in-japan-in-this-summer" },
         { "title": "나무위키 인천-후쿠오카 항공노선", "url": "https://namu.wiki/w/%EC%9D%B8%EC%B2%9C-%ED%9B%84%EC%BF%A0%EC%98%A4%EC%B9%B4%20%ED%95%AD%EA%B3%B5%EB%85%B8%EC%84%A0" }
+      ]
+    },
+    {
+      "id": "CJJ-FUK",
+      "origin": "CJJ",
+      "dest": "FUK",
+      "city": "후쿠오카",
+      "country": "JP",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 에어로케이 노선으로 소개되었지만 2026년 운항 일정은 확인하지 못했으며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "뉴시스 (2026-02-04, 에어로케이 청주 노선)", "url": "https://mobile.newsis.com/view/NISX20260204_0003502241" },
+        { "title": "KAYAK 청주-후쿠오카", "url": "https://www.kayak.co.kr/항공권/청주국제공항-CJJ/후쿠오카공항-FUK" }
       ]
     },
     {
@@ -134,6 +186,19 @@
       ]
     },
     {
+      "id": "CJJ-CTS",
+      "origin": "CJJ",
+      "dest": "CTS",
+      "city": "삿포로",
+      "country": "JP",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 에어로케이가 매일 운항하며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "뉴시스 (2026-02-04, 에어로케이 청주 노선)", "url": "https://mobile.newsis.com/view/NISX20260204_0003502241" },
+        { "title": "오비히로 공항 (2026-07)", "url": "https://www.hokkaido-airports.com/ko/obihiro/info/20260708-4881.html" }
+      ]
+    },
+    {
       "id": "ICN-OKA",
       "origin": "ICN",
       "dest": "OKA",
@@ -146,6 +211,19 @@
       "sources": [
         { "title": "Travel Voice (2026-02)", "url": "https://www.travelvoice.jp/english/korean-air-will-considerably-extend-flight-networks-to-local-cities-in-japan-in-this-summer" },
         { "title": "AeroRoutes (2026-09-02)", "url": "https://www.aeroroutes.com/eng/260902-keoznw26int" }
+      ]
+    },
+    {
+      "id": "CJJ-OKA",
+      "origin": "CJJ",
+      "dest": "OKA",
+      "city": "오키나와",
+      "country": "JP",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 에어로케이가 매일 운항하며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "뉴시스 (2026-02-04, 에어로케이 청주 노선)", "url": "https://mobile.newsis.com/view/NISX20260204_0003502241" },
+        { "title": "세계일보 (2025-08-06, 청주-오키나와 취항)", "url": "https://www.segye.com/newsView/20250806517403" }
       ]
     },
     {
@@ -198,6 +276,19 @@
       },
       "sources": [
         { "title": "Aviation Wire (2026-08-24)", "url": "https://www.aviationwire.jp/archives/349303" }
+      ]
+    },
+    {
+      "id": "CJJ-HIJ",
+      "origin": "CJJ",
+      "dest": "HIJ",
+      "city": "히로시마",
+      "country": "JP",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 에어로케이가 2025년 12월부터 주 4회 운항했지만 2026년 동계 일정은 확인하지 못했으며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "히로시마현 (청주 노선 정기편)", "url": "https://www.pref.hiroshima.lg.jp/uploaded/attachment/642979.pdf" },
+        { "title": "Aviation Wire (2025-10-24)", "url": "https://www.aviationwire.jp/?p=332476" }
       ]
     },
     {
@@ -262,6 +353,19 @@
       "note": "하계는 매일 운항했습니다. 10월 25일부터의 동계 운항 요일은 아직 확인하지 못했습니다.",
       "sources": [
         { "title": "Travel Voice (2026-02)", "url": "https://www.travelvoice.jp/english/korean-air-will-considerably-extend-flight-networks-to-local-cities-in-japan-in-this-summer" }
+      ]
+    },
+    {
+      "id": "CJJ-KMJ",
+      "origin": "CJJ",
+      "dest": "KMJ",
+      "city": "구마모토",
+      "country": "JP",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 에어로케이가 10월 24일까지 주 4회(수·목·토·일) 운항하며, 동계 운항은 발표되지 않았습니다. 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "세계일보 (2026-07-23)", "url": "https://www.segye.com/newsView/20260723514592" },
+        { "title": "파이낸셜뉴스 (2026-07-23)", "url": "https://www.fnnews.com/news/202607231343128642" }
       ]
     },
     {
@@ -334,6 +438,19 @@
       ]
     },
     {
+      "id": "CJJ-UKB",
+      "origin": "CJJ",
+      "dest": "UKB",
+      "city": "고베",
+      "country": "JP",
+      "tag": "전세편",
+      "periods": [],
+      "note": "고베공항은 아직 정기 국제선을 받지 않아 정기성 전세편으로 운항합니다. 대한항공 노선이 아니며, 에어로케이가 매일 운항합니다. 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "Aviation Wire (청주 노선)", "url": "https://www.aviationwire.jp/archives/tag/rktu-cjj-cheongju" }
+      ]
+    },
+    {
       "id": "ICN-HKD",
       "origin": "ICN",
       "dest": "HKD",
@@ -370,6 +487,19 @@
       "sources": [
         { "title": "에히메현 관광 (제주항공 탑승객 혜택)", "url": "https://www.visitehimejapan.com/ko/updates/update-002/" },
         { "title": "LIVE JAPAN", "url": "https://livejapan.com/ko/article-a0005498/" }
+      ]
+    },
+    {
+      "id": "CJJ-MYJ",
+      "origin": "CJJ",
+      "dest": "MYJ",
+      "city": "마쓰야마",
+      "country": "JP",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 에어로케이가 2027년 1월 2일부터 3월 27일까지 주 3회(화·목·토) 운항하며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "honichi (2026-10-07)", "url": "https://honichi.com/news/2026/10/07/aerok-ehime/" },
+        { "title": "파이낸셜뉴스 (2026-10-05)", "url": "https://www.fnnews.com/news/202610051137488430" }
       ]
     },
     {
@@ -421,6 +551,19 @@
       "sources": [
         { "title": "기타큐슈 공항 시간표", "url": "https://www.kitakyu-air.jp/rev-boarding/timetable.php" },
         { "title": "AeroRoutes (Jin Air NW26)", "url": "https://www.aeroroutes.com/eng/260630-ljnw26int" }
+      ]
+    },
+    {
+      "id": "CJJ-KKJ",
+      "origin": "CJJ",
+      "dest": "KKJ",
+      "city": "기타큐슈",
+      "country": "JP",
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 에어로케이가 10월 23일까지 주 10회 운항했고 동계 운항 횟수는 확인하지 못했으며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "후쿠오카현 (2026, 증편)", "url": "https://www.pref.fukuoka.lg.jp/press-release/kitakyusyu-aerok-zoubin2026.html" },
+        { "title": "후쿠오카현 (2025, 신규 취항)", "url": "https://www.pref.fukuoka.lg.jp/press-release/kitakyusyu-aerok-shinkishukou2025.html" }
       ]
     },
     {
@@ -478,6 +621,20 @@
         { "title": "대한항공 서울-타이베이 노선", "url": "https://www.koreanair.com/flights/en/flights-from-seoul-to-taipei" },
         { "title": "FlightConnections 인천-타이베이", "url": "https://www.flightconnections.com/flights-from-icn-to-tpe" },
         { "title": "AeroRoutes (Korean Air NW26 타이베이)", "url": "https://www.aeroroutes.com/eng/260902-kenw26tpe" }
+      ]
+    },
+    {
+      "id": "CJJ-TPE",
+      "origin": "CJJ",
+      "dest": "TPE",
+      "city": "타이베이 타오위안",
+      "country": "TW",
+      "utcOffset": 8,
+      "periods": [],
+      "note": "대한항공 노선이 아닙니다. 에어로케이가 하루 2회, 이스타항공도 운항하며, 운임이 확인된 일정만 나옵니다.",
+      "sources": [
+        { "title": "데일리안 (2026-02)", "url": "https://www.dailian.co.kr/news/view/1611669" },
+        { "title": "Trip.com ZE781", "url": "https://kr.trip.com/flights/status-ze781/" }
       ]
     },
     {
