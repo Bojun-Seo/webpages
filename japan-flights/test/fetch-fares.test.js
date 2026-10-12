@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  checkedBags, keepCheapest, localDate, localTime, monthsFrom, pickFares,
+  bagTally, checkedBags, keepCheapest, localDate, localTime, monthsFrom, pickFares,
 } from '../tools/fetch-fares.js';
 
 const oita = { id: 'ICN-OIT', origin: 'ICN', dest: 'OIT' };
@@ -118,8 +118,11 @@ test('the link of a ticket tells whether its fare includes a checked bag', () =>
   assert.equal(checkedBags(link('L1_2_0')), 2);
   assert.equal(checkedBags('/search/ICN1410NRT22101'), null);
   assert.equal(checkedBags(undefined), null);
-  const response = { success: true, data: [ticket({ link: link('L0') }), ticket({ link: link('L1_1_15'), price: 260000 })] };
-  assert.deepEqual(pickFares(response, oita, '2026-10-11').map((f) => f.bags), [0, undefined]);
+  const response = { success: true, data: [ticket({ link: link('L0') }), ticket({ link: link('L1_1_15'), price: 260000 }),
+    ticket({ price: 270000 })] };
+  const fares = pickFares(response, oita, '2026-10-11');
+  assert.deepEqual(fares.map((f) => f.bags), [0, 1, undefined]);
+  assert.equal(bagTally([...fares, { airline: '7C', bags: 0 }]), '7C 1/0/0, KE 1/1/1');
 });
 
 test('the cheapest fare with a checked bag is kept apart from the cheapest without', () => {
@@ -128,8 +131,6 @@ test('the cheapest fare with a checked bag is kept apart from the cheapest witho
   assert.deepEqual(keepCheapest([fare(120000, 0), fare(110000, 0), fare(190000), fare(170000)]),
     [fare(110000, 0), fare(170000)]);
 });
-
-
 
 test('an error response yields no fares', () => {
   assert.deepEqual(pickFares({ success: false, error: 'Unauthorized' }, oita, '2026-10-11'), []);
