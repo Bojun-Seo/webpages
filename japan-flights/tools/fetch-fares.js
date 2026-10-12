@@ -1,7 +1,9 @@
-// Fetches Korean Air nonstop round-trip fares for the routes in routes.json
-// from the Travelpayouts (Aviasales) Data API and writes them where the page
-// looks for live fares. The API serves prices that Aviasales users found in
-// the last 48 hours, so a route few people search there can come back empty.
+// Fetches the nonstop round-trip fares of every airline for the routes in
+// routes.json from the Travelpayouts (Aviasales) Data API and writes them
+// where the page looks for live fares, each with its airline and the times
+// its flights leave and land where the API gives them. The API serves prices
+// that Aviasales users found in the last 48 hours, so a route few people
+// search there can come back empty.
 //
 //   TRAVELPAYOUTS_TOKEN=... node tools/fetch-fares.js \
 //       [--routes site/data/routes.json] [--out site/data/live-fares.json] [--months 6]
@@ -17,9 +19,17 @@ const API = 'https://api.travelpayouts.com/aviasales/v3/prices_for_dates';
 const PAUSE_MS = 1100;
 
 // Korea and Japan both keep UTC+9 all year, so one offset gives the local
-// date at either end, whatever offset the API writes its times in.
+// date and time at either end, whatever offset the API writes its times in.
+function local(ms) {
+  return new Date(ms + 9 * 3600e3).toISOString();
+}
+
 export function localDate(timestamp) {
-  return new Date(Date.parse(timestamp) + 9 * 3600e3).toISOString().slice(0, 10);
+  return local(Date.parse(timestamp)).slice(0, 10);
+}
+
+export function localTime(timestamp, plusMinutes = 0) {
+  return local(Date.parse(timestamp) + plusMinutes * 60e3).slice(11, 16);
 }
 
 export function monthsFrom(today, count) {
@@ -30,20 +40,37 @@ export function monthsFrom(today, count) {
   });
 }
 
-// The Korean Air nonstop round trips in one API response for `route`.
+// The nonstop round trips in one API response for `route`, of every
+// airline. `departs` is when the flight out leaves; `arrives`, when the
+// flight back lands, is known only if the response gives its duration.
 export function pickFares(response, route, seen) {
   if (!response || response.success === false || !Array.isArray(response.data)) return [];
   return response.data
-    .filter((t) => t.airline === 'KE' && !t.transfers && !t.return_transfers
+    .filter((t) => t.airline && !t.transfers && !t.return_transfers
       && t.departure_at && t.return_at && t.price > 0)
     .map((t) => ({
       route: route.id,
+      airline: t.airline,
       depart: localDate(t.departure_at),
       return: localDate(t.return_at),
       price: Math.round(t.price),
       seen,
       source: 'Aviasales',
+      departs: localTime(t.departure_at),
+      ...(Number.isFinite(t.duration_back) ? { arrives: localTime(t.return_at, t.duration_back) } : {}),
     }));
+}
+
+// The cheapest fare for each route, pair of dates and airline; the page
+// needs no other.
+export function keepCheapest(fares) {
+  const best = new Map();
+  for (const fare of fares) {
+    const key = `${fare.route} ${fare.depart} ${fare.return} ${fare.airline}`;
+    const held = best.get(key);
+    if (!held || fare.price < held.price) best.set(key, fare);
+  }
+  return [...best.values()];
 }
 
 async function query(route, departMonth, returnMonth, token) {
@@ -86,9 +113,12 @@ async function main(argv) {
   const { routes } = JSON.parse(await readFile(values.routes, 'utf8'));
   const seen = localDate(new Date().toISOString());
   const months = monthsFrom(seen, Number(values.months));
-  const fares = [];
+  let fares = [];
   let ok = 0;
   let failed = 0;
+  // The API's own documentation is all the tests check the format against,
+  // so the log names the fields a real ticket has, once a run.
+  let shown = false;
   for (const route of routes) {
     for (const [i, out] of months.entries()) {
       // Ask for returns in the same month and the next, so a trip over a
@@ -96,7 +126,12 @@ async function main(argv) {
       for (const back of [out, monthsFrom(`${out}-01`, 2)[1]]) {
         if (ok + failed > 0) await new Promise((resolve) => setTimeout(resolve, PAUSE_MS));
         try {
-          fares.push(...pickFares(await query(route, out, back, token), route, seen));
+          const response = await query(route, out, back, token);
+          if (!shown && response?.data?.length) {
+            console.log(`Ticket fields: ${Object.keys(response.data[0]).join(', ')}`);
+            shown = true;
+          }
+          fares.push(...pickFares(response, route, seen));
           ok++;
         } catch (error) {
           failed++;
@@ -107,8 +142,11 @@ async function main(argv) {
     }
   }
 
+  fares = keepCheapest(fares);
   await write({ updated: new Date().toISOString(), source: 'Aviasales', fares });
-  console.log(`Wrote ${fares.length} fares from ${ok} queries (${failed} failed) to ${values.out}.`);
+  const airlines = [...new Set(fares.map((f) => f.airline))].sort().join(', ');
+  console.log(`Wrote ${fares.length} fares (${airlines || 'no airline'}) from ${ok} queries `
+    + `(${failed} failed) to ${values.out}.`);
   return ok === 0 ? 1 : 0;
 }
 
