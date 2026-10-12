@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  addDays, dayOf, fliesOn, flightMarks, flightTimes, leaveFor, monthsAhead, recommend, roundTrips,
-  searchLinks, spansFriday, timetableDays,
+  addDays, airlineOf, dayOf, fliesOn, flightMarks, flightTimes, leaveFor, monthsAhead, recommend,
+  roundTrips, searchLinks, spansFriday, timetableDays,
 } from '../site/plan.js';
 
 const data = (name) => JSON.parse(readFileSync(new URL(`../site/data/${name}`, import.meta.url)));
@@ -149,6 +149,50 @@ test('known fares come first, the cheapest first, then the soonest trips', () =>
   }
 });
 
+test('the airlines asked for decide the fares, and only Korean Air needs none', () => {
+  const fares = [
+    { route: 'ICN-OIT', airline: 'KE', depart: '2026-12-25', return: '2026-12-27', price: 280000, seen: today },
+    { route: 'ICN-OIT', airline: '7C', depart: '2026-12-25', return: '2026-12-27', price: 190000, seen: today,
+      departs: '18:40' },
+    { route: 'ICN-KMQ', airline: 'TW', depart: '2026-12-04', return: '2026-12-06', price: 210000, seen: today },
+  ];
+  const ctx = { routes, fares, holidays, today };
+  const base = { ...december, cities: new Set(['ICN-OIT', 'ICN-KMQ']) };
+  const christmas = (trips) => {
+    const t = trips.find((x) => x.route === 'ICN-OIT' && x.depart === '2026-12-25' && x.return === '2026-12-27');
+    return [t.airline, t.fare.price, t.eveningDeparture];
+  };
+  // Every airline: the cheapest fare for the dates, with its airline and the times it flies.
+  const all = recommend(ctx, base);
+  assert.deepEqual(christmas(all), ['7C', 190000, true]);
+  assert.ok(all.some((t) => t.route === 'ICN-KMQ'));
+  // Korean Air alone: its own fare, and the trips its schedule allows without one.
+  const ke = recommend(ctx, { ...base, airlines: new Set(['KE']) });
+  assert.deepEqual(christmas(ke), ['KE', 280000, false]);
+  assert.ok(ke.some((t) => t.fare === null && t.airline === 'KE'));
+  assert.ok(!ke.some((t) => t.route === 'ICN-KMQ'));
+  // Another airline alone: only the trips its fares prove.
+  const tw = recommend(ctx, { ...base, airlines: new Set(['TW']) });
+  assert.deepEqual(tw.map((t) => `${t.route} ${t.depart} ${t.airline}`), ['ICN-KMQ 2026-12-04 TW']);
+  // A fare written without an airline is Korean Air's.
+  assert.equal(airlineOf({ route: 'ICN-OIT' }), 'KE');
+});
+
+test("another airline's fare without times does not take Korean Air's", () => {
+  const late = {
+    ...route('ICN-KIJ'),
+    flights: { out: { departs: '18:00', arrives: '20:05' }, back: { departs: '08:30', arrives: '10:50' } },
+  };
+  const ctx = {
+    routes: routes.map((r) => (r.id === late.id ? late : r)), holidays, today,
+    fares: [{ route: 'ICN-KIJ', airline: 'LJ', depart: '2026-12-21', return: '2026-12-23', price: 150000, seen: today }],
+  };
+  const trips = recommend(ctx, { ...december, cities: new Set(['ICN-KIJ']) });
+  const marks = (t) => [t.airline, t.eveningDeparture, t.morningArrival];
+  assert.deepEqual(marks(trips.find((t) => t.fare)), ['LJ', false, false]);
+  assert.deepEqual(marks(trips.find((t) => !t.fare)), ['KE', true, true]);
+});
+
 test('a fare brings in a trip on a route whose days are not known', () => {
   const fares = [{ route: 'ICN-KMQ', depart: '2026-11-20', return: '2026-11-22', price: 250000, seen: today }];
   const filter = { from: '2026-11-01', to: '2026-11-30', minNights: 1, maxNights: 6 };
@@ -188,5 +232,7 @@ test('search links carry the route and both dates', () => {
   assert.equal(links['스카이스캐너'], 'https://www.skyscanner.co.kr/transport/flights/icn/oit/261225/261227/'
     + '?adultsv2=1&cabinclass=economy&rtn=1&preferdirects=true');
   assert.match(links.Google, /q=Flights%20from%20ICN%20to%20OIT%20on%202026-12-25%20through%202026-12-27/);
-  assert.match(links['카약'], /\/flights\/ICN-OIT\/2026-12-25\/2026-12-27\?/);
+  assert.match(links['카약'], /\/flights\/ICN-OIT\/2026-12-25\/2026-12-27\?.*airlines=KE;stops=0$/);
+  const jeju = searchLinks(route('ICN-OIT'), '2026-12-25', '2026-12-27', '7C').find((l) => l.name === '카약');
+  assert.match(jeju.url, /airlines=7C;stops=0$/);
 });

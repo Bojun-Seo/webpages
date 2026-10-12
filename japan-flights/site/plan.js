@@ -133,14 +133,39 @@ export function spansFriday(depart, ret) {
   return (5 - weekday(first) + 7) % 7 <= dayNumber(ret) - first;
 }
 
-// Whether a route's flight out leaves Incheon at 4 p.m. or later, and
-// whether its flight back lands there before noon. Times are 'HH:MM', so
-// they compare as strings. A route whose times are not known has neither.
+// Times are 'HH:MM' on the clock Korea and Japan share, so they compare as
+// strings.
+const EVENING = '16:00';
+const NOON = '12:00';
+
+// Whether a route's Korean Air flight out leaves Korea at 4 p.m. or later,
+// and whether its flight back lands there before noon. A route whose times
+// are not known has neither.
 export function flightMarks(route) {
   return {
-    eveningDeparture: Boolean(route.flights && route.flights.out.departs >= '16:00'),
-    morningArrival: Boolean(route.flights && route.flights.back.arrives < '12:00'),
+    eveningDeparture: Boolean(route.flights && route.flights.out.departs >= EVENING),
+    morningArrival: Boolean(route.flights && route.flights.back.arrives < NOON),
   };
+}
+
+// The airline a fare is for. Fares written before the page knew other
+// airlines are Korean Air's.
+export function airlineOf(fare) {
+  return fare.airline || 'KE';
+}
+
+// The marks a trip's flights earn: from the fare's own times where it has
+// them, else from the route's times when the trip is Korean Air's. Another
+// airline's fare without times earns neither.
+function marksFor(route, fare) {
+  if (fare && (fare.departs || fare.arrives)) {
+    return {
+      eveningDeparture: Boolean(fare.departs && fare.departs >= EVENING),
+      morningArrival: Boolean(fare.arrives && fare.arrives < NOON),
+    };
+  }
+  if (!fare || airlineOf(fare) === 'KE') return flightMarks(route);
+  return { eveningDeparture: false, morningArrival: false };
 }
 
 function tripKey(trip) {
@@ -179,22 +204,27 @@ function byFareThenDate(a, b) {
     || byString(a.route, b.route);
 }
 
-// The trips that match `filter`, each with its leave, the holidays it
-// spans, whether it spans a Friday, the marks its flight times earn and
-// the cheapest known fare: known fares first, the cheapest first, then the
-// soonest departure.
+// The trips that match `filter`, each with the cheapest known fare among
+// the airlines asked for and its airline, its leave, the holidays it spans,
+// whether it spans a Friday and the marks its flight times earn: known
+// fares first, the cheapest first, then the soonest departure. The
+// schedules are Korean Air's, so another airline's trip comes only from a
+// fare.
 //
-// filter: { from, to, minNights, maxNights, maxLeave, maxPrice, cities }
-// `from` and `to` bound the departure date; `maxLeave`, `maxPrice` and
-// `cities` (a Set of route ids) are left out to mean no limit.
+// filter: { from, to, minNights, maxNights, maxLeave, maxPrice, cities, airlines }
+// `from` and `to` bound the departure date; `maxLeave`, `maxPrice`,
+// `cities` (a Set of route ids) and `airlines` (a Set of airline codes) are
+// left out to mean no limit.
 export function recommend({ routes, fares, holidays, today }, filter) {
   const from = filter.from > today ? filter.from : today;
   const wanted = (id) => !filter.cities || filter.cities.has(id);
+  const flown = (airline) => !filter.airlines || filter.airlines.has(airline);
   const byId = new Map(routes.map((route) => [route.id, route]));
-  const cheapest = cheapestFares(fares.filter((fare) => byId.has(fare.route)), today);
+  const cheapest = cheapestFares(
+    fares.filter((fare) => byId.has(fare.route) && flown(airlineOf(fare))), today);
 
   const trips = new Map();
-  for (const route of routes) {
+  for (const route of flown('KE') ? routes : []) {
     if (!wanted(route.id)) continue;
     for (const trip of roundTrips(route, from, filter.to, filter.minNights, filter.maxNights)) {
       trips.set(tripKey(trip), trip);
@@ -215,8 +245,8 @@ export function recommend({ routes, fares, holidays, today }, filter) {
     if (filter.maxLeave != null && leave > filter.maxLeave) continue;
     if (filter.maxPrice != null && !(fare && fare.price <= filter.maxPrice)) continue;
     out.push({
-      ...trip, fare, leave, holidays: names, friday: spansFriday(trip.depart, trip.return),
-      ...flightMarks(byId.get(trip.route)),
+      ...trip, fare, airline: fare ? airlineOf(fare) : 'KE', leave, holidays: names,
+      friday: spansFriday(trip.depart, trip.return), ...marksFor(byId.get(trip.route), fare),
     });
   }
   return out.sort(byFareThenDate);
@@ -238,7 +268,8 @@ export function monthsAhead(routes, today) {
 
 // Searches for one trip on sites that show live prices. None of them
 // documents these URLs, so a site may change its format without notice.
-export function searchLinks(route, depart, ret) {
+// KAYAK's asks for the trip's airline, nonstop.
+export function searchLinks(route, depart, ret, airline = 'KE') {
   const from = route.origin;
   const to = route.dest;
   const compact = (date) => date.replaceAll('-', '');
@@ -261,7 +292,8 @@ export function searchLinks(route, depart, ret) {
     },
     {
       name: '카약',
-      url: `https://www.kayak.co.kr/flights/${from}-${to}/${depart}/${ret}?sort=price_a&fs=airlines=KE;stops=0`,
+      url: `https://www.kayak.co.kr/flights/${from}-${to}/${depart}/${ret}`
+        + `?sort=price_a&fs=airlines=${airline};stops=0`,
     },
   ];
 }
