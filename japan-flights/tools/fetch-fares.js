@@ -49,7 +49,10 @@ export function monthsFrom(today, count) {
 }
 
 // The nonstop round trips in one API response for `route`, of every
-// airline. The dates are each flight's local date of departure. `departs`
+// airline. The API answers for the cities the airports serve, Seoul for
+// both Incheon and Gimpo and Tokyo for both Narita and Haneda, so a ticket
+// counts only when it flies between the route's own airports. The dates
+// are each flight's local date of departure. `departs`
 // is when the flight out leaves Korea; `arrives`, when the flight back lands
 // there, is known only if the response gives its duration, and `lands`
 // gives the day too when it is not the date the flight left on, as for a
@@ -58,7 +61,9 @@ export function pickFares(response, route, seen) {
   if (!response || response.success === false || !Array.isArray(response.data)) return [];
   return response.data
     .filter((t) => t.airline && !t.transfers && !t.return_transfers
-      && t.departure_at && t.return_at && t.price > 0)
+      && t.departure_at && t.return_at && t.price > 0
+      && (!t.origin_airport || t.origin_airport === route.origin)
+      && (!t.destination_airport || t.destination_airport === route.dest))
     .map((t) => {
       const fare = {
         route: route.id,

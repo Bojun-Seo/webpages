@@ -33,20 +33,21 @@ test('a timestamp becomes the local date in Korea and Japan', () => {
   assert.equal(localDate('2026-11-13T14:59:00Z'), '2026-11-13');
 });
 
+const hongKong = { id: 'ICN-HKG', origin: 'ICN', dest: 'HKG', utcOffset: 8 };
+const toHongKong = (fields) => ticket({ destination: 'HKG', destination_airport: 'HKG', ...fields });
+
 test('the flight back takes the local date where it leaves', () => {
-  const hongKong = { id: 'ICN-HKG', origin: 'ICN', dest: 'HKG', utcOffset: 8 };
-  const late = { success: true, data: [ticket({ return_at: '2026-11-15T23:30:00+08:00' })] };
+  const late = { success: true, data: [toHongKong({ return_at: '2026-11-15T23:30:00+08:00' })] };
   assert.equal(pickFares(late, hongKong, '2026-10-11')[0].return, '2026-11-15');
   assert.equal(localDate('2026-11-15T23:30:00+08:00'), '2026-11-16'); // what Korea's clock says
 });
 
 test('a flight back that lands after midnight gives the day it lands', () => {
-  const hongKong = { id: 'ICN-HKG', origin: 'ICN', dest: 'HKG', utcOffset: 8 };
   const response = {
     success: true,
     data: [
-      ticket({ return_at: '2026-11-15T23:30:00+08:00', duration_back: 215 }),
-      ticket({ return_at: '2026-11-15T15:00:00+08:00', duration_back: 215 }),
+      toHongKong({ return_at: '2026-11-15T23:30:00+08:00', duration_back: 215 }),
+      toHongKong({ return_at: '2026-11-15T15:00:00+08:00', duration_back: 215 }),
     ],
   };
   const [late, day] = pickFares(response, hongKong, '2026-10-11');
@@ -84,6 +85,18 @@ test("every airline's nonstop round trips are kept, with their times", () => {
     fare({ airline: '7C', depart: '2026-11-13', return: '2026-11-15', price: 150000, departs: '18:40', arrives: '13:35' }),
     fare({ airline: 'KE', depart: '2026-11-13', return: '2026-11-16', price: 251000, departs: '08:20' }),
   ]);
+});
+
+test("a ticket counts only between the route's own airports", () => {
+  // The API answers for Seoul and Tokyo, whichever of their airports are asked for.
+  const haneda = { id: 'GMP-HND', origin: 'GMP', dest: 'HND' };
+  const tokyo = (from, to, price) =>
+    ticket({ destination: 'TYO', origin_airport: from, destination_airport: to, price });
+  const response = {
+    success: true,
+    data: [tokyo('ICN', 'NRT', 200000), tokyo('GMP', 'HND', 310000), tokyo('ICN', 'HND', 250000), tokyo('GMP', 'NRT', 220000)],
+  };
+  assert.deepEqual(pickFares(response, haneda, '2026-10-11').map((f) => f.price), [310000]);
 });
 
 test('only the cheapest fare for each route, pair of dates and airline is kept', () => {
