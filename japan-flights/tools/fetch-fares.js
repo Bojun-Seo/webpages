@@ -59,7 +59,8 @@ export function monthsFrom(today, count) {
 // out leaves Korea; `arrives`, when the flight back lands there, is known
 // only if the response gives its duration, and `lands` gives the day too
 // when it is not the date the flight left on, as for a flight that leaves
-// late at night. A fare without a checked bag says so in `bags`.
+// late at night. `bags` is the checked bags the fare includes for each
+// person, 0 for none, where the ticket's link says.
 export function pickFares(response, route, seen) {
   if (!response || response.success === false || !Array.isArray(response.data)) return [];
   return response.data
@@ -68,6 +69,7 @@ export function pickFares(response, route, seen) {
       && (!t.origin_airport || t.origin_airport === route.origin)
       && (!t.destination_airport || t.destination_airport === route.dest))
     .map((t) => {
+      const bags = checkedBags(t.link);
       const fare = {
         route: route.id,
         airline: t.airline,
@@ -77,7 +79,7 @@ export function pickFares(response, route, seen) {
         seen,
         source: 'Aviasales',
         departs: localTime(t.departure_at),
-        ...(checkedBags(t.link) === 0 ? { bags: 0 } : {}),
+        ...(bags == null ? {} : { bags }),
       };
       if (Number.isFinite(t.duration_back)) {
         const back = landing(t.return_at, t.duration_back);
@@ -118,6 +120,17 @@ export function checkedBags(link) {
 function tally(fares) {
   const airlines = [...new Set(fares.map((f) => f.airline))].sort().join(', ');
   return `${fares.length} fares${airlines ? ` (${airlines})` : ''}`;
+}
+
+// How many of each airline's `fares` include no checked bag, include one or
+// more, and do not say, for the log: "TW 71/30/2".
+export function bagTally(fares) {
+  const counts = {};
+  for (const fare of fares) {
+    counts[fare.airline] ||= [0, 0, 0];
+    counts[fare.airline][fare.bags === 0 ? 0 : fare.bags > 0 ? 1 : 2]++;
+  }
+  return Object.entries(counts).sort().map(([airline, n]) => `${airline} ${n.join('/')}`).join(', ');
 }
 
 async function query(route, departMonth, returnMonth, token) {
@@ -194,10 +207,7 @@ async function main(argv) {
   fares = keepCheapest(fares);
   await write({ updated: new Date().toISOString(), source: 'Aviasales', fares });
   console.log(`Wrote ${tally(fares)} from ${ok} queries (${failed} failed) to ${values.out}.`);
-  const bagless = {};
-  for (const fare of fares) if (fare.bags === 0) bagless[fare.airline] = (bagless[fare.airline] || 0) + 1;
-  console.log(`Fares without a checked bag: ${Object.entries(bagless).sort()
-    .map(([airline, n]) => `${airline} ${n}`).join(', ') || 'none'}.`);
+  console.log(`Checked bags, by airline (none/included/not said): ${bagTally(fares) || 'no fares'}.`);
   return ok === 0 ? 1 : 0;
 }
 

@@ -70,14 +70,16 @@ Amadeus closed its free Self-Service APIs on 17 July 2026. That leaves two sourc
 workflow writes an empty one and the page says live fares are not set up. Aviasales data comes from
 its own users' searches, so regional routes may have few fares or none. A ticket counts only on the
 route between the airports it names. The `static_fare_key` in its link says what its fare includes:
-`L0` for no checked bag, `L1_1_15` for one bag of 15 kg, and so on. A fare without one is marked
-`bags: 0`, and the cheapest such fare is kept apart from the cheapest with a bag, so that the page
-can weigh the first with its bag fee against the second; the log counts the fares without a bag by
-airline. `prices_for_dates` documents no cabin, and asked for business and first with `trip_class`
-(`1` and `2`), as the API's older methods take it, it answered all 143 queries that had tickets on
-12 October 2026 with the economy answer's tickets; so the fetcher asks for economy only, and
-business and first fares come only from `fares.json`. The tests use the response format the API
-documents; each run logs the fields a real ticket has, to check it against.
+`L0` for no checked bag, `L1_1_15` for one bag of 15 kg, and so on. A fare gives the bags it
+includes for each person in `bags`, `0` for none, when its link says, and the cheapest fare without
+a bag is kept apart from the cheapest other, so that the page can weigh the first with its bag fee
+against the second. The log counts each airline's fares that include no bag, those that include one
+or more, and those whose link does not say. `prices_for_dates` documents no cabin, and asked for
+business and first with `trip_class` (`1` and `2`), as the API's older methods take it, it answered
+all 143 queries that had tickets on 12 October 2026 with the economy answer's tickets; so the
+fetcher asks for economy only, and business and first fares come only from `fares.json`. The tests
+use the response format the API documents; each run logs the fields a real ticket has, to check it
+against.
 
 A hand-written fare looks like this. `airline` is the airline's two-letter code (`KE`, `7C`, `LJ`
 ...), and a fare without one counts as Korean Air's; `cabin` is `business` or `first` for those
