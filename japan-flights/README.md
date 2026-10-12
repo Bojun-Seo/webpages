@@ -72,17 +72,13 @@ a route whose days are not known yet.
 
 ## Publish on GitHub Pages
 
-1. Pages needs a public repository on GitHub Free. This repository is private, so either make it
-   public, use a plan that allows Pages on private repositories (Pro, Team or Enterprise; the
-   site itself is still public), or copy `japan-flights/` and the workflow into a public
-   repository.
-2. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
-3. Merge into the default branch. [`japan-flights.yml`](../.github/workflows/japan-flights.yml)
-   runs the tests on every push that touches `japan-flights/`, and on the default branch publishes
-   `site/` to `https://<owner>.github.io/<repository>/` (here,
-   `https://bojun-seo.github.io/applications/`). It publishes again every day at 06:23 KST so the
-   live fares stay fresh, and **Actions → japan-flights → Run workflow** publishes on demand.
-4. For live fares, sign up at [Travelpayouts](https://www.travelpayouts.com/), copy the API token
+1. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
+2. Merge into the default branch. [`pages.yml`](../.github/workflows/pages.yml) runs the tests on
+   every push that touches `japan-flights/`, and on the default branch publishes `site/` to
+   <https://bojun-seo.github.io/webpages/japan-flights/>. It publishes again every day at
+   06:23 KST so the live fares stay fresh, and **Actions → pages → Run workflow** publishes on
+   demand. The [top-level README](../README.md#publishing) says how the site is put together.
+3. For live fares, sign up at [Travelpayouts](https://www.travelpayouts.com/), copy the API token
    from its developer settings, and add it as the repository secret `TRAVELPAYOUTS_TOKEN`
    (**Settings → Secrets and variables → Actions**). The fetch makes about 130 queries, a little
    over a second apart, so it adds two to three minutes to a deploy. A failed fetch does not stop
