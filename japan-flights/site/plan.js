@@ -124,21 +124,17 @@ function byString(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-export const ORDERS = {
-  // Known fares first, cheapest first; then the trips that take the least
-  // leave for the most nights, soonest first.
-  best: (a, b) => byNumber(priceOf(a), priceOf(b)) || a.leave - b.leave
-    || b.nights - a.nights || byString(a.depart, b.depart) || byString(a.route, b.route),
-  leave: (a, b) => a.leave - b.leave || b.nights - a.nights
-    || byNumber(priceOf(a), priceOf(b)) || byString(a.depart, b.depart) || byString(a.route, b.route),
-  date: (a, b) => byString(a.depart, b.depart) || a.nights - b.nights
-    || byNumber(priceOf(a), priceOf(b)) || byString(a.route, b.route),
-};
+// The soonest departure first; on the same day, the shorter trip, then the
+// cheaper known fare.
+function byDate(a, b) {
+  return byString(a.depart, b.depart) || a.nights - b.nights
+    || byNumber(priceOf(a), priceOf(b)) || byString(a.route, b.route);
+}
 
 // The trips that match `filter`, each with its leave, the holidays it
-// spans and the cheapest known fare, in the order `filter.sort` names.
+// spans and the cheapest known fare, the soonest departure first.
 //
-// filter: { from, to, minNights, maxNights, maxLeave, maxPrice, cities, sort }
+// filter: { from, to, minNights, maxNights, maxLeave, maxPrice, cities }
 // `from` and `to` bound the departure date; `maxLeave`, `maxPrice` and
 // `cities` (a Set of route ids) are left out to mean no limit.
 export function recommend({ routes, fares, holidays, today }, filter) {
@@ -170,7 +166,7 @@ export function recommend({ routes, fares, holidays, today }, filter) {
     if (filter.maxPrice != null && !(fare && fare.price <= filter.maxPrice)) continue;
     out.push({ ...trip, fare, leave, holidays: names });
   }
-  return out.sort(ORDERS[filter.sort] || ORDERS.best);
+  return out.sort(byDate);
 }
 
 // The months from today's to the last one any route has a schedule for.
