@@ -85,8 +85,8 @@ a route whose days are not known yet.
    demand. The [top-level README](../README.md#publishing) says how the site is put together.
 3. For live fares, sign up at [Travelpayouts](https://www.travelpayouts.com/), copy the API token
    from its developer settings, and add it as the repository secret `TRAVELPAYOUTS_TOKEN`
-   (**Settings → Secrets and variables → Actions**). The fetch makes about 220 queries, a little
-   over a second apart, so it adds about four minutes to a deploy. A failed fetch does not stop
+   (**Settings → Secrets and variables → Actions**). The fetch makes about 290 queries, a little
+   over a second apart, so it adds about six minutes to a deploy. A failed fetch does not stop
    the page from publishing.
 
 ## Update the data
@@ -141,6 +141,9 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   season; for the others the page assumes the summer's daily service goes on, and their cards say
   so. Their flight times are not listed, since only summer times could be found, so they get
   neither 저녁 출발 nor 오전 도착.
+- Hakodate, Takamatsu, Matsuyama and Yonago, which Korean Air does not fly, were added on 12 October
+  2026 for the fares of the airlines that do; Yonago's only source is a summary of routes. Other
+  destinations only other airlines fly are not listed yet, so their fares are not fetched.
 - Gimpo–Haneda was added on 12 October 2026 as flying daily; for Gimpo–Kansai only Asiana's daily
   winter service was found, so Korean Air's days are not given and the route comes only through
   fares.
