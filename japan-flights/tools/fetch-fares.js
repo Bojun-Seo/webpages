@@ -1,11 +1,13 @@
-// Fetches the nonstop round-trip economy fares of every airline for the
-// routes in routes.json from the Travelpayouts (Aviasales) Data API and
-// writes them where the page looks for live fares, each with its airline,
-// whether it includes a checked bag and the times its flights leave and
-// land where the API gives them. The API takes no cabin: asked for business
-// or first with `trip_class`, it answers with the same economy tickets. The
-// API serves prices that Aviasales users found in the last 48 hours, so a
-// route few people search there can come back empty.
+// Fetches the round-trip economy fares of every airline for the routes the
+// page knows (routes.json, and its origins to each destination) from the
+// Travelpayouts (Aviasales) Data API, nonstop or with one connection each
+// way, and writes the ones the page can offer where it looks for live
+// fares, each with its airline, its connections, the checked bags it
+// includes and the times its flights leave and land where the API gives
+// them. The API takes no cabin: asked for business or first with
+// `trip_class`, it answers with the same economy tickets. The API serves
+// prices that Aviasales users found in the last 48 hours, so a route few
+// people search there can come back empty.
 //
 //   TRAVELPAYOUTS_TOKEN=... node tools/fetch-fares.js \
 //       [--routes site/data/routes.json] [--out site/data/live-fares.json] [--months 6]
@@ -16,15 +18,18 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
+import { TRIP_NIGHTS, daysBetween, landsInTheMorning, landsLate, routesOf } from '../site/plan.js';
 
 const API = 'https://api.travelpayouts.com/aviasales/v3/prices_for_dates';
+const LIMIT = 1000;
 // The API takes 600 queries a minute; a pause of 0.15 s between them keeps
 // well under that even when answers come back at once.
 const PAUSE_MS = 150;
 
 // Local dates and times, whatever offset the API writes its times in.
-// Korea and Japan keep UTC+9 all year, and Taiwan, Hong Kong and Macau
-// UTC+8; a route outside UTC+9 says so in `utcOffset`.
+// Korea and Japan keep UTC+9 all year; a route outside UTC+9 says so in
+// `utcOffset`: Taiwan, Hong Kong and Macau UTC+8, Vietnam and Thailand
+// UTC+7, Guam and Saipan UTC+10.
 const KOREA = 9;
 
 function local(ms, offset) {
@@ -35,8 +40,8 @@ export function localDate(timestamp, offset = KOREA) {
   return local(Date.parse(timestamp), offset).slice(0, 10);
 }
 
-export function localTime(timestamp) {
-  return local(Date.parse(timestamp), KOREA).slice(11, 16);
+export function localTime(timestamp, offset = KOREA) {
+  return local(Date.parse(timestamp), offset).slice(11, 16);
 }
 
 // The moment a flight that leaves at `timestamp` and flies `minutes` lands.
@@ -52,19 +57,24 @@ export function monthsFrom(today, count) {
   });
 }
 
-// The nonstop round trips in one API response for `route`, of every
-// airline. A ticket names its cities (SEL, TYO) as well as its airports,
-// and counts only when it flies between the route's own airports. The dates
-// are each flight's local date of departure. `departs` is when the flight
-// out leaves Korea; `arrives`, when the flight back lands there, is known
-// only if the response gives its duration, and `lands` gives the day too
-// when it is not the date the flight left on, as for a flight that leaves
-// late at night. `bags` is the checked bags the fare includes for each
-// person, 0 for none, where the ticket's link says.
+// The round trips in one API response for `route`, of every airline, with
+// no more than one connection each way; `stops` gives the connections out
+// and back of a ticket that makes any. A ticket names its cities (SEL, TYO)
+// as well as its airports, and counts only when it flies between the
+// route's own airports. The dates are each flight's local date of
+// departure. `departs` is when the flight out leaves Korea, Korean time.
+// The times the flights land are known only if the response gives their
+// durations: `arrivesAbroad` when the flight out lands, local time, with
+// `landsAbroad` for its day when that is not the day it left; `arrives`
+// when the flight back lands in Korea, with `lands` for its day when that
+// is not the day it left, as for a flight that leaves late at night.
+// `bags` is the checked bags the fare includes for each person, 0 for
+// none, where the ticket's link says.
 export function pickFares(response, route, seen) {
   if (!response || response.success === false || !Array.isArray(response.data)) return [];
+  const abroad = route.utcOffset ?? KOREA;
   return response.data
-    .filter((t) => t.airline && !t.transfers && !t.return_transfers
+    .filter((t) => t.airline && (t.transfers || 0) <= 1 && (t.return_transfers || 0) <= 1
       && t.departure_at && t.return_at && t.price > 0
       && (!t.origin_airport || t.origin_airport === route.origin)
       && (!t.destination_airport || t.destination_airport === route.dest))
@@ -74,13 +84,19 @@ export function pickFares(response, route, seen) {
         route: route.id,
         airline: t.airline,
         depart: localDate(t.departure_at),
-        return: localDate(t.return_at, route.utcOffset ?? KOREA),
+        return: localDate(t.return_at, abroad),
         price: Math.round(t.price),
         seen,
         source: 'Aviasales',
         departs: localTime(t.departure_at),
+        ...(t.transfers || t.return_transfers ? { stops: [t.transfers || 0, t.return_transfers || 0] } : {}),
         ...(bags == null ? {} : { bags }),
       };
+      if (Number.isFinite(t.duration_to)) {
+        const there = landing(t.departure_at, t.duration_to);
+        fare.arrivesAbroad = localTime(there, abroad);
+        if (localDate(there, abroad) !== fare.depart) fare.landsAbroad = localDate(there, abroad);
+      }
       if (Number.isFinite(t.duration_back)) {
         const back = landing(t.return_at, t.duration_back);
         fare.arrives = localTime(back);
@@ -90,14 +106,17 @@ export function pickFares(response, route, seen) {
     });
 }
 
-// The cheapest fare for each route, pair of dates and airline, and the
-// cheapest of those with a checked bag apart from those without, since the
-// page adds the bag's fee to the second; it needs no other.
+// The fares the page could offer: the cheapest for each route, pair of
+// dates and airline, apart for those without a checked bag, since the page
+// adds the bag's fee to them, for those that connect, which it lists apart
+// from nonstop ones, and for each day and time of day the flight back
+// lands that the leave a trip takes depends on.
 export function keepCheapest(fares) {
   const best = new Map();
   for (const fare of fares) {
     const key = `${fare.route} ${fare.depart} ${fare.return} ${fare.airline}`
-      + (fare.bags === 0 ? ' no bag' : '');
+      + (fare.bags === 0 ? ' no bag' : '') + (fare.stops ? ' via' : '')
+      + ` ${fare.lands || fare.return}${landsInTheMorning(fare) ? ' morning' : ''}`;
     const held = best.get(key);
     if (!held || fare.price < held.price) best.set(key, fare);
   }
@@ -141,11 +160,11 @@ async function query(route, departMonth, returnMonth, token) {
     departure_at: departMonth,
     return_at: returnMonth,
     one_way: 'false',
-    direct: 'true',
+    direct: 'false',
     unique: 'false',
     sorting: 'price',
     currency: 'krw',
-    limit: '1000',
+    limit: String(LIMIT),
   });
   const res = await fetch(url, { headers: { 'X-Access-Token': token } });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -170,12 +189,13 @@ async function main(argv) {
     return 0;
   }
 
-  const { routes } = JSON.parse(await readFile(values.routes, 'utf8'));
+  const routes = routesOf(JSON.parse(await readFile(values.routes, 'utf8')));
   const seen = localDate(new Date().toISOString());
   const months = monthsFrom(seen, Number(values.months));
   let fares = [];
   let ok = 0;
   let failed = 0;
+  let late = 0;
   // The API's own documentation is all the tests check the format against,
   // so the log names the fields a real ticket has, once a run, and the
   // airlines of each route's fares.
@@ -193,7 +213,14 @@ async function main(argv) {
             console.log(`Ticket fields: ${Object.keys(response.data[0]).join(', ')}`);
             shown = true;
           }
-          fares.push(...pickFares(response, route, seen));
+          if (response?.data?.length >= LIMIT) {
+            console.warn(`${route.id} ${out}/${back}: the answer reached the limit of ${LIMIT} tickets`);
+          }
+          for (const fare of pickFares(response, route, seen)) {
+            if (!TRIP_NIGHTS.includes(daysBetween(fare.depart, fare.return))) continue;
+            if (landsLate(route, fare)) late++;
+            else fares.push(fare);
+          }
           ok++;
         } catch (error) {
           failed++;
@@ -206,7 +233,8 @@ async function main(argv) {
 
   fares = keepCheapest(fares);
   await write({ updated: new Date().toISOString(), source: 'Aviasales', fares });
-  console.log(`Wrote ${tally(fares)} from ${ok} queries (${failed} failed) to ${values.out}.`);
+  console.log(`Wrote ${tally(fares)}, ${fares.filter((f) => f.stops).length} of them connecting, `
+    + `from ${ok} queries (${failed} failed) to ${values.out}; left out ${late} whose flight out lands late.`);
   console.log(`Checked bags, by airline (none/included/not said): ${bagTally(fares) || 'no fares'}.`);
   return ok === 0 ? 1 : 0;
 }

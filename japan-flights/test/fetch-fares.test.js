@@ -67,15 +67,16 @@ test('months run on from the current one, across a year', () => {
   assert.deepEqual(monthsFrom('2026-11-30', 3), ['2026-11', '2026-12', '2027-01']);
 });
 
-test("every airline's nonstop round trips are kept, with their times", () => {
+test("every airline's round trips with no more than one connection each way are kept, with their times", () => {
   const response = {
     success: true,
     currency: 'krw',
     data: [
       ticket({}),
-      ticket({ airline: '7C', price: 150000, departure_at: '2026-11-13T18:40:00+09:00', duration_back: 95 }),
+      ticket({ airline: '7C', price: 150000, departure_at: '2026-11-13T18:40:00+09:00', duration_to: 85, duration_back: 95 }),
       ticket({ transfers: 1, price: 180000 }),
       ticket({ return_transfers: 1, price: 190000 }),
+      ticket({ transfers: 2, price: 170000 }),
       ticket({ return_at: undefined, price: 120000 }),
       ticket({ airline: undefined, price: 110000 }),
       ticket({ departure_at: '2026-11-12T23:20:00Z', return_at: '2026-11-16T02:35:00Z', price: 251000.4 }),
@@ -84,9 +85,22 @@ test("every airline's nonstop round trips are kept, with their times", () => {
   const fare = (fields) => ({ route: 'ICN-OIT', seen: '2026-10-11', source: 'Aviasales', ...fields });
   assert.deepEqual(pickFares(response, oita, '2026-10-11'), [
     fare({ airline: 'KE', depart: '2026-11-13', return: '2026-11-15', price: 236500, departs: '09:15' }),
-    fare({ airline: '7C', depart: '2026-11-13', return: '2026-11-15', price: 150000, departs: '18:40', arrives: '13:35' }),
+    fare({ airline: '7C', depart: '2026-11-13', return: '2026-11-15', price: 150000, departs: '18:40',
+      arrivesAbroad: '20:05', arrives: '13:35' }),
+    fare({ airline: 'KE', depart: '2026-11-13', return: '2026-11-15', price: 180000, departs: '09:15', stops: [1, 0] }),
+    fare({ airline: 'KE', depart: '2026-11-13', return: '2026-11-15', price: 190000, departs: '09:15', stops: [0, 1] }),
     fare({ airline: 'KE', depart: '2026-11-13', return: '2026-11-16', price: 251000, departs: '08:20' }),
   ]);
+});
+
+test('the flight out lands abroad at local time, with its day when that is a later one', () => {
+  const vietnam = { id: 'ICN-HAN', origin: 'ICN', dest: 'HAN', utcOffset: 7 };
+  const toHanoi = (departure_at, duration_to) => ticket({ destination: 'HAN', destination_airport: 'HAN',
+    departure_at, duration_to, return_at: '2026-11-16T10:00:00+07:00' });
+  const [day, night] = pickFares({ success: true, data: [toHanoi('2026-11-13T10:00:00+09:00', 290),
+    toHanoi('2026-11-13T22:30:00+09:00', 300)] }, vietnam, '2026-10-11');
+  assert.deepEqual([day.arrivesAbroad, 'landsAbroad' in day], ['12:50', false]);
+  assert.deepEqual([night.arrivesAbroad, night.landsAbroad], ['01:30', '2026-11-14']);
 });
 
 test("a ticket counts only between the route's own airports", () => {
@@ -106,6 +120,14 @@ test('only the cheapest fare for each route, pair of dates and airline is kept',
     ({ route: 'ICN-OIT', airline, depart: '2026-11-13', return: ret, price });
   assert.deepEqual(keepCheapest([fare('KE', 300000), fare('7C', 150000), fare('KE', 280000), fare('KE', 260000, '2026-11-16')]),
     [fare('KE', 280000), fare('7C', 150000), fare('KE', 260000, '2026-11-16')]);
+});
+
+test('a connecting fare, and one back by noon or on another day, is kept apart from the cheapest', () => {
+  const fare = (price, fields) => ({ route: 'ICN-OIT', airline: 'KE', depart: '2026-11-13', return: '2026-11-15',
+    price, ...fields });
+  const kept = keepCheapest([fare(300000, { arrives: '10:50' }), fare(250000, { arrives: '15:00' }),
+    fare(200000, { stops: [1, 0] }), fare(260000, { arrives: '04:35', lands: '2026-11-16' })]);
+  assert.deepEqual(kept.map((f) => f.price), [300000, 250000, 200000, 260000]);
 });
 
 // The link of a real ticket, which says in its static_fare_key what the fare includes.
