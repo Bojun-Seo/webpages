@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  addDays, dayOf, fliesOn, leaveFor, monthsAhead, recommend, roundTrips, searchLinks,
+  addDays, dayOf, fliesOn, flightTimes, leaveFor, monthsAhead, recommend, roundTrips, searchLinks,
   timetableDays,
 } from '../site/plan.js';
 
@@ -32,7 +32,18 @@ test('every route has the fields the page reads', () => {
       assert.ok(p.days === 'daily' || p.days.every((d) => /^(mon|tue|wed|thu|fri|sat|sun)$/.test(d)));
     }
     if (r.periods.length === 0) assert.ok(r.note, `${r.id} needs a note saying why it has no days`);
+    for (const flight of r.flights ? [r.flights.out, r.flights.back] : []) {
+      assert.match(flight.departs, /^([01]\d|2[0-3]):[0-5]\d$/, r.id);
+      assert.match(flight.arrives, /^([01]\d|2[0-3]):[0-5]\d$/, r.id);
+      if (flight.number) assert.match(flight.number, /^[A-Z0-9]{2}\d{1,4}$/, r.id);
+    }
   }
+});
+
+test('a route card gives the flight times as the timetable writes them', () => {
+  assert.equal(flightTimes(route('ICN-HIJ')),
+    'KE2183 인천 10:35 → 히로시마 12:15 · KE2184 히로시마 13:25 → 인천 15:25');
+  assert.equal(flightTimes(route('ICN-OIT')), '인천 09:15 → 오이타 10:50 · 오이타 12:00 → 인천 13:45');
 });
 
 test('Oita flies Monday, Wednesday, Friday and Sunday within its season', () => {

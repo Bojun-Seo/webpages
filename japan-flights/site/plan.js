@@ -61,6 +61,15 @@ export function weeklyFlights(period) {
   return WEEK.filter((day) => periodFlies(period, day)).length;
 }
 
+// A route's flight times as its card shows them, such as
+// "KE2183 인천 10:35 → 히로시마 12:15 · KE2184 히로시마 13:25 → 인천 15:25".
+// Every route starts at Incheon.
+export function flightTimes(route) {
+  const leg = (flight, from, to) =>
+    `${flight.number ? `${flight.number} ` : ''}${from} ${flight.departs} → ${to} ${flight.arrives}`;
+  return `${leg(route.flights.out, '인천', route.city)} · ${leg(route.flights.back, route.city, '인천')}`;
+}
+
 // Every round trip on `route` leaving between `from` and `to` that stays
 // `minNights` to `maxNights` nights with a flight at both ends.
 export function roundTrips(route, from, to, minNights, maxNights) {

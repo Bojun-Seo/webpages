@@ -2,8 +2,8 @@
 // The working out lives in plan.js.
 
 import {
-  DAY_NAMES, WEEK, daysBetween, dayOf, lastDayOfMonth, monthsAhead, recommend, searchLinks,
-  timetableDays, weeklyFlights,
+  DAY_NAMES, WEEK, daysBetween, dayOf, flightTimes, lastDayOfMonth, monthsAhead, recommend,
+  searchLinks, timetableDays, weeklyFlights,
 } from './plan.js';
 
 const PAGE_SIZE = 30;
@@ -154,7 +154,7 @@ function routeCard(route) {
       weekStrip(p),
       el('span', { class: 'freq' }, `주 ${weeklyFlights(p)}회 · ${timetableDays(p)}`))),
     route.note && el('p', { class: 'note' }, route.note),
-    route.times && el('p', { class: 'times' }, route.times),
+    route.flights && el('p', { class: 'times' }, flightTimes(route)),
     route.aircraft && el('p', { class: 'aircraft' }, route.aircraft),
     el('p', { class: 'sources' }, '출처 ',
       route.sources.map((s, i) => [i > 0 && ' · ', link(s.url, s.title)])));
