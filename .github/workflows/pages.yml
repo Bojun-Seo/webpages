@@ -49,10 +49,21 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: |
+      - name: Build the site
+        # Pages lets browsers keep a file for ten minutes, so a page fetched after a deploy could
+        # run a script from before it. The script and style URLs carry the commit (?v=...) so a
+        # deploy always loads its own; the grep fails the build if a file stops matching.
+        run: |
           mkdir _site
           cp index.html _site/
           cp -R japan-flights/site _site/japan-flights
+          v=${GITHUB_SHA::7}
+          sed -i "s|href=\"style.css\"|href=\"style.css?v=$v\"|; s|src=\"app.js\"|src=\"app.js?v=$v\"|" \
+            _site/japan-flights/index.html
+          sed -i "s|from './plan.js'|from './plan.js?v=$v'|" _site/japan-flights/app.js
+          grep -q "style.css?v=$v" _site/japan-flights/index.html
+          grep -q "app.js?v=$v" _site/japan-flights/index.html
+          grep -q "plan.js?v=$v" _site/japan-flights/app.js
       - name: Fetch live fares
         # Writes an empty file when the secret is not set. The page publishes even if this fails.
         continue-on-error: true
