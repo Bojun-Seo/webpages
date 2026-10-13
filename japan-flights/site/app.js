@@ -2,8 +2,7 @@
 // The working out lives in plan.js.
 
 import {
-  DAY_NAMES, DEFAULT_PARTY, TRIP_NIGHTS, daysBetween, dayOf, fareMonths, lastDayOfMonth, recommend, routesOf,
-  searchLinks,
+  DAY_NAMES, DEFAULT_PARTY, TRIP_NIGHTS, dayOf, fareMonths, lastDayOfMonth, recommend, routesOf, searchLinks,
 } from './plan.js';
 
 const PAGE_SIZE = 30;
@@ -82,11 +81,6 @@ function won(price) {
   return `${price.toLocaleString('ko-KR')}원`;
 }
 
-function seenLabel(seen, today) {
-  const days = daysBetween(seen.slice(0, 10), today);
-  return days <= 0 ? '오늘 확인' : `${days}일 전 확인`;
-}
-
 function link(href, text, cls) {
   return el('a', { href, target: '_blank', rel: 'noopener', class: cls }, text);
 }
@@ -147,7 +141,7 @@ function tripRow(trip) {
   const price = el('div', { class: 'price' },
     el('strong', null, won(trip.total)),
     trip.bag.count > 0 && el('small', { class: 'bag-fee' }, bagLine(trip.bag)),
-    el('span', null, `${airlineName(trip.airline)} · ${seenLabel(trip.fare.seen, data.today)}`));
+    el('span', null, airlineName(trip.airline)));
   return el('li', { class: 'trip' },
     el('div', { class: 'when' },
       el('span', { class: 'dates' }, `${dayLabel(trip.depart)} → ${dayLabel(trip.return)}`),

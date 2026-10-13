@@ -70,7 +70,7 @@ export function monthsFrom(today, count) {
 // is not the day it left, as for a flight that leaves late at night.
 // `bags` is the checked bags the fare includes for each person, 0 for
 // none, where the ticket's link says.
-export function pickFares(response, route, seen) {
+export function pickFares(response, route) {
   if (!response || response.success === false || !Array.isArray(response.data)) return [];
   const abroad = route.utcOffset ?? KOREA;
   return response.data
@@ -83,8 +83,6 @@ export function pickFares(response, route, seen) {
         depart: localDate(t.departure_at),
         return: localDate(t.return_at, abroad),
         price: Math.round(t.price),
-        seen,
-        source: 'Aviasales',
         departs: localTime(t.departure_at),
         ...(t.transfers || t.return_transfers ? { stops: [t.transfers || 0, t.return_transfers || 0] } : {}),
         ...(bags == null ? {} : { bags }),
@@ -216,8 +214,7 @@ async function main(argv) {
   }
 
   const routes = routesOf(JSON.parse(await readFile(values.routes, 'utf8')));
-  const seen = localDate(new Date().toISOString());
-  const months = monthsFrom(seen, Number(values.months));
+  const months = monthsFrom(localDate(new Date().toISOString()), Number(values.months));
   let fares = [];
   let ok = 0;
   let failed = 0;
@@ -252,7 +249,7 @@ async function main(argv) {
             if (why && why.includes('-')) counts.others[why] = (counts.others[why] || 0) + 1;
             else if (why) counts[why]++;
           }
-          for (const fare of pickFares(response, route, seen)) {
+          for (const fare of pickFares(response, route)) {
             if (!TRIP_NIGHTS.includes(daysBetween(fare.depart, fare.return))) counts.nights++;
             else if (landsLate(fare)) counts.late++;
             else fares.push(fare);
