@@ -1,6 +1,6 @@
 {
   "updated": "2026-10-12",
-  "included": ["KE", "OZ", "JL", "NH", "ET", "LJ", "WE", "YP", "VN", "TG", "CX", "SQ", "BR", "CI", "CA", "SL"],
+  "included": ["KE", "OZ", "JL", "NH", "ET", "LJ", "WE", "YP", "VN", "TG", "CX", "SQ", "BR", "CI", "SL"],
   "includedTo": { "TW": ["GU", "MP"] },
   "includedSources": [
     { "title": "진에어 무료 수하물 허용량 (특가를 포함한 모든 운임 15kg)", "url": "https://help.jinair.com/hc/ko/articles/4409835717657" },
