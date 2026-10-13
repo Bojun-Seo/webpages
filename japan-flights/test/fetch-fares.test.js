@@ -151,36 +151,38 @@ test('the link of a ticket tells whether its fare includes a checked bag', () =>
   assert.equal(bagTally([...fares, { airline: '7C', bags: 0 }]), '7C 1/0/0, KE 1/1/1');
 });
 
-test("the link of a real ticket lists its flights, out and back, and so says where it connects", () => {
+test('the link of a real ticket lists its ways out and back, and so says where it connects', () => {
   const toNarita = ticket({ destination: 'TYO', destination_airport: 'NRT', link: link('L0') });
   assert.deepEqual(connections(toNarita), [[], []]);
+  // Jetstar Japan from Incheon to Narita through Kansai, and back through Kagoshima.
+  const through = ticket({ airline: 'GK', destination: 'TYO', destination_airport: 'NRT', transfers: 1,
+    return_transfers: 1, link: '/search/ICN1810NRT26101?t=GK17923626001792448700001435ICNKIXNRT'
+      + '17930190001793044200000420NRTKOJICN_ed75cbc3f2cf3ba1c32033b311ad3ba2_23920&search_date=09102026'
+      + '&static_fare_key=TY%7CP1%7CH1%7CL0%7CCH0%7CR0%7CTBC0&origin_airports=0,1&destination_airports=0,1' });
+  assert.deepEqual(connections(through), [['KIX'], ['KOJ']]);
 });
 
-// A link that lists a ticket's flights as a real one does: each the Unix times it leaves and lands,
-// its minutes in the air and its airports, after its airline's code where that changes.
-const listing = (...flights) => '/search/ICN1311OIT15111?t='
-  + flights.map(([airline, from, to], i) => `${i > 0 && flights[i - 1][0] === airline ? '' : airline}`
-    + `17923068001792312500000095${from}${to}`).join('')
+// A link that lists a ticket's ways as a real one does: each the Unix times it leaves and lands, its
+// minutes on the way and every airport it passes, after its airline's code where that changes.
+const listing = (...ways) => '/search/ICN1311OIT15111?t='
+  + ways.map(([airline, ...airports], i) => `${i > 0 && ways[i - 1][0] === airline ? '' : airline}`
+    + `17923068001792312500000095${airports.join('')}`).join('')
   + '_e44efbf0187589ac43b5421875bdebd7_25135';
 
-test('a connecting fare names the airports it connects at, where its link lists its flights', () => {
+test('a connecting fare names the airports it connects at, where its link lists its ways', () => {
   const nonstop = ticket({ link: listing(['7C', 'ICN', 'OIT'], ['7C', 'OIT', 'ICN']) });
-  const out = ticket({ transfers: 1, price: 180000,
-    link: listing(['MU', 'ICN', 'PVG'], ['MU', 'PVG', 'OIT'], ['KE', 'OIT', 'ICN']) });
+  const out = ticket({ transfers: 1, price: 180000, link: listing(['MU', 'ICN', 'PVG', 'OIT'], ['KE', 'OIT', 'ICN']) });
   const both = ticket({ transfers: 1, return_transfers: 1, price: 170000,
-    link: listing(['9C', 'ICN', 'PVG'], ['9C', 'PVG', 'OIT'], ['CI', 'OIT', 'TPE'], ['CI', 'TPE', 'ICN']) });
+    link: listing(['9C', 'ICN', 'PVG', 'OIT'], ['D7', 'OIT', 'TPE', 'ICN']) });
   assert.deepEqual(connections(out), [['PVG'], []]);
   assert.deepEqual(connections(both), [['PVG'], ['TPE']]);
   assert.deepEqual(pickFares({ success: true, data: [nonstop, out, both] }, oita).map((f) => f.via),
     [undefined, [['PVG'], []], [['PVG'], ['TPE']]]);
-  // An airline's code before every flight reads the same.
-  const every = '/search/ICN1311OIT15111?t=MU17923068001792312500000095ICNPVGMU17923068001792312500000095PVGOIT'
-    + 'KE17923068001792312500000095OITICN_e44efbf0187589ac43b5421875bdebd7_25135';
-  assert.deepEqual(connections(ticket({ transfers: 1, link: every })), [['PVG'], []]);
-  // Too few flights for the connections, flights out that end elsewhere, or none listed say nothing.
+  // Ways that make other connections than the ticket says, a way out that ends elsewhere, or none
+  // listed say nothing.
   assert.equal(connections(ticket({ transfers: 1, link: nonstop.link })), null);
-  assert.equal(connections(ticket({ transfers: 1,
-    link: listing(['MU', 'ICN', 'PVG'], ['MU', 'PVG', 'TPE'], ['CI', 'OIT', 'ICN']) })), null);
+  assert.equal(connections(ticket({ transfers: 1, link: listing(['MU', 'ICN', 'PVG', 'TPE'], ['CI', 'OIT', 'ICN']) })),
+    null);
   assert.equal(connections(ticket({ transfers: 1 })), null);
 });
 

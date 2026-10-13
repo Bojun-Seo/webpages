@@ -162,32 +162,33 @@ export function checkedBags(link) {
   return part === 'L0' ? 0 : Number(part.split('_')[1] || 1);
 }
 
-// The flights a ticket's link lists in `t`, out first, then back, before a
-// hash and the price: each the Unix times it leaves and lands, its minutes
-// in the air and the airports it flies from and to, after its airline's
-// code where that is not the one before's, as in
-// "7C17923068001792312500000095ICNMYJ17925753001792581300000100MYJICN".
-// An airline's code is never two digits, so it cannot be mistaken for the
-// start of the times.
+// The ways out and back a ticket's link lists in `t`, before a hash and
+// the price: each the Unix times it leaves and lands, its minutes on the
+// way and every airport it passes, after its airline's code where that is
+// not the one before's, as in "GK17923626001792448700001435ICNKIXNRT
+// 17930190001793044200000420NRTKOJICN" (without the space) for Incheon to
+// Narita through Kansai and back through Kagoshima. An airline's code is
+// never two digits, and is followed by the times, so it cannot be taken for
+// the times or for an airport.
 const AIRLINE = '(?:[A-Z][A-Z0-9]|\\d[A-Z])';
-const FLIGHTS = new RegExp(`^(?:${AIRLINE}?\\d{26}[A-Z]{6})+$`);
-const FLIGHT = new RegExp(`${AIRLINE}?\\d{26}([A-Z]{3})([A-Z]{3})`, 'g');
+const WAYS = new RegExp(`^(?:${AIRLINE}?\\d{26}(?:[A-Z]{3}){2,})+$`);
+const WAY = new RegExp(`${AIRLINE}?\\d{26}((?:[A-Z]{3}){2,})`, 'g');
 
 // The airports a ticket connects at, on the way out and on the way back,
-// from the flights its link lists: [["PVG"], []] for one connection out at
-// Shanghai. Null when the link does not list as many flights as the
-// ticket's connections make, or the flights out do not end where the
-// ticket goes.
+// from the ways its link lists: [["KIX"], []] for one connection out at
+// Kansai. Null when the link does not list a way out and a way back, they
+// do not make as many connections as the ticket says, or the way out does
+// not end where the ticket goes.
 export function connections(t) {
   const query = String(t.link || '').split('?')[1];
   const listed = ((query && new URLSearchParams(query).get('t')) || '').split('_')[0];
-  if (!FLIGHTS.test(listed)) return null;
-  const flights = [...listed.matchAll(FLIGHT)].map((match) => ({ from: match[1], to: match[2] }));
-  const out = (t.transfers || 0) + 1;
-  if (flights.length !== out + (t.return_transfers || 0) + 1) return null;
-  if (t.destination_airport && flights[out - 1].to !== t.destination_airport) return null;
-  const via = (legs) => legs.slice(0, -1).map((leg) => leg.to);
-  return [via(flights.slice(0, out)), via(flights.slice(out))];
+  if (!WAYS.test(listed)) return null;
+  const ways = [...listed.matchAll(WAY)].map((match) => match[1].match(/.{3}/g));
+  if (ways.length !== 2) return null;
+  const [out, back] = ways.map((airports) => airports.slice(1, -1));
+  if (out.length !== (t.transfers || 0) || back.length !== (t.return_transfers || 0)) return null;
+  if (t.destination_airport && ways[0].at(-1) !== t.destination_airport) return null;
+  return [out, back];
 }
 
 // How many `fares` there are, with their airlines, for the log:

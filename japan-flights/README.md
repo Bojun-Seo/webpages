@@ -75,20 +75,21 @@ tickets, since then the dearest tickets are missing. A ticket counts only on the
 airports it names. The `static_fare_key` in its link says what its fare includes: `L0` for no
 checked bag, `L1_1_15` for one bag of 15 kg, and so on. A fare gives the bags it includes for each
 person in `bags`, `0` for none, when its link says, and its connections out and back in `stops` when
-it makes any. The link's `t` lists the ticket's flights, out first, then back, each with the Unix
-times it leaves and lands, its minutes in the air and its two airports, after its airline's code
-where that changes, so a connecting fare names the airports it connects at in `via`: `[["PVG"], []]`
-for one connection on the way out at Shanghai Pudong. The log counts the connecting fares that say
-where, and shows the link of one ticket that does not. The cheapest fare without a bag is kept apart
-from the cheapest other, so that the page can weigh the first with its bag fee against the second,
-and a connecting fare from a nonstop one, and so is a fare whose flight back lands on another day or
-at another time of day, since the leave a trip takes depends on it. The log counts each airline's
-fares that include no bag, those that include one or more, and those whose link does not say, and
-the fares left out because the flight out lands late. `prices_for_dates` documents no cabin, and
-asked for business and first with `trip_class` (`1` and `2`), as the API's older methods take it, it
-answered all 143 queries that had tickets on 12 October 2026 with the economy answer's tickets; so
-the fetcher asks for economy only, and the page has no business or first fares. The tests use the
-response format the API documents; each run logs the fields a real ticket has, to check it against.
+it makes any. The link's `t` lists the ticket's way out and way back, each with the Unix times it
+leaves and lands, its minutes on the way and every airport it passes, `ICNKIXNRT` for Incheon to
+Narita through Kansai, after its airline's code where that changes, so a connecting fare names the
+airports it connects at in `via`: `[["KIX"], []]` for one connection on the way out at Kansai. The
+log counts the connecting fares that say where, and shows the link of one ticket that does not. The
+cheapest fare without a bag is kept apart from the cheapest other, so that the page can weigh the
+first with its bag fee against the second, and a connecting fare from a nonstop one, and so is a
+fare whose flight back lands on another day or at another time of day, since the leave a trip takes
+depends on it. The log counts each airline's fares that include no bag, those that include one or
+more, and those whose link does not say, and the fares left out because the flight out lands late.
+`prices_for_dates` documents no cabin, and asked for business and first with `trip_class` (`1` and
+`2`), as the API's older methods take it, it answered all 143 queries that had tickets on 12 October
+2026 with the economy answer's tickets; so the fetcher asks for economy only, and the page has no
+business or first fares. The tests use the response format the API documents; each run logs the
+fields a real ticket has, to check it against.
 
 ## Publish on GitHub Pages
 
