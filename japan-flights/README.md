@@ -22,8 +22,8 @@ The page is in Korean. It is not affiliated with any airline.
 ## What it does
 
 For the departure month, trip length, budget, Korean airport, destinations, alliances and airlines
-the visitor picks, and the number of people and of checked bags between them, one each unless
-picked, the page:
+the visitor picks, the number of people and of checked bags between them, one each unless picked,
+and the days off the visitor adds, the page:
 
 1. lists the round trips of two to six nights, or of the lengths picked among them, that a fare of
    one of the airlines picked gives, nonstop or with one connection on the way out, back or both;
@@ -31,10 +31,14 @@ picked, the page:
    or later, or on a later day, which loses the first day;
 2. counts the leave each takes, and offers only the trips that take none; it keeps the count to tell
    which those are, but does not show it: the workdays from departure to the day the flight back
-   lands that are not public holidays, both ends included, except a landing day when the flight
-   lands before noon. A flight back that leaves late at night lands the next day, so the day it
-   leaves counts too. The workdays are Monday, Tuesday and Thursday, the week of the person the page
-   was made for; `WORKDAYS` in `site/plan.js` sets them;
+   lands that are neither public holidays nor days off the visitor added, both ends included, except
+   a landing day when the flight lands before noon. A flight back that leaves late at night lands
+   the next day, so the day it leaves counts too. The workdays are Monday, Tuesday and Thursday, the
+   week of the person the page was made for; `WORKDAYS` in `site/plan.js` sets them. A day off the
+   visitor adds under 내 휴일 추가, annual leave or a company holiday, must be one of those workdays that
+   is not a public holiday and has not passed (`dayOffProblem`), since any other day is off already;
+   the page says why it turns a date down, and the browser keeps the days added in its local
+   storage;
 3. marks the trips whose flight back lands in Korea before noon (오전 도착, or 다음 날 오전 도착 when it lands
    the day after it leaves), where the fare gives the time, which the mark shows on hover, and the
    trips that connect (갈 때 경유, 올 때 경유 or 왕복 경유), with the airports they connect at on hover;
@@ -49,7 +53,8 @@ picked, the page:
    total. A fare ranks at its total less a head start of 50,000 won for each person on an airline of
    any of the three alliances (`ADVANTAGE` in `site/plan.js`); the price shown is the total. The
    best fare is the one that ranks lowest of those whose trip takes no leave;
-5. lists the trips lowest rank first, then by departure date, soonest first; on the same day, the
+5. lists first the trips that span a day off the visitor added, marked 내 휴일 with its date, then the
+   rest; each lot lowest rank first, then by departure date, soonest first; on the same day, the
    shorter trip first, and a nonstop one before one that connects.
 
 Every trip links to searches with the route and dates filled in, for the live price: first on
@@ -182,8 +187,9 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   listed.
 - The search links follow URL formats the sites do not document, and any of them can change. The
   KAYAK link asks for the trip's airline, nonstop for a nonstop trip; the others show every airline.
-- Leave counts the departure day as a whole day, and knows only Korean public holidays and the days
-  off of a Monday, Tuesday and Thursday week, not company holidays.
+- Leave counts the departure day as a whole day, and knows only Korean public holidays, the days off
+  of a Monday, Tuesday and Thursday week and the days off the visitor adds, which stay in that
+  browser alone.
 - A fare that does not give the times of its flights is let through the rule against a late flight
   out, and is not marked 오전 도착.
 - Only the trips Aviasales users searched for in the last 48 hours have fares, so a route few of

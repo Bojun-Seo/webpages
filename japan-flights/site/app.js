@@ -2,8 +2,8 @@
 // The working out lives in plan.js.
 
 import {
-  ALLIANCES, DAY_NAMES, DEFAULT_PARTY, TRIP_NIGHTS, allianceOf, dayOf, fareMonths, lastDayOfMonth, recommend,
-  routesOf, searchLinks,
+  ALLIANCES, DAY_NAMES, DEFAULT_PARTY, TRIP_NIGHTS, allianceOf, dayOf, dayOffProblem, fareMonths, lastDayOfMonth,
+  recommend, routesOf, searchLinks,
 } from './plan.js';
 
 const PAGE_SIZE = 30;
@@ -12,6 +12,17 @@ const PAGE_SIZE = 30;
 // to nine adults.
 const MAX_PEOPLE = 9;
 const MAX_BAGS = 9;
+
+// Where this browser keeps the days off the viewer added.
+const DAYS_OFF_KEY = 'japan-flights.daysOff';
+
+// What the page says when a date cannot be added as a day off, by the
+// problem `dayOffProblem` finds; a public holiday is named.
+const DAY_OFF_PROBLEMS = {
+  invalid: '날짜를 골라 주세요.',
+  past: '지난 날짜는 추가할 수 없습니다.',
+  'not a workday': '월·화·목만 추가할 수 있습니다. 수·금·토·일은 원래 쉬는 날입니다.',
+};
 
 // Names for the airlines that fly these routes or connect on them; any
 // other shows its code.
@@ -125,6 +136,8 @@ const state = {
   cities: new Set(),
   alliances: new Set(),
   airlines: new Set(),
+  // The dates the viewer has off besides public holidays.
+  daysOff: new Set(),
   trips: [],
   shown: PAGE_SIZE,
 };
@@ -143,6 +156,7 @@ function readFilter() {
     alliances: state.alliances.size ? state.alliances : null,
     airlines: state.airlines.size ? state.airlines : null,
     party: { people: Number($('people').value), bags: Number($('bags').value) },
+    daysOff: state.daysOff.size ? state.daysOff : null,
   };
 }
 
@@ -171,6 +185,8 @@ function tripRow(trip) {
   const morning = trip.lands > trip.return ? '다음 날 오전 도착' : '오전 도착';
   // A mark that says more on hover gives it as its title.
   const badges = [
+    trip.daysOff.length > 0
+      && el('span', { class: 'badge badge-day-off' }, `내 휴일 ${trip.daysOff.map(shortDate).join('·')}`),
     trip.alliance && el('span', { class: 'badge badge-alliance' }, ALLIANCE_NAMES[trip.alliance]),
     stops && el('span', { class: 'badge badge-stops', title: viaLabel(trip.fare.via) }, stops),
     ...trip.holidays.map((name) => el('span', { class: 'badge badge-holiday' }, name)),
@@ -197,9 +213,11 @@ function tripRow(trip) {
 
 function renderTrips() {
   const { data, trips, party } = state;
+  const first = trips.filter((t) => t.daysOff.length > 0).length;
   $('summary').textContent = trips.length
-    ? `조건에 맞는 일정 ${trips.length.toLocaleString('ko-KR')}개 · `
-      + `${party.people}명·위탁수하물 ${party.bags ? `${party.bags}개` : '없음'} 기준`
+    ? [`조건에 맞는 일정 ${trips.length.toLocaleString('ko-KR')}개`,
+      state.daysOff.size > 0 && (first ? `내 휴일이 들어간 ${first.toLocaleString('ko-KR')}개 먼저` : '내 휴일이 들어간 일정 없음'),
+      `${party.people}명·위탁수하물 ${party.bags ? `${party.bags}개` : '없음'} 기준`].filter(Boolean).join(' · ')
     : '';
   $('price-head').textContent = `${party.people}인 왕복`;
 
@@ -253,11 +271,64 @@ function renderAirlines() {
     state.data.airlines.map((code) => ({ value: code, label: airlineName(code) })));
 }
 
+// The days off this browser kept, less any that has passed or has since
+// become a public holiday.
+function loadDaysOff({ holidays, today }) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(DAYS_OFF_KEY));
+    return new Set((Array.isArray(saved) ? saved : []).filter((date) => !dayOffProblem(date, holidays, today)));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDaysOff() {
+  try {
+    localStorage.setItem(DAYS_OFF_KEY, JSON.stringify([...state.daysOff].sort()));
+  } catch {
+    // Without storage the days off last as long as the page.
+  }
+}
+
+// Adds the date picked as a day off if `dayOffProblem` takes it, and says
+// why not otherwise.
+function addDayOff() {
+  const { holidays, today } = state.data;
+  const date = $('day-off').value;
+  const problem = dayOffProblem(date, holidays, today);
+  let note = '';
+  if (problem === 'holiday') note = `이미 공휴일(${holidays[date]})인 날입니다.`;
+  else if (problem) note = DAY_OFF_PROBLEMS[problem];
+  else if (state.daysOff.has(date)) note = '이미 추가한 날입니다.';
+  $('day-off-note').textContent = note;
+  if (note) return;
+  state.daysOff.add(date);
+  saveDaysOff();
+  $('day-off').value = '';
+  update();
+}
+
+// The days off added, each a chip that takes it out again.
+function renderDaysOff() {
+  const box = $('days-off');
+  const days = [...state.daysOff].sort();
+  box.hidden = days.length === 0;
+  box.replaceChildren(el('span', { class: 'chips-label' }, '내 휴일'), ...days.map((date) => el('button', {
+    type: 'button', class: 'chip chip-day-off', 'aria-label': `${dayLabel(date)} 휴일 빼기`,
+    onclick: () => {
+      state.daysOff.delete(date);
+      saveDaysOff();
+      update();
+    },
+  }, `${dayLabel(date)} ✕`)));
+}
+
 function update() {
   state.shown = PAGE_SIZE;
   const filter = readFilter();
   state.party = filter.party;
   state.trips = recommend(state.data, filter);
+  renderDaysOff();
   renderNights();
   renderCities();
   renderAlliances();
@@ -314,6 +385,16 @@ async function main() {
     el('option', { value: from + i, selected: from + i === picked }, label(from + i)));
   $('people').replaceChildren(...counts(1, MAX_PEOPLE, (n) => `${n}명`, DEFAULT_PARTY.people));
   $('bags').replaceChildren(...counts(0, MAX_BAGS, (n) => (n ? `${n}개` : '없음'), DEFAULT_PARTY.bags));
+
+  state.daysOff = loadDaysOff(state.data);
+  $('day-off').min = today;
+  $('add-day-off').addEventListener('click', addDayOff);
+  $('day-off').addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    addDayOff();
+  });
+  $('day-off').addEventListener('input', () => { $('day-off-note').textContent = ''; });
 
   for (const id of ['origin', 'month', 'people', 'bags']) $(id).addEventListener('change', update);
   $('budget').addEventListener('input', update);
