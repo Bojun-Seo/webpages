@@ -1,13 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { addDays } from '../site/plan.js';
 import {
-  bagTally, checkedBags, connections, keepCheapest, leftOut, localDate, localTime, monthsFrom, pickFares, query,
-  retryAfter,
+  bagTally, carryOver, checkedBags, connections, keepCheapest, leftOut, localDate, localTime, monthsFrom, pickFares,
+  query, retryAfter,
 } from '../tools/fetch-fares.js';
 
 const oita = { id: 'ICN-OIT', origin: 'ICN', dest: 'OIT' };
@@ -244,4 +245,60 @@ test('without a token the script writes an empty file and succeeds', () => {
   delete env.TRAVELPAYOUTS_TOKEN;
   execFileSync(process.execPath, [script, '--out', out], { env, stdio: 'pipe' });
   assert.deepEqual(JSON.parse(readFileSync(out, 'utf8')), { updated: null, fares: [] });
+});
+
+test('fares fetched before stand in for the queries the API did not answer', () => {
+  const fare = (route, depart, ret, price) => ({ route, airline: '7C', depart, return: ret, price });
+  const before = [fare('ICN-NRT', '2026-11-13', '2026-11-15', 150000), fare('ICN-NRT', '2026-11-27', '2026-12-01', 160000),
+    fare('ICN-KIX', '2026-11-13', '2026-11-15', 140000), fare('ICN-NRT', '2026-10-09', '2026-10-11', 90000)];
+  const unanswered = [{ route: 'ICN-NRT', out: '2026-11', back: '2026-12' }, { route: 'ICN-NRT', out: '2026-10', back: '2026-10' }];
+  // A query's fares leave in its month out and come back in its month back; those that have left stay out.
+  assert.deepEqual(carryOver(before, unanswered, '2026-10-13').map((f) => f.price), [160000]);
+});
+
+// Runs the script on a route to Narita and one to Kansai, for this month, against an API that `answer`
+// stands in for, with `previous` as the fares fetched before; gives the fares it wrote and its exit code.
+function fetchWith(answer, previous) {
+  const dir = mkdtempSync(join(tmpdir(), 'fares-'));
+  const path = (name) => join(dir, name);
+  writeFileSync(path('stub.mjs'), `globalThis.fetch = async (url) => (${answer})(new URL(url));\n`);
+  writeFileSync(path('routes.json'), JSON.stringify({ origins: ['ICN'], destinations: [
+    { dest: 'NRT', city: '도쿄 나리타', country: 'JP' }, { dest: 'KIX', city: '오사카', country: 'JP' }] }));
+  writeFileSync(path('previous.json'), JSON.stringify(previous));
+  const script = fileURLToPath(new URL('../tools/fetch-fares.js', import.meta.url));
+  let status = 0;
+  try {
+    execFileSync(process.execPath, ['--import', path('stub.mjs'), script, '--routes', path('routes.json'),
+      '--out', path('out.json'), '--months', '1', '--previous', path('previous.json')],
+    { env: { ...process.env, TRAVELPAYOUTS_TOKEN: 'token' }, stdio: 'pipe' });
+  } catch (error) {
+    status = error.status;
+  }
+  return { doc: JSON.parse(readFileSync(path('out.json'), 'utf8')), status };
+}
+
+test('when the API answers no query, the fares fetched before stay as they were', () => {
+  const today = localDate(new Date().toISOString());
+  const previous = { updated: '2026-10-12T21:40:00.000Z', source: 'Aviasales', fares: [
+    { route: 'ICN-NRT', airline: '7C', depart: today, return: addDays(today, 2), price: 150000 }] };
+  const refusing = `() => ({ ok: false, status: 429, headers: { get: () => '0' } })`;
+  assert.deepEqual(fetchWith(refusing, previous), { doc: previous, status: 1 });
+});
+
+test('when the API answers some queries, the fares fetched before stand in for the others', () => {
+  const today = localDate(new Date().toISOString());
+  const ret = addDays(today, 2);
+  const previous = { updated: '2026-10-12T21:40:00.000Z', source: 'Aviasales', fares: [
+    { route: 'ICN-NRT', airline: '7C', depart: today, return: ret, price: 99000 },
+    { route: 'ICN-KIX', airline: 'MM', depart: today, return: ret, price: 120000 }] };
+  // Narita answers with a fare; Kansai fails.
+  const narita = `(url) => url.searchParams.get('destination') === 'KIX'
+    ? { ok: false, status: 500, headers: { get: () => null } }
+    : { ok: true, status: 200, json: async () => ({ success: true, data: [{ origin: 'SEL', destination: 'TYO',
+      origin_airport: 'ICN', destination_airport: 'NRT', airline: '7C', price: 150000, transfers: 0,
+      return_transfers: 0, departure_at: '${today}T09:00:00+09:00', return_at: '${ret}T12:00:00+09:00' }] }) }`;
+  const { doc, status } = fetchWith(narita, previous);
+  assert.equal(status, 0);
+  assert.notEqual(doc.updated, previous.updated);
+  assert.deepEqual(doc.fares.map((f) => `${f.route} ${f.airline} ${f.price}`), ['ICN-NRT 7C 150000', 'ICN-KIX MM 120000']);
 });

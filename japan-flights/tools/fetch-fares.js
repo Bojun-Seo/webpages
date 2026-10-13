@@ -9,7 +9,12 @@
 // back empty.
 //
 //   TRAVELPAYOUTS_TOKEN=... node tools/fetch-fares.js \
-//       [--routes site/data/routes.json] [--out site/data/live-fares.json] [--months 6]
+//       [--routes site/data/routes.json] [--out site/data/live-fares.json] [--months 6] \
+//       [--previous live-fares.json]
+//
+// `--previous` names the fares fetched before, which the workflow downloads
+// from the published site: the fetcher keeps those of any query the API
+// does not answer, and should it answer none, writes them as they were.
 //
 // Without a token it writes an empty file, so the page can say live fares
 // are not set up. It exits 1 only when every query failed.
@@ -261,6 +266,25 @@ export async function query(route, departMonth, returnMonth, token, wait = sleep
   }
 }
 
+// The fares in `fares`, fetched before, that queries the API did not
+// answer this time (`unanswered`, each a route and the months of its way
+// out and back) would have given, and that leave today or later.
+export function carryOver(fares, unanswered, today) {
+  const asked = new Set(unanswered.map((q) => `${q.route} ${q.out} ${q.back}`));
+  return fares.filter((f) => f.depart >= today
+    && asked.has(`${f.route} ${f.depart.slice(0, 7)} ${f.return.slice(0, 7)}`));
+}
+
+// The document of fares at `path`, or null when it is missing or not one.
+async function readFares(path) {
+  try {
+    const doc = JSON.parse(await readFile(path, 'utf8'));
+    return Array.isArray(doc?.fares) ? doc : null;
+  } catch {
+    return null;
+  }
+}
+
 async function main(argv) {
   const here = (path) => fileURLToPath(new URL(path, import.meta.url));
   const { values } = parseArgs({
@@ -269,6 +293,7 @@ async function main(argv) {
       routes: { type: 'string', default: here('../site/data/routes.json') },
       out: { type: 'string', default: here('../site/data/live-fares.json') },
       months: { type: 'string', default: '6' },
+      previous: { type: 'string' },
     },
   });
   const token = process.env.TRAVELPAYOUTS_TOKEN;
@@ -280,7 +305,8 @@ async function main(argv) {
   }
 
   const routes = routesOf(JSON.parse(await readFile(values.routes, 'utf8')));
-  const months = monthsFrom(localDate(new Date().toISOString()), Number(values.months));
+  const today = localDate(new Date().toISOString());
+  const months = monthsFrom(today, Number(values.months));
   let fares = [];
   let ok = 0;
   let failed = 0;
@@ -294,15 +320,22 @@ async function main(argv) {
   let unread = null;
   // The queries the API has refused in a row with 429, even when asked again.
   let refused = 0;
+  // The queries that failed, or were not asked once the API stopped taking
+  // them, whose fares the previous fetch's stand in for.
+  const unanswered = [];
   for (const route of routes) {
-    if (refused >= REFUSED_IN_A_ROW) break;
     const before = fares.length;
     const counts = { tickets: 0, others: {}, connections: 0, incomplete: 0, nights: 0, late: 0 };
+    let asked = 0;
     for (const out of months) {
       // Ask for returns in the same month and the next, so a trip over a
       // month's end (New Year's) is not missed.
       for (const back of [out, monthsFrom(`${out}-01`, 2)[1]]) {
-        if (refused >= REFUSED_IN_A_ROW) break;
+        if (refused >= REFUSED_IN_A_ROW) {
+          unanswered.push({ route: route.id, out, back });
+          continue;
+        }
+        asked++;
         if (ok + failed > 0) await sleep(PAUSE_MS);
         try {
           const response = await query(route, out, back, token);
@@ -333,18 +366,30 @@ async function main(argv) {
         } catch (error) {
           failed++;
           refused = error.message === 'HTTP 429' ? refused + 1 : 0;
+          unanswered.push({ route: route.id, out, back });
           console.warn(`${route.id} ${out}/${back}: ${error.message}`);
         }
       }
     }
-    console.log(`${route.id}: ${tally(fares.slice(before))} from ${ticketTally(counts)}`);
+    if (asked) console.log(`${route.id}: ${tally(fares.slice(before))} from ${ticketTally(counts)}`);
     late += counts.late;
   }
 
   if (refused >= REFUSED_IN_A_ROW) {
     console.warn(`The API refused ${refused} queries in a row with HTTP 429, so the fetch stopped there.`);
   }
-  fares = keepCheapest(fares);
+  const previous = values.previous ? await readFares(values.previous) : null;
+  if (ok === 0 && previous?.fares.length) {
+    await write(previous);
+    console.warn(`No query was answered, so the ${previous.fares.length} fares fetched at ${previous.updated} stay.`);
+    return 1;
+  }
+  const kept = unanswered.length && previous ? carryOver(previous.fares, unanswered, today) : [];
+  if (unanswered.length) {
+    console.warn(`${unanswered.length} queries went unanswered; `
+      + (previous ? `${kept.length} fares fetched before stand in for theirs.` : 'no fares fetched before to keep.'));
+  }
+  fares = keepCheapest([...fares, ...kept]);
   await write({ updated: new Date().toISOString(), source: 'Aviasales', fares });
   const connecting = fares.filter((f) => f.stops);
   console.log(`Wrote ${tally(fares)}, ${connecting.length} of them connecting, `
