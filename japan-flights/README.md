@@ -7,9 +7,9 @@ Aomori, Taipei, Taichung, Kaohsiung, Hong Kong, Macau, every Vietnamese city wit
 Bangkok's two airports, Guam and Saipan. It knows the days Korean Air flies its routes to Japan,
 Taiwan and Hong Kong and lists the round trips that schedule allows; other trips come from the fares
 known for them. It counts the days of leave each trip takes against a Monday, Tuesday and Thursday
-work week and Korean public holidays, and puts the trips that take the least leave first, then those
-with a known fare, cheapest first, with Korean Air, Asiana, business and first given a head start.
-GitHub Pages serves it; there is no server.
+work week and Korean public holidays, offers only the trips that take none, without showing the
+count, and puts those with a known fare first, cheapest first, with Korean Air, Asiana, business and
+first given a head start. GitHub Pages serves it; there is no server.
 
 The page is in Korean. It is not affiliated with any airline.
 
@@ -26,19 +26,20 @@ The page is in Korean. It is not affiliated with any airline.
 
 The main routes fly every day, but regional ones fly a few days a week (Oita: Monday, Wednesday,
 Friday and Sunday), so on those most pairs of dates are not a round trip at all. For the departure
-month, trip length, leave, budget, Korean airport, cabins, destinations and airlines the visitor
-picks, and the number of people and of checked bags between them, one each unless picked, the page:
+month, trip length, budget, Korean airport, cabins, destinations and airlines the visitor picks, and
+the number of people and of checked bags between them, one each unless picked, the page:
 
 1. lists every round trip of two to six nights, or of the lengths picked among them, with a Korean
    Air flight at both ends, within the schedule periods in `data/routes.json`, and every such trip a
    known fare of one of the airlines picked proves, nonstop or with one connection on the way out,
    back or both; it never offers a trip of one night, nor one whose flight out lands abroad at 6
    p.m. local time or later, or on a later day, which loses the first day;
-2. counts the leave each takes: the workdays from departure to the day the flight back lands that
-   are not public holidays, both ends included, except a landing day when the flight lands before
-   noon. A flight back that leaves late at night lands the next day, so the day it leaves counts
-   too. The workdays are Monday, Tuesday and Thursday, the week of the person the page was made for;
-   `WORKDAYS` in `site/plan.js` sets them;
+2. counts the leave each takes, and offers only the trips that take none; it keeps the count to tell
+   which those are, but does not show it: the workdays from departure to the day the flight back
+   lands that are not public holidays, both ends included, except a landing day when the flight
+   lands before noon. A flight back that leaves late at night lands the next day, so the day it
+   leaves counts too. The workdays are Monday, Tuesday and Thursday, the week of the person the page
+   was made for; `WORKDAYS` in `site/plan.js` sets them;
 3. marks the trips whose flight back lands in Korea before noon (오전 도착, or 다음 날 오전 도착 when it lands
    the day after it leaves), from the fare's own times, or for a Korean Air trip without them from
    the route's flight times, and the trips that connect (갈 때 경유, 올 때 경유 or 왕복 경유);
@@ -51,12 +52,12 @@ picks, and the number of people and of checked bags between them, one each unles
    total. A fare ranks at its total less a head start for each person, 50,000 won for Korean Air and
    Asiana, 200,000 for business and 500,000 for first, together for Korean Air's business
    (`ADVANTAGE` in `site/plan.js`); the price shown is the total. The best fare is the one that
-   takes the least leave, then ranks lowest. A trip from Korean Air's days without a nonstop fare is
-   offered without one, in the cheaper cabin picked of economy and business, but never in first,
-   which Korean Air hardly sells on these routes;
-5. lists the trips that take the least leave first; among those, the trips with a known fare first,
-   lowest rank first, then the rest by departure date, soonest first; on the same day, the shorter
-   trip first, and a nonstop one before one that connects.
+   ranks lowest of those whose trip takes no leave. A trip from Korean Air's days without a nonstop
+   fare is offered without one, in the cheaper cabin picked of economy and business, but never in
+   first, which Korean Air hardly sells on these routes;
+5. lists the trips with a known fare first, lowest rank first, then the rest by departure date,
+   soonest first; on the same day, the shorter trip first, and a nonstop one before one that
+   connects.
 
 Every trip links to Naver, Google Flights, Skyscanner and KAYAK searches with the route and dates
 filled in, for the live price; each asks for the trip's cabin and for as many adults as there are

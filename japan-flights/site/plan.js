@@ -263,11 +263,6 @@ function tripKey(trip) {
   return `${trip.route} ${trip.depart} ${trip.return}`;
 }
 
-// Whether trip `a` takes less leave than trip `b`, or as much at a lower rank.
-function takesLess(a, b) {
-  return a.leave < b.leave || (a.leave === b.leave && a.rank < b.rank);
-}
-
 function priceOf(trip) {
   return trip.fare ? trip.rank : Infinity;
 }
@@ -280,23 +275,25 @@ function byString(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-// The trips that take the least leave first; among them, those with a
-// known fare, the lowest rank first; then the soonest departure, and on the
-// same day the shorter trip, and a nonstop one before one that connects.
-function byLeaveFareDate(a, b) {
-  return a.leave - b.leave || byNumber(priceOf(a), priceOf(b)) || byString(a.depart, b.depart)
+// The trips with a known fare first, the lowest rank first; then the
+// soonest departure, and on the same day the shorter trip, and a nonstop
+// one before one that connects.
+function byFareDate(a, b) {
+  return byNumber(priceOf(a), priceOf(b)) || byString(a.depart, b.depart)
     || a.nights - b.nights || byString(a.route, b.route)
     || CABINS.indexOf(a.cabin) - CABINS.indexOf(b.cabin)
     || Number(!nonstop(a.fare)) - Number(!nonstop(b.fare));
 }
 
-// The trips that match `filter`: for each cabin with a known fare among the
-// airlines asked for, one nonstop both ways and one that connects once on
-// the way out, back or both, each with the fare that takes the least leave
-// and then ranks lowest, and with its airline and cabin, its connections,
-// the day its flight back lands, its leave, the holidays it spans and the
-// marks its flight times earn; the least leave first, then known fares, the
-// lowest rank first, then the soonest departure. A fare costs its price for
+// The trips that match `filter` and take no leave: the page works out the
+// leave of each (`leaveFor`) to tell which to offer, and keeps it in
+// `leave`, but does not show it. For each cabin with a known fare among the
+// airlines asked for, it offers one nonstop both ways and one that connects
+// once on the way out, back or both, each with the fare that ranks lowest,
+// and with its airline and cabin, its connections, the day its flight back
+// lands, the holidays it spans and the marks its flight times earn; known
+// fares first, the lowest rank first, then the soonest departure. A fare
+// costs its price for
 // each of the people in `party` and the fee for the bags they check that it
 // does not include, each both ways (`bag`, from `bagFee`), and is held to the
 // budget by that `total`; it ranks at that less its advantage for each
@@ -306,13 +303,13 @@ function byLeaveFareDate(a, b) {
 // without one, in the cheaper cabin asked for of economy and business, but
 // never in first, which Korean Air hardly sells on these routes.
 //
-// filter: { from, to, nights, maxLeave, maxPrice, origins, cities, airlines, cabins, party }
+// filter: { from, to, nights, maxPrice, origins, cities, airlines, cabins, party }
 // `from` and `to` bound the departure date. `nights` (a Set of trip lengths
 // in nights) is left out to mean all of TRIP_NIGHTS, and no other length is
 // ever offered; `party` ({ people, bags }) to mean DEFAULT_PARTY;
-// `maxLeave`, `maxPrice`, `origins` (a Set of Korean airport codes),
-// `cities` (a Set of destination airport codes), `airlines` (a Set of
-// airline codes) and `cabins` (a Set of CABINS) to mean no limit.
+// `maxPrice`, `origins` (a Set of Korean airport codes), `cities` (a Set of
+// destination airport codes), `airlines` (a Set of airline codes) and
+// `cabins` (a Set of CABINS) to mean no limit.
 export function recommend({ routes, fares, holidays, today, baggage }, filter) {
   const party = filter.party || DEFAULT_PARTY;
   const from = filter.from > today ? filter.from : today;
@@ -338,7 +335,7 @@ export function recommend({ routes, fares, holidays, today, baggage }, filter) {
       bag, lands, leave, holidays: names, ...marks,
     };
   };
-  const kept = (row) => (filter.maxLeave == null || row.leave <= filter.maxLeave)
+  const kept = (row) => row.leave === 0
     && (filter.maxPrice == null || (row.fare && row.total <= filter.maxPrice));
 
   // A fare proves a flight even where the schedule is not known.
@@ -351,11 +348,11 @@ export function recommend({ routes, fares, holidays, today, baggage }, filter) {
     if (!(fare.depart >= from && fare.depart <= filter.to && nights.has(n) && fare.price > 0)) continue;
     if (landsLate(route, fare)) continue;
     const row = rowFor({ route: fare.route, depart: fare.depart, return: fare.return, nights: n }, fare);
-    if (nonstop(fare)) nonstopTrips.add(tripKey(row));
     if (!kept(row)) continue;
+    if (nonstop(fare)) nonstopTrips.add(tripKey(row));
     const key = `${tripKey(row)} ${row.cabin} ${nonstop(fare) ? 'nonstop' : 'via'}`;
     const held = best.get(key);
-    if (!held || takesLess(row, held)) best.set(key, row);
+    if (!held || row.rank < held.rank) best.set(key, row);
   }
 
   const out = [...best.values()];
@@ -367,7 +364,7 @@ export function recommend({ routes, fares, holidays, today, baggage }, filter) {
       if (kept(row)) out.push(row);
     }
   }
-  return out.sort(byLeaveFareDate);
+  return out.sort(byFareDate);
 }
 
 // The months from today's to the last one any route has a schedule for.
