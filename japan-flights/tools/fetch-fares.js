@@ -265,9 +265,12 @@ export async function query(route, departMonth, returnMonth, token, wait = sleep
 // An experiment, to come out once its log is read: whether the API's
 // latest-prices method, which takes a cabin as `trip_class` (1 business,
 // 2 first) where prices_for_dates takes none, knows business and first
-// fares for a few busy routes, and what it gives for one.
+// fares for a few busy routes, and what it gives for one. Asked with
+// airport codes it answered every query with HTTP 400, so it is asked
+// with city codes too (SEL for Seoul, TYO for Tokyo, OSA for Osaka), and a
+// refusal's answer goes to the log.
 const LATEST = 'https://api.travelpayouts.com/v2/prices/latest';
-const PROBED = [['ICN', 'NRT'], ['ICN', 'KIX'], ['ICN', 'BKK'], ['ICN', 'DAD'], ['GMP', 'HND']];
+const PROBED = [['ICN', 'NRT'], ['SEL', 'TYO'], ['SEL', 'OSA'], ['SEL', 'BKK'], ['SEL', 'DAD']];
 
 async function probeCabins(token) {
   for (const [origin, destination] of PROBED) {
@@ -281,12 +284,19 @@ async function probeCabins(token) {
           trip_class: String(tripClass),
         });
         const res = await fetch(url, { headers: { 'X-Access-Token': token } });
-        const body = res.ok ? await res.json() : null;
+        const text = await res.text();
+        let body = null;
+        try {
+          body = JSON.parse(text);
+        } catch {
+          // The answer is not JSON; the log shows it as it is.
+        }
         const prices = Array.isArray(body?.data) ? body.data : [];
         const inClass = prices.filter((p) => p.trip_class === tripClass);
         const cheapest = inClass[0] || prices[0];
         console.log(`${asked}: HTTP ${res.status}, ${prices.length} prices, ${inClass.length} in that cabin`
-          + (cheapest ? `; the cheapest: ${JSON.stringify(cheapest)}` : ''));
+          + (cheapest ? `; the cheapest: ${JSON.stringify(cheapest)}` : '')
+          + (res.ok ? '' : `; the answer: ${text.slice(0, 300)}`));
       } catch (error) {
         console.log(`${asked}: ${error.message}`);
       }
