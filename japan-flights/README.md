@@ -103,7 +103,10 @@ fields a real ticket has, to check it against.
    from its developer settings, and add it as the repository secret `TRAVELPAYOUTS_TOKEN`
    (**Settings → Secrets and variables → Actions**). The fetch makes about 2,200 queries, one for
    each route and pair of months, 0.15 seconds apart to stay well under the API's limit of 600 a
-   minute, so it adds about eleven minutes to a deploy. A failed fetch does not stop the page from
+   minute, so it adds about eleven minutes to a deploy. Should the API answer HTTP 429, too many
+   queries, all the same, the fetcher waits as long as its Retry-After header says, a minute if it
+   says nothing, and asks again, up to twice; three queries refused in a row stop the fetch, and the
+   page publishes with the fares fetched until then. A failed fetch does not stop the page from
    publishing.
 
 ## Update the data

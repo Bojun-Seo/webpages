@@ -6,7 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  bagTally, checkedBags, connections, keepCheapest, leftOut, localDate, localTime, monthsFrom, pickFares,
+  bagTally, checkedBags, connections, keepCheapest, leftOut, localDate, localTime, monthsFrom, pickFares, query,
+  retryAfter,
 } from '../tools/fetch-fares.js';
 
 const oita = { id: 'ICN-OIT', origin: 'ICN', dest: 'OIT' };
@@ -191,6 +192,39 @@ test('the cheapest fare with a checked bag is kept apart from the cheapest witho
     ...(bags === 0 ? { bags } : {}) });
   assert.deepEqual(keepCheapest([fare(120000, 0), fare(110000, 0), fare(190000), fare(170000)]),
     [fare(110000, 0), fare(170000)]);
+});
+
+test('Retry-After says how long to wait, in seconds or as a date, a minute if neither, five at most', () => {
+  const now = Date.parse('2026-10-13T08:00:00Z');
+  assert.equal(retryAfter('120', now), 120);
+  assert.equal(retryAfter('Tue, 13 Oct 2026 08:01:30 GMT', now), 90);
+  assert.equal(retryAfter(null, now), 60);
+  assert.equal(retryAfter('', now), 60);
+  assert.equal(retryAfter('soon', now), 60);
+  assert.equal(retryAfter('3600', now), 300);
+  assert.equal(retryAfter('-5', now), 0);
+});
+
+test('a query the API refuses with 429 is asked again after the wait, twice at most', async (t) => {
+  const answer = (status, retry) => ({ ok: status === 200, status, headers: { get: () => retry },
+    json: async () => ({ success: true, data: [] }) });
+  const ask = async (statuses) => {
+    const waits = [];
+    let i = 0;
+    t.mock.method(globalThis, 'fetch', async () => answer(statuses[Math.min(i++, statuses.length - 1)], '7'));
+    t.mock.method(console, 'warn', () => {});
+    try {
+      return { result: await query(oita, '2026-11', '2026-11', 'token', async (ms) => { waits.push(ms); }), waits };
+    } catch (error) {
+      return { error: error.message, waits };
+    } finally {
+      globalThis.fetch.mock.restore();
+      console.warn.mock.restore();
+    }
+  };
+  assert.deepEqual(await ask([429, 200]), { result: { success: true, data: [] }, waits: [7000] });
+  assert.deepEqual(await ask([429, 429, 429]), { error: 'HTTP 429', waits: [7000, 7000] });
+  assert.deepEqual(await ask([500]), { error: 'HTTP 500', waits: [] });
 });
 
 test('an error response yields no fares', () => {

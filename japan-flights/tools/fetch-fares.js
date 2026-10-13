@@ -25,6 +25,17 @@ const LIMIT = 1000;
 // The API takes 600 queries a minute; a pause of 0.15 s between them keeps
 // well under that even when answers come back at once.
 const PAUSE_MS = 150;
+// Should the API answer 429, too many queries, all the same, the fetcher
+// waits as long as the answer's Retry-After says, a minute if it does not
+// say and five at most, and asks again, up to twice; a query refused even
+// then fails. Three refused in a row mean the API takes no more for now,
+// so the fetcher stops asking and writes the fares it has.
+const RETRIES = 2;
+const RETRY_AFTER_S = 60;
+const MAX_WAIT_S = 300;
+const REFUSED_IN_A_ROW = 3;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Local dates and times, whatever offset the API writes its times in.
 // Korea and Japan keep UTC+9 all year; a route outside UTC+9 says so in
@@ -209,7 +220,18 @@ export function bagTally(fares) {
   return Object.entries(counts).sort().map(([airline, n]) => `${airline} ${n.join('/')}`).join(', ');
 }
 
-async function query(route, departMonth, returnMonth, token) {
+// How many seconds a Retry-After header says to wait, given in seconds or
+// as a date: a minute when it says neither, and five minutes at most.
+export function retryAfter(header, now = Date.now()) {
+  const given = header == null || header.trim() === '' ? NaN : Number(header);
+  const until = Date.parse(header);
+  let seconds = RETRY_AFTER_S;
+  if (Number.isFinite(given)) seconds = given;
+  else if (Number.isFinite(until)) seconds = (until - now) / 1000;
+  return Math.min(Math.max(Math.ceil(seconds), 0), MAX_WAIT_S);
+}
+
+export async function query(route, departMonth, returnMonth, token, wait = sleep) {
   const url = new URL(API);
   url.search = new URLSearchParams({
     origin: route.origin,
@@ -223,9 +245,17 @@ async function query(route, departMonth, returnMonth, token) {
     currency: 'krw',
     limit: String(LIMIT),
   });
-  const res = await fetch(url, { headers: { 'X-Access-Token': token } });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, { headers: { 'X-Access-Token': token } });
+    if (res.status === 429 && attempt < RETRIES) {
+      const seconds = retryAfter(res.headers.get('retry-after'));
+      console.warn(`${route.id} ${departMonth}/${returnMonth}: HTTP 429, asking again in ${seconds} s`);
+      await wait(seconds * 1000);
+      continue;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
 }
 
 async function main(argv) {
@@ -259,14 +289,18 @@ async function main(argv) {
   // A connecting ticket whose link does not list where it connects, to
   // show in the log what such a link looks like.
   let unread = null;
+  // The queries the API has refused in a row with 429, even when asked again.
+  let refused = 0;
   for (const route of routes) {
+    if (refused >= REFUSED_IN_A_ROW) break;
     const before = fares.length;
     const counts = { tickets: 0, others: {}, connections: 0, incomplete: 0, nights: 0, late: 0 };
     for (const out of months) {
       // Ask for returns in the same month and the next, so a trip over a
       // month's end (New Year's) is not missed.
       for (const back of [out, monthsFrom(`${out}-01`, 2)[1]]) {
-        if (ok + failed > 0) await new Promise((resolve) => setTimeout(resolve, PAUSE_MS));
+        if (refused >= REFUSED_IN_A_ROW) break;
+        if (ok + failed > 0) await sleep(PAUSE_MS);
         try {
           const response = await query(route, out, back, token);
           if (!shown && response?.data?.length) {
@@ -292,8 +326,10 @@ async function main(argv) {
             else fares.push(fare);
           }
           ok++;
+          refused = 0;
         } catch (error) {
           failed++;
+          refused = error.message === 'HTTP 429' ? refused + 1 : 0;
           console.warn(`${route.id} ${out}/${back}: ${error.message}`);
         }
       }
@@ -302,6 +338,9 @@ async function main(argv) {
     late += counts.late;
   }
 
+  if (refused >= REFUSED_IN_A_ROW) {
+    console.warn(`The API refused ${refused} queries in a row with HTTP 429, so the fetch stopped there.`);
+  }
   fares = keepCheapest(fares);
   await write({ updated: new Date().toISOString(), source: 'Aviasales', fares });
   const connecting = fares.filter((f) => f.stops);
