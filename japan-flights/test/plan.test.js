@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  addDays, airlineOf, bagFee, dayOf, fliesOn, flightMarks, landsLate, leaveFor, monthsAhead, recommend,
+  addDays, bagFee, dayOf, fliesOn, flightMarks, landsLate, leaveFor, monthsAhead, recommend,
   roundTrips, routesOf, searchLinks,
 } from '../site/plan.js';
 
@@ -69,7 +69,7 @@ test('a round trip may cross from one season into the next', () => {
 });
 
 test('trips run two to six nights, never one, and the lengths picked narrow them', () => {
-  const fares = [1, 2].map((nights) => ({ route: 'ICN-KMQ', depart: '2026-11-20',
+  const fares = [1, 2].map((nights) => ({ route: 'ICN-KMQ', airline: 'KE', depart: '2026-11-20',
     return: addDays('2026-11-20', nights), price: 200000, seen: today }));
   const ctx = { routes, fares, holidays, today };
   // Seollal 2027 runs from Saturday 6 to Tuesday 9 February, so from Friday 5 up to five nights take no leave.
@@ -187,12 +187,12 @@ test('no trip is offered whose flight out lands late', () => {
 
 test('only trips that take no leave are offered: known fares first, the cheapest first, then the soonest', () => {
   const fares = [
-    { route: 'ICN-AOJ', depart: '2026-12-04', return: '2026-12-06', price: 310000, seen: today },
-    { route: 'ICN-AOJ', depart: '2026-12-04', return: '2026-12-06', price: 290000, seen: today },
-    { route: 'ICN-AOJ', depart: '2026-12-01', return: '2026-12-03', price: 200000, seen: today },
-    { route: 'ICN-OIT', depart: '2026-12-25', return: '2026-12-27', price: 250000, seen: today },
-    { route: 'ICN-OIT', depart: '2026-10-01', return: '2026-10-03', price: 90000, seen: today },
-    { route: 'ICN-XXX', depart: '2026-12-02', return: '2026-12-04', price: 80000, seen: today },
+    { route: 'ICN-AOJ', airline: 'KE', depart: '2026-12-04', return: '2026-12-06', price: 310000, seen: today },
+    { route: 'ICN-AOJ', airline: 'KE', depart: '2026-12-04', return: '2026-12-06', price: 290000, seen: today },
+    { route: 'ICN-AOJ', airline: 'KE', depart: '2026-12-01', return: '2026-12-03', price: 200000, seen: today },
+    { route: 'ICN-OIT', airline: 'KE', depart: '2026-12-25', return: '2026-12-27', price: 250000, seen: today },
+    { route: 'ICN-OIT', airline: 'KE', depart: '2026-10-01', return: '2026-10-03', price: 90000, seen: today },
+    { route: 'ICN-XXX', airline: 'KE', depart: '2026-12-02', return: '2026-12-04', price: 80000, seen: today },
   ];
   const trips = recommend({ routes, fares, holidays, today }, december);
   assert.ok(trips.length > 0 && trips.every((t) => t.leave === 0));
@@ -233,8 +233,6 @@ test('the airlines asked for decide the fares, and only Korean Air needs none', 
   // Another airline alone: only the trips its fares prove.
   const tw = recommend(ctx, { ...base, airlines: new Set(['TW']) });
   assert.deepEqual(tw.map((t) => `${t.route} ${t.depart} ${t.airline}`), ['ICN-KMQ 2026-12-04 TW']);
-  // A fare written without an airline is Korean Air's.
-  assert.equal(airlineOf({ route: 'ICN-OIT' }), 'KE');
 });
 
 test("another airline's fare without times does not take Korean Air's", () => {
@@ -265,22 +263,21 @@ test('a trip gets a nonstop row and a connecting row, and Korean Air\'s days sta
   assert.deepEqual(christmas(recommend(ctx, december)), ['MM 150000 1,0', 'TW 230000 0,0']);
 });
 
-test('Korean Air and Asiana rank 50,000 won lower, business 200,000 and first 500,000, per person', () => {
-  const fare = (airline, price, depart, cabin) => ({ route: 'ICN-OIT', airline, depart, return: addDays(depart, 2),
-    price, seen: today, ...(cabin ? { cabin } : {}) });
+test('Korean Air and Asiana rank 50,000 won lower for each person', () => {
+  const fare = (airline, price, depart) => ({ route: 'ICN-OIT', airline, depart, return: addDays(depart, 2),
+    price, seen: today });
   const order = (fares, party) => recommend({ routes, holidays, today, fares }, { ...december, party })
-    .filter((t) => t.fare).map((t) => `${t.airline} ${t.cabin} ${t.total} ${t.rank}`);
+    .filter((t) => t.fare).map((t) => `${t.airline} ${t.total} ${t.rank}`);
   // Trinity at 330,000 and Korean Air at 360,000 for the same days: Korean Air's fare is the one shown.
   assert.deepEqual(order([fare('TW', 330000, '2026-12-25'), fare('KE', 360000, '2026-12-25')]),
-    ['KE economy 360000 310000']);
+    ['KE 360000 310000']);
   // On other days, Korean Air's 360,000 comes before Trinity's 330,000, and two people double the lead.
   const fares = [fare('TW', 330000, '2026-12-25'), fare('KE', 360000, '2026-12-11')];
-  assert.deepEqual(order(fares), ['KE economy 360000 310000', 'TW economy 330000 330000']);
-  assert.deepEqual(order(fares, { people: 2, bags: 0 }), ['KE economy 720000 620000', 'TW economy 660000 660000']);
-  // Business and first, and Korean Air's business with both leads; every trip here takes no leave.
-  assert.deepEqual(order([fare('TW', 330000, '2026-12-25'), fare('7C', 520000, '2026-12-11', 'business'),
-    fare('NH', 900000, '2026-12-18', 'first'), fare('KE', 600000, '2026-12-04', 'business')]),
-  ['7C business 520000 320000', 'TW economy 330000 330000', 'KE business 600000 350000', 'NH first 900000 400000']);
+  assert.deepEqual(order(fares), ['KE 360000 310000', 'TW 330000 330000']);
+  assert.deepEqual(order(fares, { people: 2, bags: 0 }), ['KE 720000 620000', 'TW 660000 660000']);
+  // Asiana has the same lead, and no other airline has any.
+  assert.deepEqual(order([fare('TW', 330000, '2026-12-25'), fare('OZ', 370000, '2026-12-18'),
+    fare('7C', 335000, '2026-12-04')]), ['OZ 370000 320000', 'TW 330000 330000', '7C 335000 335000']);
 });
 
 test('every Korean airport reaches every destination, through fares where no route is listed', () => {
@@ -293,22 +290,18 @@ test('every Korean airport reaches every destination, through fares where no rou
     ['ICN-NRT 도쿄 나리타 9', 'ICN-HAN 하노이 7', 'GMP-NRT 도쿄 나리타 9', 'GMP-HAN 하노이 7']);
 });
 
-test('each cabin with a fare gets its own trip, and the cabins picked narrow them', () => {
-  const fare = (airline, price, cabin) => ({ route: 'ICN-HND', airline, depart: '2026-11-20', return: '2026-11-22',
-    price, seen: today, ...(cabin ? { cabin } : {}) });
-  const fares = [fare('MM', 180000), fare('KE', 690000, 'business'), fare('KE', 720000, 'business'), fare('NH', 990000, 'first')];
+test("fares are economy, and business alone brings in Korean Air's days without a fare", () => {
+  const fares = [{ route: 'ICN-HND', airline: 'MM', depart: '2026-11-20', return: '2026-11-22', price: 180000,
+    seen: today }];
   const ctx = { routes, fares, holidays, today };
   const november = { from: '2026-11-01', to: '2026-11-30', cities: new Set(['HND']), origins: new Set(['ICN']) };
-  const rows = (filter) => recommend(ctx, { ...november, ...filter })
-    .filter((t) => t.depart === '2026-11-20' && t.return === '2026-11-22')
-    .map((t) => `${t.cabin} ${t.airline} ${t.fare ? t.fare.price : '?'}`);
-  assert.deepEqual(rows({}), ['economy MM 180000', 'business KE 690000', 'first NH 990000']);
-  assert.deepEqual(rows({ cabins: new Set(['business', 'first']) }), ['business KE 690000', 'first NH 990000']);
-  // Without economy, Korean Air's days bring in trips in business, without a fare; first has only fares.
+  const economy = recommend(ctx, november);
+  assert.ok(economy.every((t) => t.cabin === 'economy'));
+  assert.ok(economy.some((t) => t.fare) && economy.some((t) => !t.fare));
+  assert.deepEqual(recommend(ctx, { ...november, cabins: new Set(['economy', 'business']) }), economy);
   const business = recommend(ctx, { ...november, cabins: new Set(['business']) });
-  assert.ok(business.every((t) => t.cabin === 'business') && business.some((t) => !t.fare));
-  assert.ok(recommend(ctx, { ...november, cabins: new Set(['first']) }).every((t) => t.fare && t.cabin === 'first'));
-  assert.ok(recommend(ctx, november).some((t) => !t.fare && t.cabin === 'economy'));
+  assert.ok(business.length > 0);
+  assert.ok(business.every((t) => t.cabin === 'business' && !t.fare && t.airline === 'KE'));
 });
 
 test('every destination has the fields a route would give it', () => {
@@ -438,7 +431,7 @@ test('a city takes in every Korean airport, and the airport picked narrows it', 
 });
 
 test('a fare brings in a trip on a route whose days are not known', () => {
-  const fares = [{ route: 'ICN-KMQ', depart: '2026-11-20', return: '2026-11-22', price: 250000, seen: today }];
+  const fares = [{ route: 'ICN-KMQ', airline: 'KE', depart: '2026-11-20', return: '2026-11-22', price: 250000, seen: today }];
   const filter = { from: '2026-11-01', to: '2026-11-30' };
   const trips = recommend({ routes, fares, holidays, today }, filter);
   assert.deepEqual(trips.filter((t) => t.route === 'ICN-KMQ').map((t) => t.depart), ['2026-11-20']);
@@ -446,9 +439,9 @@ test('a fare brings in a trip on a route whose days are not known', () => {
 
 test('filters on city and budget', () => {
   const fares = [
-    { route: 'ICN-OIT', depart: '2026-12-25', return: '2026-12-27', price: 280000, seen: today },
-    { route: 'ICN-OIT', depart: '2026-12-18', return: '2026-12-20', price: 240000, seen: today },
-    { route: 'ICN-OIT', depart: '2026-12-21', return: '2026-12-23', price: 200000, seen: today },
+    { route: 'ICN-OIT', airline: 'KE', depart: '2026-12-25', return: '2026-12-27', price: 280000, seen: today },
+    { route: 'ICN-OIT', airline: 'KE', depart: '2026-12-18', return: '2026-12-20', price: 240000, seen: today },
+    { route: 'ICN-OIT', airline: 'KE', depart: '2026-12-21', return: '2026-12-23', price: 200000, seen: today },
   ];
   const base = { ...december, cities: new Set(['OIT']) };
   const ctx = { routes, fares, holidays, today };
@@ -487,13 +480,12 @@ test('search links carry the route and both dates', () => {
   assert.match(via['스카이스캐너'], /preferdirects=false$/);
 });
 
-test('search links ask for the cabin of the fare', () => {
+test("search links ask for the trip's cabin", () => {
   const links = Object.fromEntries(
     searchLinks(route('ICN-OIT'), '2026-12-25', '2026-12-27', { cabin: 'business' }).map((l) => [l.name, l.url]));
   assert.match(links['스카이스캐너'], /cabinclass=business/);
   assert.match(links.Google, /through%202026-12-27%20in%20business%20class/);
   assert.match(links['카약'], /\/2026-12-27\/business\?sort=/);
-  assert.match(searchLinks(route('ICN-OIT'), '2026-12-25', '2026-12-27', { cabin: 'first' })[1].url, /cabinclass=first/);
 });
 
 test('search links ask for as many adults as there are people', () => {

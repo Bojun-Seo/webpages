@@ -2,8 +2,8 @@
 // The working out lives in plan.js.
 
 import {
-  CABINS, DAY_NAMES, DEFAULT_PARTY, TRIP_NIGHTS, airlineOf, daysBetween, dayOf, lastDayOfMonth,
-  monthsAhead, recommend, routesOf, searchLinks,
+  CABINS, DAY_NAMES, DEFAULT_PARTY, TRIP_NIGHTS, daysBetween, dayOf, lastDayOfMonth, monthsAhead,
+  recommend, routesOf, searchLinks,
 } from './plan.js';
 
 const PAGE_SIZE = 30;
@@ -29,7 +29,7 @@ const AIRLINE_NAMES = {
   SQ: '싱가포르항공', MH: '말레이시아항공', AK: '에어아시아', D7: '에어아시아엑스', OD: '바틱에어 말레이시아',
 };
 
-const CABIN_NAMES = { economy: '이코노미', business: '비즈니스', first: '퍼스트' };
+const CABIN_NAMES = { economy: '이코노미', business: '비즈니스' };
 
 function airlineName(code) {
   return AIRLINE_NAMES[code] || code;
@@ -154,7 +154,7 @@ function tripRow(trip) {
     ? el('div', { class: 'price' },
       el('strong', null, won(trip.total)),
       trip.bag.count > 0 && el('small', { class: 'bag-fee' }, bagLine(trip.bag)),
-      el('span', null, `${airlineName(trip.airline)} · ${seenLabel(trip.fare.seen || data.today, data.today)}`))
+      el('span', null, `${airlineName(trip.airline)} · ${seenLabel(trip.fare.seen, data.today)}`))
     : el('div', { class: 'price price-unknown' }, el('strong', null, '가격 미확인'),
       el('span', null, `${airlineName(trip.airline)} · 검색 링크로 확인`));
   return el('li', { class: 'trip' },
@@ -245,8 +245,8 @@ function update() {
   renderTrips();
 }
 
-function statusLine(routesDoc, manual, live) {
-  const parts = [`노선 정보 ${routesDoc.updated} 기준`, `저장된 운임 ${manual.length}건`];
+function statusLine(routesDoc, live) {
+  const parts = [`노선 정보 ${routesDoc.updated} 기준`];
   if (live && live.updated) {
     const at = new Date(live.updated);
     parts.push(`실시간 운임 ${live.fares.length}건 (${at.getMonth() + 1}.${at.getDate()} 갱신)`);
@@ -257,16 +257,14 @@ function statusLine(routesDoc, manual, live) {
 }
 
 async function main() {
-  const [routesDoc, manualDoc, live, holidaysDoc, baggage] = await Promise.all([
-    load('data/routes.json'), load('data/fares.json'), load('data/live-fares.json'), load('data/holidays.json'),
-    load('data/baggage.json'),
+  const [routesDoc, live, holidaysDoc, baggage] = await Promise.all([
+    load('data/routes.json'), load('data/live-fares.json'), load('data/holidays.json'), load('data/baggage.json'),
   ]);
   if (!routesDoc) {
     $('status').textContent = 'data/routes.json을 읽지 못했습니다. 파일을 직접 열었다면 README의 로컬 실행 방법을 따라 주세요.';
     return;
   }
-  const manual = manualDoc?.fares || [];
-  const fares = [...manual, ...(live?.fares || [])];
+  const fares = live?.fares || [];
   const today = localToday();
   const routes = routesOf(routesDoc);
   state.data = {
@@ -279,12 +277,12 @@ async function main() {
     months: monthsAhead(routes, today),
     fareCount: fares.filter((f) => f.depart >= today).length,
     // Korean Air, whose schedules the page knows, then the airlines with fares.
-    airlines: ['KE', ...[...new Set(fares.filter((f) => f.depart >= today).map(airlineOf))]
+    airlines: ['KE', ...[...new Set(fares.filter((f) => f.depart >= today).map((f) => f.airline))]
       .filter((code) => code !== 'KE')
       .sort((a, b) => airlineName(a).localeCompare(airlineName(b), 'ko'))],
   };
 
-  $('status').textContent = statusLine(routesDoc, manual, live);
+  $('status').textContent = statusLine(routesDoc, live);
   $('month').replaceChildren(
     el('option', { value: 'all' }, '전체 기간'),
     ...state.data.months.map((m) => el('option', { value: m }, monthLabel(m))));
