@@ -4,12 +4,9 @@
 // with one connection each way, and writes the ones the page can offer
 // where it looks for live fares, each with its airline, its connections,
 // the checked bags it includes and the times its flights leave and land
-// where the API gives them. The API has economy fares alone: asked for
-// business or first with `trip_class`, prices_for_dates answers with the
-// same economy tickets, and the latest-prices method, which documents the
-// parameter, refuses it ("Only economy trip class is supported"). The
-// API serves prices that Aviasales users found in the last 48 hours, so a
-// route few people search there can come back empty.
+// where the API gives them. The API serves prices that Aviasales users
+// found in the last 48 hours, so a route few people search there can come
+// back empty.
 //
 //   TRAVELPAYOUTS_TOKEN=... node tools/fetch-fares.js \
 //       [--routes site/data/routes.json] [--out site/data/live-fares.json] [--months 6]
