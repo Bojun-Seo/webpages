@@ -195,6 +195,7 @@ h2 { font-size: 1.25rem; font-weight: 600; }
 }
 .badge[title] { cursor: help; }
 .badge-holiday { background: var(--holiday-soft); color: var(--holiday); }
+.badge-alliance { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .badge-stops { background: var(--caution-soft); color: var(--caution); }
 .price { grid-area: price; display: grid; justify-items: end; align-content: start; text-align: right; }
 .price strong {

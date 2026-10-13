@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  addDays, bagFee, dayOf, fareMonths, landsInTheMorning, landsLate, leaveFor, recommend, routesOf, searchLinks,
+  addDays, allianceOf, bagFee, dayOf, fareMonths, landsInTheMorning, landsLate, leaveFor, recommend, routesOf,
+  searchLinks,
 } from '../site/plan.js';
 
 const data = (name) => JSON.parse(readFileSync(new URL(`../site/data/${name}`, import.meta.url)));
@@ -185,7 +186,7 @@ test('a trip gets a nonstop row and a connecting row, each with its cheapest far
   assert.deepEqual(rows([...connecting, fare('TW', 230000)]), ['MM 150000 1,0', 'TW 230000 0,0']);
 });
 
-test('Korean Air and Asiana rank 50,000 won lower for each person', () => {
+test('the airlines of the three alliances rank 50,000 won lower for each person', () => {
   const fare = (airline, price, depart) => ({ route: 'ICN-OIT', airline, depart, return: addDays(depart, 2),
     price });
   const order = (fares, party) => recommend({ routes, holidays, today, fares }, { ...december, party })
@@ -197,9 +198,22 @@ test('Korean Air and Asiana rank 50,000 won lower for each person', () => {
   const fares = [fare('TW', 330000, '2026-12-25'), fare('KE', 360000, '2026-12-11')];
   assert.deepEqual(order(fares), ['KE 360000 310000', 'TW 330000 330000']);
   assert.deepEqual(order(fares, { people: 2, bags: 0 }), ['KE 720000 620000', 'TW 660000 660000']);
-  // Asiana has the same lead, and no other airline has any.
-  assert.deepEqual(order([fare('TW', 330000, '2026-12-25'), fare('OZ', 370000, '2026-12-18'),
-    fare('7C', 335000, '2026-12-04')]), ['OZ 370000 320000', 'TW 330000 330000', '7C 335000 335000']);
+  // Star Alliance and oneworld have the same lead, and an airline in none has none.
+  assert.deepEqual(order([fare('TW', 330000, '2026-12-25'), fare('NH', 370000, '2026-12-18'),
+    fare('JL', 375000, '2026-12-11'), fare('7C', 335000, '2026-12-04')]),
+  ['NH 370000 320000', 'JL 375000 325000', 'TW 330000 330000', '7C 335000 335000']);
+});
+
+test('each trip names its airline\'s alliance, Asiana counted in SkyTeam, and the alliances picked narrow them', () => {
+  assert.deepEqual(['KE', 'OZ', 'JL', 'NH', 'MM'].map(allianceOf), ['skyteam', 'skyteam', 'oneworld', 'star', null]);
+  const fare = (airline, depart) => ({ route: 'ICN-NRT', airline, depart, return: addDays(depart, 2), price: 200000 });
+  const fares = [fare('KE', '2026-12-04'), fare('JL', '2026-12-11'), fare('NH', '2026-12-18'), fare('MM', '2026-12-25')];
+  const offered = (alliances) => recommend({ routes, fares, holidays, today }, { ...december, alliances })
+    .map((t) => `${t.airline} ${t.alliance}`);
+  assert.deepEqual(offered(null), ['KE skyteam', 'JL oneworld', 'NH star', 'MM null']);
+  assert.deepEqual(offered(new Set(['skyteam'])), ['KE skyteam']);
+  assert.deepEqual(offered(new Set(['oneworld', 'star'])), ['JL oneworld', 'NH star']);
+  assert.deepEqual(offered(new Set(['none'])), ['MM null']);
 });
 
 test('baggage.json has a usual fee for every country flown to, and a fee with a source for each airline', () => {
