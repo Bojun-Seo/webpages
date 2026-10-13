@@ -208,7 +208,7 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   routes.
 - Kobe takes international flights only as charters until it opens to scheduled ones, but Korean Air
   flies there twice a day to a timetable and sells the seats like any other route's, so it is listed
-  with Korean Air's days and marked 전세편.
+  with Korean Air's days like any other route.
 - Taipei Taoyuan, Taichung and Hong Kong fly daily on Korean Air. Taoyuan's winter flights are on
   file; Taichung's daily service returns on 25 October 2026 with no end date given, so the page
   assumes it lasts the season; Hong Kong's winter season is assumed. Their notes in `routes.json`
