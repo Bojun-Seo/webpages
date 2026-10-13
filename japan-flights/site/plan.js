@@ -74,27 +74,42 @@ function holidayDays(holidays) {
   return days;
 }
 
+// Why `date` cannot be a day off the viewer adds, or null when it can: a
+// day off is a workday that is not a public holiday, since any other day
+// is off already, and not one that has passed.
+export function dayOffProblem(date, holidays, today) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || fromUTC(toUTC(date)) !== date) return 'invalid';
+  if (date < today) return 'past';
+  if (!WORKDAYS.has(weekday(dayNumber(date)))) return 'not a workday';
+  if (holidays[date]) return 'holiday';
+  return null;
+}
+
 // The leave a trip takes: the workdays from departure to the day the
-// flight back lands that are not public holidays, both ends included as
-// whole days, except that the landing day takes none when the flight lands
+// flight back lands that are neither public holidays nor among the days
+// off the viewer added (`daysOff`, dates), both ends included as whole
+// days, except that the landing day takes none when the flight lands
 // before noon (`morningArrival`), since there is still time to go to work.
 // Also gives the holidays the trip spans, a substitute day under the name
-// of the holiday it stands in for.
-export function leaveFor(depart, lands, holidays, { morningArrival = false } = {}) {
+// of the holiday it stands in for, and the days off it spans.
+export function leaveFor(depart, lands, holidays, { morningArrival = false, daysOff } = {}) {
   const named = holidayDays(holidays);
+  const off = new Map([...(daysOff || [])].map((date) => [dayNumber(date), date]));
   let leave = 0;
   const names = [];
+  const spanned = [];
   const last = dayNumber(lands);
   for (let day = dayNumber(depart); day <= last; day++) {
     const name = named.get(day);
     if (name) {
       const shown = name.replace(/ 대체공휴일$/, '');
       if (!names.includes(shown)) names.push(shown);
-    } else if (WORKDAYS.has(weekday(day)) && !(day === last && morningArrival)) {
-      leave++;
+    } else if (WORKDAYS.has(weekday(day))) {
+      if (off.has(day)) spanned.push(off.get(day));
+      else if (!(day === last && morningArrival)) leave++;
     }
   }
-  return { leave, holidays: names };
+  return { leave, holidays: names, daysOff: spanned };
 }
 
 // Times are 'HH:MM', so they compare as strings.
@@ -209,10 +224,12 @@ function byString(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-// The lowest rank first; then the soonest departure, and on the same day
-// the shorter trip, and a nonstop one before one that connects.
-function byRankDate(a, b) {
-  return byNumber(a.rank, b.rank) || byString(a.depart, b.depart)
+// The trips that span a day off the viewer added first; then the lowest
+// rank, then the soonest departure, and on the same day the shorter trip,
+// and a nonstop one before one that connects.
+function byOrder(a, b) {
+  return Number(!a.daysOff.length) - Number(!b.daysOff.length)
+    || byNumber(a.rank, b.rank) || byString(a.depart, b.depart)
     || a.nights - b.nights || byString(a.route, b.route)
     || Number(!nonstop(a.fare)) - Number(!nonstop(b.fare));
 }
@@ -223,23 +240,25 @@ function byRankDate(a, b) {
 // asked for, it offers for each pair of dates on a route the one nonstop
 // both ways and the one that connects once on the way out, back or both
 // that rank lowest, each with its airline and the airline's alliance, its
-// connections, the day its flight back lands, the holidays it spans and
-// whether it lands in the morning; the lowest rank first, then the
-// soonest departure. A fare costs
+// connections, the day its flight back lands, the holidays and days off it
+// spans and whether it lands in the morning; those that span a day off
+// first, then the lowest rank, then the soonest departure. A fare costs
 // its price for each of the people in `party` and the fee for the bags
 // they check that it does not include, each both ways (`bag`, from
 // `bagFee`), and is held to the budget by that `total`; it ranks at that
 // less its advantage for each person (`advantageOf`). A fare whose flight
 // out lands late (`landsLate`) is not offered.
 //
-// filter: { from, to, nights, maxPrice, origins, cities, alliances, airlines, party }
+// filter: { from, to, nights, maxPrice, origins, cities, alliances, airlines, party, daysOff }
 // `from` and `to` bound the departure date, and `to` is left out for no
 // end. `nights` (a Set of trip lengths in nights) is left out to mean all
 // of TRIP_NIGHTS, and no other length is ever offered; `party` ({ people,
 // bags }) to mean DEFAULT_PARTY; `maxPrice`, `origins` (a Set of Korean
 // airport codes), `cities` (a Set of destination airport codes),
 // `alliances` (a Set of ALLIANCES' keys, and 'none' for the airlines in
-// none) and `airlines` (a Set of airline codes) to mean no limit.
+// none) and `airlines` (a Set of airline codes) to mean no limit, and
+// `daysOff` (a Set of dates the viewer has off besides public holidays,
+// those `dayOffProblem` takes) to mean none.
 export function recommend({ routes, fares, holidays, today, baggage }, filter) {
   const party = filter.party || DEFAULT_PARTY;
   const from = filter.from > today ? filter.from : today;
@@ -260,7 +279,8 @@ export function recommend({ routes, fares, holidays, today, baggage }, filter) {
     const morningArrival = landsInTheMorning(fare);
     // A flight back that leaves late at night lands the next day.
     const lands = fare.lands || fare.return;
-    const { leave, holidays: names } = leaveFor(fare.depart, lands, holidays, { morningArrival });
+    const { leave, holidays: names, daysOff } = leaveFor(fare.depart, lands, holidays,
+      { morningArrival, daysOff: filter.daysOff });
     if (leave > 0) continue;
     const bag = bagFee(fare, route, baggage, party);
     const total = party.people * fare.price + bag.amount;
@@ -268,13 +288,13 @@ export function recommend({ routes, fares, holidays, today, baggage }, filter) {
     const trip = {
       route: fare.route, depart: fare.depart, return: fare.return, nights: n, fare, airline: fare.airline,
       alliance: allianceOf(fare.airline), stops: stopsOf(fare), total, rank: total - party.people * advantageOf(fare),
-      bag, lands, leave, holidays: names, morningArrival,
+      bag, lands, leave, holidays: names, daysOff, morningArrival,
     };
     const key = `${tripKey(trip)} ${nonstop(fare) ? 'nonstop' : 'via'}`;
     const held = best.get(key);
     if (!held || trip.rank < held.rank) best.set(key, trip);
   }
-  return [...best.values()].sort(byRankDate);
+  return [...best.values()].sort(byOrder);
 }
 
 // The months from today's to the last one a fare leaves in.

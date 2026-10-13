@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  addDays, allianceOf, bagFee, dayOf, fareMonths, landsInTheMorning, landsLate, leaveFor, recommend, routesOf,
-  searchLinks,
+  addDays, allianceOf, bagFee, dayOf, dayOffProblem, fareMonths, landsInTheMorning, landsLate, leaveFor, recommend,
+  routesOf, searchLinks,
 } from '../site/plan.js';
 
 const data = (name) => JSON.parse(readFileSync(new URL(`../site/data/${name}`, import.meta.url)));
@@ -61,11 +61,55 @@ test('trips run two to six nights, never one, and the lengths picked narrow them
 });
 
 test('leave counts the Mondays, Tuesdays and Thursdays that are not holidays', () => {
-  assert.deepEqual(leaveFor('2026-12-25', '2026-12-27', holidays), { leave: 0, holidays: ['성탄절'] });
-  assert.deepEqual(leaveFor('2026-11-13', '2026-11-15', holidays), { leave: 0, holidays: [] }); // Friday off
-  assert.deepEqual(leaveFor('2027-02-06', '2027-02-09', holidays), { leave: 0, holidays: ['설 연휴'] });
+  assert.deepEqual(leaveFor('2026-12-25', '2026-12-27', holidays), { leave: 0, holidays: ['성탄절'], daysOff: [] });
+  // Friday off
+  assert.deepEqual(leaveFor('2026-11-13', '2026-11-15', holidays), { leave: 0, holidays: [], daysOff: [] });
+  assert.deepEqual(leaveFor('2027-02-06', '2027-02-09', holidays), { leave: 0, holidays: ['설 연휴'], daysOff: [] });
   assert.equal(leaveFor('2027-02-05', '2027-02-10', holidays).leave, 0); // Friday and Wednesday off
   assert.equal(leaveFor('2026-11-16', '2026-11-19', holidays).leave, 3); // Monday to Thursday
+});
+
+test('a day off the viewer adds is a Monday, Tuesday or Thursday that is no holiday and has not passed', () => {
+  assert.equal(dayOffProblem('2026-11-17', holidays, today), null); // a Tuesday
+  assert.equal(dayOffProblem('2026-10-12', holidays, today), null); // Monday, the day after today
+  assert.equal(dayOffProblem('2026-11-18', holidays, today), 'not a workday'); // Wednesday is off already
+  assert.equal(dayOffProblem('2026-11-21', holidays, today), 'not a workday'); // and so is Saturday
+  assert.equal(dayOffProblem('2027-03-01', holidays, today), 'holiday'); // a Monday, but 삼일절
+  assert.equal(dayOffProblem('2026-10-06', holidays, today), 'past');
+  assert.equal(dayOffProblem('2026-02-30', holidays, today), 'invalid');
+  assert.equal(dayOffProblem('', holidays, today), 'invalid');
+});
+
+test('a day off the viewer adds takes no leave, and the trip says it spans it', () => {
+  // Saturday to Tuesday afternoon takes Monday and Tuesday.
+  assert.deepEqual(leaveFor('2026-11-14', '2026-11-17', holidays), { leave: 2, holidays: [], daysOff: [] });
+  assert.deepEqual(leaveFor('2026-11-14', '2026-11-17', holidays, { daysOff: new Set(['2026-11-16']) }),
+    { leave: 1, holidays: [], daysOff: ['2026-11-16'] });
+  assert.deepEqual(leaveFor('2026-11-14', '2026-11-17', holidays,
+    { daysOff: new Set(['2026-11-17', '2026-11-16', '2026-12-01']) }),
+  { leave: 0, holidays: [], daysOff: ['2026-11-16', '2026-11-17'] });
+  // Only a workday that is no holiday counts as a day off.
+  assert.deepEqual(leaveFor('2027-02-26', '2027-03-01', holidays, { daysOff: new Set(['2027-02-27', '2027-03-01']) }),
+    { leave: 0, holidays: ['삼일절'], daysOff: [] });
+});
+
+test('the trips that span a day off the viewer added come first, however dear', () => {
+  const fare = (depart, ret, price) => ({ route: 'ICN-NRT', airline: '7C', depart, return: ret, price });
+  // Friday to Sunday twice, and Saturday to Tuesday, which takes Monday and Tuesday.
+  const fares = [fare('2026-12-04', '2026-12-06', 150000), fare('2026-12-11', '2026-12-13', 140000),
+    fare('2026-12-05', '2026-12-08', 250000)];
+  const order = (daysOff) => recommend({ routes, fares, holidays, today }, { ...december, daysOff })
+    .map((t) => `${t.depart} ${t.daysOff.join(',')}`.trim());
+  assert.deepEqual(order(null), ['2026-12-11', '2026-12-04']);
+  // With Monday off, the trip still takes Tuesday; with both off it is offered, and first.
+  assert.deepEqual(order(new Set(['2026-12-07'])), ['2026-12-11', '2026-12-04']);
+  assert.deepEqual(order(new Set(['2026-12-07', '2026-12-08'])),
+    ['2026-12-05 2026-12-07,2026-12-08', '2026-12-11', '2026-12-04']);
+  // A trip that took no leave already comes first too when it spans a day off: back on Monday morning.
+  const morning = { ...fare('2026-12-11', '2026-12-14', 200000), arrives: '09:30' };
+  assert.deepEqual(recommend({ routes, fares: [...fares, morning], holidays, today },
+    { ...december, nights: null, daysOff: new Set(['2026-12-14']) }).map((t) => `${t.depart} ${t.nights}`),
+  ['2026-12-11 3', '2026-12-11 2', '2026-12-04 2']);
 });
 
 test('a flight back that lands before noon frees the return day', () => {
