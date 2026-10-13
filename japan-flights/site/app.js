@@ -2,7 +2,8 @@
 // The working out lives in plan.js.
 
 import {
-  DAY_NAMES, DEFAULT_PARTY, TRIP_NIGHTS, dayOf, fareMonths, lastDayOfMonth, recommend, routesOf, searchLinks,
+  ALLIANCES, DAY_NAMES, DEFAULT_PARTY, TRIP_NIGHTS, allianceOf, dayOf, fareMonths, lastDayOfMonth, recommend,
+  routesOf, searchLinks,
 } from './plan.js';
 
 const PAGE_SIZE = 30;
@@ -31,6 +32,10 @@ const AIRLINE_NAMES = {
 function airlineName(code) {
   return AIRLINE_NAMES[code] || code;
 }
+
+// The alliances' names, in the order their chips show, and the chip for
+// the airlines in none.
+const ALLIANCE_NAMES = { skyteam: '스카이팀', star: '스타얼라이언스', oneworld: '원월드', none: '항공연합 없음' };
 
 // Names for the airports trips connect at that are not destinations, whose
 // names routes.json gives; any other shows its code alone.
@@ -119,6 +124,7 @@ const state = {
   party: DEFAULT_PARTY,
   nights: new Set(),
   cities: new Set(),
+  alliances: new Set(),
   airlines: new Set(),
   trips: [],
   shown: PAGE_SIZE,
@@ -135,6 +141,7 @@ function readFilter() {
     maxPrice: budget > 0 ? budget * 10000 : null,
     origins: $('origin').value === 'all' ? null : new Set([$('origin').value]),
     cities: state.cities.size ? state.cities : null,
+    alliances: state.alliances.size ? state.alliances : null,
     airlines: state.airlines.size ? state.airlines : null,
     party: { people: Number($('people').value), bags: Number($('bags').value) },
   };
@@ -165,6 +172,7 @@ function tripRow(trip) {
   const morning = trip.lands > trip.return ? '다음 날 오전 도착' : '오전 도착';
   // A mark that says more on hover gives it as its title.
   const badges = [
+    trip.alliance && el('span', { class: 'badge badge-alliance' }, ALLIANCE_NAMES[trip.alliance]),
     stops && el('span', { class: 'badge badge-stops', title: viaLabel(trip.fare.via) }, stops),
     ...trip.holidays.map((name) => el('span', { class: 'badge badge-holiday' }, name)),
     trip.morningArrival && el('span', { class: 'badge', title: `${trip.fare.arrives} 도착` }, morning),
@@ -236,6 +244,11 @@ function renderCities() {
     [...airports].map(([value, label]) => ({ value, label })));
 }
 
+function renderAlliances() {
+  renderChips($('alliances'), '모든 항공연합', state.alliances,
+    state.data.alliances.map((alliance) => ({ value: alliance, label: ALLIANCE_NAMES[alliance] })));
+}
+
 function renderAirlines() {
   renderChips($('airlines'), '모든 항공사', state.airlines,
     state.data.airlines.map((code) => ({ value: code, label: airlineName(code) })));
@@ -248,6 +261,7 @@ function update() {
   state.trips = recommend(state.data, filter);
   renderNights();
   renderCities();
+  renderAlliances();
   renderAirlines();
   renderTrips();
 }
@@ -287,6 +301,9 @@ async function main() {
     airlines: [...new Set(fares.filter((f) => f.depart >= today).map((f) => f.airline))]
       .sort((a, b) => airlineName(a).localeCompare(airlineName(b), 'ko')),
   };
+  // The alliances of the airlines with fares, and the chip for those in none if there are any.
+  const alliances = new Set(state.data.airlines.map((code) => allianceOf(code) || 'none'));
+  state.data.alliances = [...Object.keys(ALLIANCES), 'none'].filter((alliance) => alliances.has(alliance));
 
   $('status').textContent = statusLine(live);
   $('month').replaceChildren(

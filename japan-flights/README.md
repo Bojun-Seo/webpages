@@ -4,8 +4,8 @@ A static page that recommends round trips, nonstop or with one connection each w
 Gimpo and Cheongju to Japan, Taiwan, Hong Kong, Macau, Vietnam, Thailand, Guam and Saipan, from the
 fares Aviasales users found in the last 48 hours. It counts the days of leave each trip takes
 against a Monday, Tuesday and Thursday work week and Korean public holidays, offers only the trips
-that take none, without showing the count, and lists them cheapest first, with Korean Air and Asiana
-given a head start. GitHub Pages serves it; there is no server.
+that take none, without showing the count, and lists them cheapest first, with the airlines of
+SkyTeam, Star Alliance and oneworld given a head start. GitHub Pages serves it; there is no server.
 
 The page is in Korean. It is not affiliated with any airline.
 
@@ -20,8 +20,9 @@ The page is in Korean. It is not affiliated with any airline.
 
 ## What it does
 
-For the departure month, trip length, budget, Korean airport, destinations and airlines the visitor
-picks, and the number of people and of checked bags between them, one each unless picked, the page:
+For the departure month, trip length, budget, Korean airport, destinations, alliances and airlines
+the visitor picks, and the number of people and of checked bags between them, one each unless
+picked, the page:
 
 1. lists the round trips of two to six nights, or of the lengths picked among them, that a fare of
    one of the airlines picked gives, nonstop or with one connection on the way out, back or both;
@@ -37,14 +38,16 @@ picks, and the number of people and of checked bags between them, one each unles
    the day after it leaves), where the fare gives the time, which the mark shows on hover, and the
    trips that connect (갈 때 경유, 올 때 경유 or 왕복 경유), with the airports they connect at on hover;
 4. offers for each pair of dates on a route its best fare among the airlines picked, one nonstop
-   both ways and one that connects, each as a trip of its own, and names its airline. Every fare is
-   economy. A fare costs its price for each person, and the fee from `data/baggage.json` both ways
-   for each bag it does not include, shown under the price: a fare with a checked bag includes one
-   for each person, a fare without one none. Two people with one bag thus pay two fares, and the fee
-   for one bag only on a fare without one. The budget holds that total. A fare ranks at its total
-   less a head start of 50,000 won for each person on Korean Air and Asiana (`ADVANTAGE` in
-   `site/plan.js`); the price shown is the total. The best fare is the one that ranks lowest of
-   those whose trip takes no leave;
+   both ways and one that connects, each as a trip of its own, and names its airline and the
+   airline's alliance, SkyTeam, Star Alliance or oneworld (`ALLIANCES` in `site/plan.js`, as of
+   October 2026), with Asiana in SkyTeam, since it leaves Star Alliance and merges into Korean Air
+   in December 2026. Every fare is economy. A fare costs its price for each person, and the fee from
+   `data/baggage.json` both ways for each bag it does not include, shown under the price: a fare
+   with a checked bag includes one for each person, a fare without one none. Two people with one bag
+   thus pay two fares, and the fee for one bag only on a fare without one. The budget holds that
+   total. A fare ranks at its total less a head start of 50,000 won for each person on an airline of
+   any of the three alliances (`ADVANTAGE` in `site/plan.js`); the price shown is the total. The
+   best fare is the one that ranks lowest of those whose trip takes no leave;
 5. lists the trips lowest rank first, then by departure date, soonest first; on the same day, the
    shorter trip first, and a nonstop one before one that connects.
 

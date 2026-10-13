@@ -171,13 +171,30 @@ function nonstop(fare) {
   return out === 0 && back === 0;
 }
 
+// The three airline alliances, each with its members' codes as of October
+// 2026, affiliates such as Japan Transocean Air and Shanghai Airlines
+// included. Asiana is counted in SkyTeam: it leaves Star Alliance on
+// 16 December 2026 and merges into Korean Air the next day.
+export const ALLIANCES = {
+  skyteam: ['KE', 'OZ', 'VN', 'MU', 'FM', 'MF', 'CI', 'GA', 'DL', 'AF', 'KL', 'VS', 'SK', 'SV', 'ME', 'KQ', 'AM',
+    'AR', 'RO', 'UX'],
+  star: ['NH', 'BR', 'CA', 'ZH', 'SQ', 'TG', 'UA', 'ET', 'AC', 'AI', 'NZ', 'LH', 'LX', 'OS', 'SN', 'TK', 'TP', 'LO',
+    'MS', 'SA', 'A3', 'AV', 'CM', 'OU'],
+  oneworld: ['JL', 'NU', 'CX', 'MH', 'QF', 'QR', 'BA', 'AA', 'AY', 'IB', 'AS', 'FJ', 'UL', 'RJ', 'AT', 'WY'],
+};
+
+// The alliance `airline` belongs to, or null for one in none.
+export function allianceOf(airline) {
+  return Object.keys(ALLIANCES).find((alliance) => ALLIANCES[alliance].includes(airline)) || null;
+}
+
 // How much less than its price a fare counts for each person when trips
-// are ordered and a trip's fare is picked: Korean Air's and Asiana's by
-// 50,000 won. The page still shows what the fare costs.
-export const ADVANTAGE = { KE: 50000, OZ: 50000 };
+// are ordered and a trip's fare is picked: an alliance airline's by 50,000
+// won. The page still shows what the fare costs.
+export const ADVANTAGE = 50000;
 
 export function advantageOf(fare) {
-  return ADVANTAGE[fare.airline] || 0;
+  return allianceOf(fare.airline) ? ADVANTAGE : 0;
 }
 
 function tripKey(trip) {
@@ -205,22 +222,24 @@ function byRankDate(a, b) {
 // keeps it in `leave`, but does not show it. Of the fares of the airlines
 // asked for, it offers for each pair of dates on a route the one nonstop
 // both ways and the one that connects once on the way out, back or both
-// that rank lowest, each with its airline, its connections, the day its
-// flight back lands, the holidays it spans and whether it lands in the
-// morning; the lowest rank first, then the soonest departure. A fare costs
+// that rank lowest, each with its airline and the airline's alliance, its
+// connections, the day its flight back lands, the holidays it spans and
+// whether it lands in the morning; the lowest rank first, then the
+// soonest departure. A fare costs
 // its price for each of the people in `party` and the fee for the bags
 // they check that it does not include, each both ways (`bag`, from
 // `bagFee`), and is held to the budget by that `total`; it ranks at that
 // less its advantage for each person (`advantageOf`). A fare whose flight
 // out lands late (`landsLate`) is not offered.
 //
-// filter: { from, to, nights, maxPrice, origins, cities, airlines, party }
+// filter: { from, to, nights, maxPrice, origins, cities, alliances, airlines, party }
 // `from` and `to` bound the departure date, and `to` is left out for no
 // end. `nights` (a Set of trip lengths in nights) is left out to mean all
 // of TRIP_NIGHTS, and no other length is ever offered; `party` ({ people,
 // bags }) to mean DEFAULT_PARTY; `maxPrice`, `origins` (a Set of Korean
-// airport codes), `cities` (a Set of destination airport codes) and
-// `airlines` (a Set of airline codes) to mean no limit.
+// airport codes), `cities` (a Set of destination airport codes),
+// `alliances` (a Set of ALLIANCES' keys, and 'none' for the airlines in
+// none) and `airlines` (a Set of airline codes) to mean no limit.
 export function recommend({ routes, fares, holidays, today, baggage }, filter) {
   const party = filter.party || DEFAULT_PARTY;
   const from = filter.from > today ? filter.from : today;
@@ -228,7 +247,8 @@ export function recommend({ routes, fares, holidays, today, baggage }, filter) {
   const byId = new Map(routes.map((route) => [route.id, route]));
   const wanted = (route) => (!filter.origins || filter.origins.has(route.origin))
     && (!filter.cities || filter.cities.has(route.dest));
-  const flown = (airline) => !filter.airlines || filter.airlines.has(airline);
+  const flown = (airline) => (!filter.airlines || filter.airlines.has(airline))
+    && (!filter.alliances || filter.alliances.has(allianceOf(airline) || 'none'));
 
   const best = new Map();
   for (const fare of fares) {
@@ -247,8 +267,8 @@ export function recommend({ routes, fares, holidays, today, baggage }, filter) {
     if (filter.maxPrice != null && total > filter.maxPrice) continue;
     const trip = {
       route: fare.route, depart: fare.depart, return: fare.return, nights: n, fare, airline: fare.airline,
-      stops: stopsOf(fare), total, rank: total - party.people * advantageOf(fare), bag, lands, leave,
-      holidays: names, morningArrival,
+      alliance: allianceOf(fare.airline), stops: stopsOf(fare), total, rank: total - party.people * advantageOf(fare),
+      bag, lands, leave, holidays: names, morningArrival,
     };
     const key = `${tripKey(trip)} ${nonstop(fare) ? 'nonstop' : 'via'}`;
     const held = best.get(key);
