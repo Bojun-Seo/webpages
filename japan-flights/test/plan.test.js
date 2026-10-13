@@ -352,7 +352,8 @@ test('months run from this one to the last a fare leaves in', () => {
 test('search links carry the route and both dates', () => {
   const links = Object.fromEntries(
     searchLinks(route('ICN-OIT'), '2026-12-25', '2026-12-27', { airline: 'KE' }).map((l) => [l.name, l.url]));
-  assert.deepEqual(Object.keys(links), ['Google', '스카이스캐너', '카약']);
+  assert.deepEqual(Object.keys(links), ['Aviasales', 'Google', '스카이스캐너', '카약']);
+  assert.equal(links.Aviasales, 'https://www.aviasales.com/search/ICN2512OIT27121');
   assert.equal(links['스카이스캐너'], 'https://www.skyscanner.co.kr/transport/flights/icn/oit/261225/261227/'
     + '?adultsv2=1&cabinclass=economy&rtn=1&preferdirects=true');
   assert.match(links.Google, /q=Flights%20from%20ICN%20to%20OIT%20on%202026-12-25%20through%202026-12-27/);
@@ -366,9 +367,17 @@ test('search links carry the route and both dates', () => {
   assert.match(via['스카이스캐너'], /preferdirects=false$/);
 });
 
+test('the Aviasales link carries the partner marker when there is one', () => {
+  const aviasales = (options) => searchLinks(route('GMP-HND'), '2027-01-29', '2027-02-01', options)[0].url;
+  assert.equal(aviasales({ airline: 'NH', marker: '123456' }),
+    'https://www.aviasales.com/search/GMP2901HND01021?marker=123456');
+  assert.equal(aviasales({ airline: 'NH' }), 'https://www.aviasales.com/search/GMP2901HND01021');
+});
+
 test('search links ask for as many adults as there are people', () => {
   const links = Object.fromEntries(searchLinks(route('ICN-OIT'), '2026-12-25', '2026-12-27', { airline: 'KE', people: 2 })
     .map((l) => [l.name, l.url]));
+  assert.equal(links.Aviasales, 'https://www.aviasales.com/search/ICN2512OIT27122');
   assert.match(links['스카이스캐너'], /\?adultsv2=2&/);
   assert.match(links.Google, /through%202026-12-27%20for%202%20adults&/);
   assert.match(links['카약'], /\/2026-12-27\/2adults\?sort=/);

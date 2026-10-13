@@ -257,8 +257,9 @@ test('fares fetched before stand in for the queries the API did not answer', () 
 });
 
 // Runs the script on a route to Narita and one to Kansai, for this month, against an API that `answer`
-// stands in for, with `previous` as the fares fetched before; gives the fares it wrote and its exit code.
-function fetchWith(answer, previous) {
+// stands in for, with `previous` as the fares fetched before and `marker` as the partner marker; gives
+// the fares it wrote and its exit code.
+function fetchWith(answer, previous, marker) {
   const dir = mkdtempSync(join(tmpdir(), 'fares-'));
   const path = (name) => join(dir, name);
   writeFileSync(path('stub.mjs'), `globalThis.fetch = async (url) => (${answer})(new URL(url));\n`);
@@ -270,19 +271,21 @@ function fetchWith(answer, previous) {
   try {
     execFileSync(process.execPath, ['--import', path('stub.mjs'), script, '--routes', path('routes.json'),
       '--out', path('out.json'), '--months', '1', '--previous', path('previous.json')],
-    { env: { ...process.env, TRAVELPAYOUTS_TOKEN: 'token' }, stdio: 'pipe' });
+    { env: { ...process.env, TRAVELPAYOUTS_TOKEN: 'token', TRAVELPAYOUTS_MARKER: marker || '' }, stdio: 'pipe' });
   } catch (error) {
     status = error.status;
   }
   return { doc: JSON.parse(readFileSync(path('out.json'), 'utf8')), status };
 }
 
-test('when the API answers no query, the fares fetched before stay as they were', () => {
+test('when the API answers no query, the fares fetched before stay as they were, with the marker set now', () => {
   const today = localDate(new Date().toISOString());
-  const previous = { updated: '2026-10-12T21:40:00.000Z', source: 'Aviasales', fares: [
+  const previous = { updated: '2026-10-12T21:40:00.000Z', source: 'Aviasales', marker: '111111', fares: [
     { route: 'ICN-NRT', airline: '7C', depart: today, return: addDays(today, 2), price: 150000 }] };
   const refusing = `() => ({ ok: false, status: 429, headers: { get: () => '0' } })`;
-  assert.deepEqual(fetchWith(refusing, previous), { doc: previous, status: 1 });
+  assert.deepEqual(fetchWith(refusing, previous, '123456'), { doc: { ...previous, marker: '123456' }, status: 1 });
+  const { marker, ...unmarked } = previous;
+  assert.deepEqual(fetchWith(refusing, previous), { doc: unmarked, status: 1 });
 });
 
 test('when the API answers some queries, the fares fetched before stand in for the others', () => {
@@ -297,8 +300,9 @@ test('when the API answers some queries, the fares fetched before stand in for t
     : { ok: true, status: 200, json: async () => ({ success: true, data: [{ origin: 'SEL', destination: 'TYO',
       origin_airport: 'ICN', destination_airport: 'NRT', airline: '7C', price: 150000, transfers: 0,
       return_transfers: 0, departure_at: '${today}T09:00:00+09:00', return_at: '${ret}T12:00:00+09:00' }] }) }`;
-  const { doc, status } = fetchWith(narita, previous);
+  const { doc, status } = fetchWith(narita, previous, '123456');
   assert.equal(status, 0);
   assert.notEqual(doc.updated, previous.updated);
+  assert.equal(doc.marker, '123456');
   assert.deepEqual(doc.fares.map((f) => `${f.route} ${f.airline} ${f.price}`), ['ICN-NRT 7C 150000', 'ICN-KIX MM 120000']);
 });

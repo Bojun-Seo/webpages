@@ -289,17 +289,25 @@ export function fareMonths(fares, today) {
   return months;
 }
 
-// Searches for one trip on sites that show live prices, in economy: for
-// `people` adults, and on KAYAK on `airline`, nonstop unless the trip
-// connects (`nonstop`). None of the sites documents these URLs, so one may
-// change its format without notice.
-export function searchLinks(route, depart, ret, { airline, people = 1, nonstop: direct = true } = {}) {
+// Searches for one trip on sites that show live prices, for `people`
+// adults: on Aviasales, whose fares the page shows, first, with the
+// Travelpayouts partner `marker` when there is one, then in economy on the
+// others, and on KAYAK on `airline`, nonstop unless the trip connects
+// (`nonstop`). None of the sites documents these URLs, so one may change
+// its format without notice.
+export function searchLinks(route, depart, ret, { airline, people = 1, nonstop: direct = true, marker } = {}) {
   const from = route.origin;
   const to = route.dest;
   const compact = (date) => date.replaceAll('-', '');
+  const dayMonth = (date) => `${date.slice(8, 10)}${date.slice(5, 7)}`;
   const query = `Flights from ${from} to ${to} on ${depart} through ${ret}`
     + (people === 1 ? '' : ` for ${people} adults`);
   return [
+    {
+      name: 'Aviasales',
+      url: `https://www.aviasales.com/search/${from}${dayMonth(depart)}${to}${dayMonth(ret)}${people}`
+        + (marker ? `?marker=${encodeURIComponent(marker)}` : ''),
+    },
     {
       name: 'Google',
       url: `https://www.google.com/travel/flights?q=${encodeURIComponent(query)}&hl=ko&gl=kr&curr=KRW`,

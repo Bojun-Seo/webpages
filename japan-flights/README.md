@@ -51,9 +51,12 @@ picked, the page:
 5. lists the trips lowest rank first, then by departure date, soonest first; on the same day, the
    shorter trip first, and a nonstop one before one that connects.
 
-Every trip links to Google Flights, Skyscanner and KAYAK searches with the route and dates filled
-in, for the live price; each asks for economy and for as many adults as there are people, and the
-KAYAK search for the trip's airline too, nonstop unless the trip connects.
+Every trip links to searches with the route and dates filled in, for the live price: first on
+Aviasales, whose fares the page shows, then on Google Flights, Skyscanner and KAYAK. Each asks for
+as many adults as there are people, the last three for economy too, and the KAYAK search for the
+trip's airline, nonstop unless the trip connects. The Aviasales search carries the Travelpayouts
+partner marker that the repository variable `TRAVELPAYOUTS_MARKER` gives, so that a booking it
+brings is credited to the partner.
 
 ## Where the fares come from
 
@@ -101,14 +104,17 @@ check it against.
    demand. The [top-level README](../README.md#publishing) says how the site is put together.
 3. For live fares, sign up at [Travelpayouts](https://www.travelpayouts.com/), copy the API token
    from its developer settings, and add it as the repository secret `TRAVELPAYOUTS_TOKEN`
-   (**Settings → Secrets and variables → Actions**). The fetch makes about 2,200 queries, one for
-   each route and pair of months, 0.15 seconds apart to stay well under the API's limit of 600 a
-   minute, so it adds about eleven minutes to a deploy. Should the API answer HTTP 429, too many
-   queries, all the same, the fetcher waits as long as its Retry-After header says, a minute if it
-   says nothing, and asks again, up to twice; three queries refused in a row stop the fetch. Before
-   it fetches, the workflow downloads the fares the site has now, and the fetcher keeps those of
-   every query the API does not answer; should the API answer none, the page keeps the fares it had,
-   with the time they were fetched. A failed fetch does not stop the page from publishing.
+   (**Settings → Secrets and variables → Actions**). For the Aviasales links to credit you, add your
+   partner marker, the number the Travelpayouts dashboard shows for your account, as the repository
+   variable `TRAVELPAYOUTS_MARKER` on the **Variables** tab of the same page. The fetch makes about
+   2,200 queries, one for each route and pair of months, 0.15 seconds apart to stay well under the
+   API's limit of 600 a minute, so it adds about eleven minutes to a deploy. Should the API answer
+   HTTP 429, too many queries, all the same, the fetcher waits as long as its Retry-After header
+   says, a minute if it says nothing, and asks again, up to twice; three queries refused in a row
+   stop the fetch. Before it fetches, the workflow downloads the fares the site has now, and the
+   fetcher keeps those of every query the API does not answer; should the API answer none, the page
+   keeps the fares it had, with the time they were fetched. A failed fetch does not stop the page
+   from publishing.
 
 ## Update the data
 
