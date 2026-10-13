@@ -4,12 +4,11 @@ A static page that recommends round trips, nonstop or with one connection each w
 Gimpo and Cheongju to Japan, Taiwan, Hong Kong, Macau, Vietnam, Bangkok, Guam and Saipan: Tokyo,
 Osaka, Fukuoka and the other main Japanese cities, regional airports such as Oita, Hiroshima and
 Aomori, Taipei, Taichung, Kaohsiung, Hong Kong, Macau, every Vietnamese city with an airport,
-Bangkok's two airports, Guam and Saipan. It knows the days Korean Air flies its routes to Japan,
-Taiwan and Hong Kong and lists the round trips that schedule allows; other trips come from the fares
-known for them. It counts the days of leave each trip takes against a Monday, Tuesday and Thursday
-work week and Korean public holidays, offers only the trips that take none, without showing the
-count, and puts those with a known fare first, cheapest first, with Korean Air and Asiana given a
-head start. GitHub Pages serves it; there is no server.
+Bangkok's two airports, Guam and Saipan. Its trips are those the fares Aviasales users found in the
+last 48 hours give. It counts the days of leave each trip takes against a Monday, Tuesday and
+Thursday work week and Korean public holidays, offers only the trips that take none, without showing
+the count, and lists them cheapest first, with Korean Air and Asiana given a head start. GitHub
+Pages serves it; there is no server.
 
 The page is in Korean. It is not affiliated with any airline.
 
@@ -24,16 +23,13 @@ The page is in Korean. It is not affiliated with any airline.
 
 ## What it does
 
-The main routes fly every day, but regional ones fly a few days a week (Oita: Monday, Wednesday,
-Friday and Sunday), so on those most pairs of dates are not a round trip at all. For the departure
-month, trip length, budget, Korean airport, cabins, destinations and airlines the visitor picks, and
-the number of people and of checked bags between them, one each unless picked, the page:
+For the departure month, trip length, budget, Korean airport, destinations and airlines the visitor
+picks, and the number of people and of checked bags between them, one each unless picked, the page:
 
-1. lists every round trip of two to six nights, or of the lengths picked among them, with a Korean
-   Air flight at both ends, within the schedule periods in `data/routes.json`, and every such trip a
-   known fare of one of the airlines picked proves, nonstop or with one connection on the way out,
-   back or both; it never offers a trip of one night, nor one whose flight out lands abroad at 6
-   p.m. local time or later, or on a later day, which loses the first day;
+1. lists the round trips of two to six nights, or of the lengths picked among them, that a fare of
+   one of the airlines picked gives, nonstop or with one connection on the way out, back or both;
+   it never offers a trip of one night, nor one whose flight out lands abroad at 6 p.m. local time
+   or later, or on a later day, which loses the first day;
 2. counts the leave each takes, and offers only the trips that take none; it keeps the count to tell
    which those are, but does not show it: the workdays from departure to the day the flight back
    lands that are not public holidays, both ends included, except a landing day when the flight
@@ -41,26 +37,23 @@ the number of people and of checked bags between them, one each unless picked, t
    leaves counts too. The workdays are Monday, Tuesday and Thursday, the week of the person the page
    was made for; `WORKDAYS` in `site/plan.js` sets them;
 3. marks the trips whose flight back lands in Korea before noon (오전 도착, or 다음 날 오전 도착 when it lands
-   the day after it leaves), from the fare's own times, or for a Korean Air trip without them from
-   the route's flight times, and the trips that connect (갈 때 경유, 올 때 경유 or 왕복 경유);
-4. attaches to each trip its best known fare among the airlines picked, one nonstop both ways and
-   one that connects, each as a trip of its own, and names its airline. Every fare is economy, the
-   only cabin the fare API gives. A fare costs its price for each person, and the fee from
-   `data/baggage.json` both ways for each bag it does not include, shown under the price: a fare
-   with a checked bag includes one for each person, a fare without one none. Two people with one bag
-   thus pay two fares, and the fee for one bag only on a fare without one. The budget holds that
-   total. A fare ranks at its total less a head start of 50,000 won for each person on Korean Air
-   and Asiana (`ADVANTAGE` in `site/plan.js`); the price shown is the total. The best fare is the
-   one that ranks lowest of those whose trip takes no leave. A trip from Korean Air's days without a
-   nonstop fare is offered without one, in economy, or in business, with searches for that cabin,
-   when only business is picked;
-5. lists the trips with a known fare first, lowest rank first, then the rest by departure date,
-   soonest first; on the same day, the shorter trip first, and a nonstop one before one that
-   connects.
+   the day after it leaves), where the fare gives the time, and the trips that connect (갈 때 경유, 올 때
+   경유 or 왕복 경유);
+4. offers for each pair of dates on a route its best fare among the airlines picked, one nonstop
+   both ways and one that connects, each as a trip of its own, and names its airline. Every fare is
+   economy, the only cabin the fare API gives. A fare costs its price for each person, and the fee
+   from `data/baggage.json` both ways for each bag it does not include, shown under the price: a
+   fare with a checked bag includes one for each person, a fare without one none. Two people with
+   one bag thus pay two fares, and the fee for one bag only on a fare without one. The budget holds
+   that total. A fare ranks at its total less a head start of 50,000 won for each person on Korean
+   Air and Asiana (`ADVANTAGE` in `site/plan.js`); the price shown is the total. The best fare is
+   the one that ranks lowest of those whose trip takes no leave;
+5. lists the trips lowest rank first, then by departure date, soonest first; on the same day, the
+   shorter trip first, and a nonstop one before one that connects.
 
 Every trip links to Google Flights, Skyscanner and KAYAK searches with the route and dates filled
-in, for the live price; each asks for the trip's cabin and for as many adults as there are people,
-and the KAYAK search for its airline too, nonstop unless the trip connects.
+in, for the live price; each asks for economy and for as many adults as there are people, and the
+KAYAK search for the trip's airline too, nonstop unless the trip connects.
 
 ## Where the fares come from
 
@@ -113,25 +106,16 @@ each run logs the fields a real ticket has, to check it against.
 
 ## Update the data
 
-Schedules change every season (late March and late October). Everything is in `site/data/`:
+Everything the page knows is in `site/data/`:
 
-- `routes.json`: one entry per route, from Incheon (`ICN`), Gimpo (`GMP`) or Cheongju (`CJJ`); the
-  city chips group routes by the airport they fly to. `country` is the destination's country (`JP`,
-  `TW`, `HK`, `MO`, `VN` for Vietnam, `TH` for Thailand, `GU` for Guam or `MP` for Saipan), which
-  bag fees go by. A destination outside UTC+9 gives `utcOffset` (Taiwan, Hong Kong and Macau `8`,
-  Vietnam and Thailand `7`, Guam and Saipan `10`), so the fetcher gives the flight back its local
-  date and the flight out its local landing time. `periods` lists the stretches whose days are
-  known, each with `from`, `to` and `days` (`"daily"`, or a list such as `["mon", "wed", "fri",
-  "sun"]`); the same days serve both directions, since each route turns around abroad the same day.
-  A route whose days are not known keeps `periods` empty and says why in `note`. `flights`, where
-  known, gives the flight `out` and the flight `back`, each with `departs` and `arrives` in local
-  24-hour time (`"09:15"`) and the flight `number` where the source names it. They decide 오전 도착, and
-  a flight out that lands at 6 p.m. or later keeps the route's Korean Air days off the page. Add the
-  source of every change to `sources`, and move `updated` on. `origins` names the Korean airports,
-  and the page and the fetcher add a route from each of them to every destination with none listed
-  from it, which only fares bring trips to, nonstop or connecting. `destinations` lists the places
-  no route is listed to, with the `dest`, `city`, `country` and `utcOffset` a route would give:
-  Vietnam's airports, Bangkok's, Guam and Saipan.
+- `routes.json`: `origins` names the Korean airports, Incheon (`ICN`), Gimpo (`GMP`) and Cheongju
+  (`CJJ`), and `destinations` the airports abroad, each with its `dest` code, the `city` its chip
+  shows, its `country` (`JP`, `TW`, `HK`, `MO`, `VN` for Vietnam, `TH` for Thailand, `GU` for Guam
+  or `MP` for Saipan), which bag fees go by, and, outside UTC+9, its `utcOffset` (Taiwan, Hong Kong
+  and Macau `8`, Vietnam and Thailand `7`, Guam and Saipan `10`), so that the fetcher gives the
+  flight back its local date and the flight out its local landing time. The page and the fetcher
+  take a route from every origin to every destination (`routesOf` in `site/plan.js`). Move `updated`
+  on with each change.
 - `holidays.json`: public holidays by date, through 2027, from the 월력요항 that the Korea
   AeroSpace Administration publishes each June. A substitute holiday is named after the holiday it
   stands in for.
@@ -151,8 +135,8 @@ Schedules change every season (late March and late October). Everything is in `s
   adds nothing for it. Add an airline when the deploy log counts fares of its without a checked bag,
   the first of its three numbers there.
 
-The tests check that every route has the fields the page reads and that the 2027 holidays add up
-to the 119 days off the official calendar gives, so run them after editing.
+The tests check that every destination has the fields the page reads and that the 2027 holidays add
+up to the 119 days off the official calendar gives, so run them after editing.
 
 ## Run and test locally
 
@@ -175,74 +159,43 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
 
 ## Known limitations
 
-- Schedules were collected on 11 October 2026 from press reports and the announcements of
-  Japanese prefectures and airports, for the 2026/27 winter season (to 27 March 2027). Komatsu,
-  Kumamoto, Kagoshima and Okayama had not announced their winter days by then, and Sendai and
-  Miyazaki join Korean Air only when Asiana merges into it on 17 December 2026; those routes
-  appear in recommendations only through a fare.
-- The main routes (Tokyo Narita and Haneda, Osaka, Nagoya, Fukuoka, Sapporo and Okinawa) were added
-  on 12 October 2026 as flying daily. Only Narita, Osaka and Okinawa have a source for the winter
-  season; for the others the page assumes the summer's daily service goes on, and their notes in
-  `routes.json` say so. Their flight times are not listed, since only summer times could be found,
-  so they get no 오전 도착, and a late flight out cannot keep their days off the page.
-- Hakodate, Takamatsu, Matsuyama, Yonago, Shizuoka, Tokushima, Kitakyushu, Saga, Miyakojima and
-  Ishigaki, which Korean Air does not fly, and Gimpo–Nagoya, which only Peach flies, were added on
-  12 October 2026 for the fares of the airlines that do; Yonago's only source is a summary of
-  routes.
-- Kobe takes international flights only as charters until it opens to scheduled ones, but Korean Air
-  flies there twice a day to a timetable and sells the seats like any other route's, so it is listed
-  with Korean Air's days like any other route.
-- Taipei Taoyuan, Taichung and Hong Kong fly daily on Korean Air. Taoyuan's winter flights are on
-  file; Taichung's daily service returns on 25 October 2026 with no end date given, so the page
-  assumes it lasts the season; Hong Kong's winter season is assumed. Their notes in `routes.json`
-  say so. Taipei Songshan, Kaohsiung (from Incheon and from Gimpo) and Macau come through fares
-  only: Korean Air does not fly the first two, and its daily Macau service from July 2024 was not
-  confirmed for 2026.
-- On 12 October 2026 the routes were checked against press reports, airline filings and airport
-  pages for every Japanese and Taiwanese airport with scheduled flights from Incheon, Gimpo or
-  Cheongju. Routes flown only by charter, such as Toyama, Ube and Kushiro, and routes from other
-  Korean airports are left out. Many of those sources could be read only as search-result excerpts,
-  so the frequencies in the notes may be off.
-- Cheongju's routes are Aero K's, and Eastar Jet's to Taipei, and come through fares only. Aero K
-  had not published its winter days by 12 October 2026: Kumamoto is announced only to 24 October and
-  Matsuyama only from 2 January, Fukuoka and Hiroshima have no 2026 schedule, and Kobe is a charter
-  like Incheon's. Ibaraki and Obihiro, which Aero K suspended during the year, are left out.
-- Gimpo–Haneda was added on 12 October 2026 as flying daily; for Gimpo–Kansai only Asiana's daily
-  winter service was found, so Korean Air's days are not given and the route comes only through
-  fares.
+- The destinations are the airports in Japan and Taiwan with scheduled flights from Incheon, Gimpo
+  or Cheongju, checked on 12 October 2026 against press reports, airline filings and airport pages,
+  with Hong Kong, Macau, every Vietnamese airport, Bangkok's two, Guam and Saipan. Airports served
+  only by charters, such as Toyama, Ube and Kushiro, and other Korean airports are left out. Kobe
+  takes international flights only as charters until it opens to scheduled ones, but Korean Air
+  flies there twice a day to a timetable and sells the seats like any other route's, so it is
+  listed.
 - The search links follow URL formats the sites do not document, and any of them can change. The
   KAYAK link asks for the trip's airline, nonstop for a nonstop trip; the others show every airline.
 - Leave counts the departure day as a whole day, and knows only Korean public holidays and the days
   off of a Monday, Tuesday and Thursday week, not company holidays.
-- A route lists one set of flight times, the latest its sources give, and 오전 도착 and the rule against
-  a late flight out follow them even for a trip in another season. The routes with times all leave
-  Incheon in the morning and land back in the afternoon, so only a fare's own times can mark a trip
-  either way. A fare without its own times, and a Korean Air day on a route without them, is let
-  through.
-- Vietnam, Bangkok, Guam and Saipan, and every route `origins` adds, come through fares only: the
-  page lists no Korean Air days for them. Ca Mau was closed until at least 31 October 2026 and is
-  listed so that its fares show once it flies again. Long Thanh, Ho Chi Minh City's new airport,
-  opens on 1 December 2026, but the API answered every query for it with HTTP 400 on 13 October
-  2026, so it is left out until the API knows it. Most flights from Korea to Vietnam, Guam and
-  Saipan leave in the evening and land at night, so the rule against a late flight out leaves few of
-  their trips: on 13 October 2026 it left out 122 of the 257 tickets from Incheon to Da Nang and
-  every one to Guam and Saipan of two to six nights. The page does not say where a trip connects or
-  for how long; the search links show it.
-- Prices are economy fares, one for each person picked, all as adults, and may differ from what a
-  booking finally costs; the API gives no other cabin, so a trip in business has no price. Bag fees
-  are the cheapest price online in advance, from the airlines' own pages for Jeju Air, Trinity, Air
-  Seoul, Eastar Jet, Aero K, HK Express and ZIPAIR (whose won price out of Incheon the page also
-  takes for the way back, charged in yen, and marks 약), and from a travel blog for Tigerair Taiwan,
-  converted from Taiwan dollars, and for Jeju Air to Vietnam and Thailand. Peach, Air Busan, Scoot,
-  Vietjet, Thai Vietjet, Thai AirAsia X, United, China Eastern, China Southern, Philippine Airlines
-  and Malaysia Airlines published none that could be found, nor Eastar Jet to Taiwan or Hong Kong
-  and Air Seoul to Guam, so they take the usual fee, Jeju Air's and Trinity's, which the page marks
-  약. An airline may charge more for a bag bought late: Air Seoul 5,000 won more within 48 hours of
-  departure, HK Express 72,000 won after booking. A second bag for one person is charged the same as
-  the first, though an airline may charge more. A connecting fare pays the bag fee of the airline
-  Aviasales names for it, once each way, though separate tickets on two airlines may each charge for
-  the bag. A fare with a checked bag counts as including one for each person. Of the airlines that
-  always include one, Korean Air, Asiana, Jin Air, Parata Air and Air Premia say so on their own
-  pages, and the airlines added for Vietnam, Bangkok, Guam and Saipan were checked only through
-  search results; JAL and ANA have given two in economy, and ANA's Basic fares, sold on some routes
-  since November 2024, can include none.
+- A fare that does not give the times of its flights is let through the rule against a late flight
+  out, and is not marked 오전 도착.
+- Only the trips Aviasales users searched for in the last 48 hours have fares, so a route few of
+  them search, regional Japan and most of Vietnam among them, may show few trips or none. Ca Mau was
+  closed until at least 31 October 2026 and is listed so that its fares show once it flies again.
+  Long Thanh, Ho Chi Minh City's new airport, opens on 1 December 2026, but the API answered every
+  query for it with HTTP 400 on 13 October 2026, so it is left out until the API knows it. Most
+  flights from Korea to Vietnam, Guam and Saipan leave in the evening and land at night, so the rule
+  against a late flight out leaves few of their trips: on 13 October 2026 it left out 122 of the 257
+  tickets from Incheon to Da Nang and every one to Guam and Saipan of two to six nights. The page
+  does not say where a trip connects or for how long; the search links show it.
+- Prices are economy fares, the only cabin the API gives, one for each person picked, all as adults,
+  and may differ from what a booking finally costs. Bag fees are the cheapest price online in
+  advance, from the airlines' own pages for Jeju Air, Trinity, Air Seoul, Eastar Jet, Aero K, HK
+  Express and ZIPAIR (whose won price out of Incheon the page also takes for the way back, charged
+  in yen, and marks 약), and from a travel blog for Tigerair Taiwan, converted from Taiwan dollars,
+  and for Jeju Air to Vietnam and Thailand. Peach, Air Busan, Scoot, Vietjet, Thai Vietjet, Thai
+  AirAsia X, United, China Eastern, China Southern, Philippine Airlines and Malaysia Airlines
+  published none that could be found, nor Eastar Jet to Taiwan or Hong Kong and Air Seoul to Guam,
+  so they take the usual fee, Jeju Air's and Trinity's, which the page marks 약. An airline may
+  charge more for a bag bought late: Air Seoul 5,000 won more within 48 hours of departure, HK
+  Express 72,000 won after booking. A second bag for one person is charged the same as the first,
+  though an airline may charge more. A connecting fare pays the bag fee of the airline Aviasales
+  names for it, once each way, though separate tickets on two airlines may each charge for the bag.
+  A fare with a checked bag counts as including one for each person. Of the airlines that always
+  include one, Korean Air, Asiana, Jin Air, Parata Air and Air Premia say so on their own pages, and
+  the airlines added for Vietnam, Bangkok, Guam and Saipan were checked only through search results;
+  JAL and ANA have given two in economy, and ANA's Basic fares, sold on some routes since November
+  2024, can include none.

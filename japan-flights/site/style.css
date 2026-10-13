@@ -151,13 +151,6 @@ select, input {
 }
 h2 { font-size: 1.25rem; font-weight: 600; }
 .summary { font-size: 0.8125rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-.hint {
-  margin-bottom: 0.75rem;
-  padding: 0.6rem 0.8rem;
-  border-radius: 6px;
-  background: var(--accent-soft);
-  font-size: 0.875rem;
-}
 
 /* Departures board */
 .board {
@@ -198,7 +191,6 @@ h2 { font-size: 1.25rem; font-weight: 600; }
   white-space: nowrap;
 }
 .badge-holiday { background: var(--holiday-soft); color: var(--holiday); }
-.badge-cabin { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .badge-stops { background: var(--caution-soft); color: var(--caution); }
 .price { grid-area: price; display: grid; justify-items: end; align-content: start; text-align: right; }
 .price strong {
@@ -210,7 +202,6 @@ h2 { font-size: 1.25rem; font-weight: 600; }
 }
 .price span { font-size: 0.75rem; color: var(--muted); }
 .price .bag-fee { max-width: 8.5rem; font-size: 0.6875rem; color: var(--muted); }
-.price-unknown strong { font-family: var(--font-body); font-size: 0.875rem; color: var(--muted); }
 .links { grid-area: links; display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font-size: 0.8125rem; }
 .empty { padding: 1.5rem 1rem; color: var(--muted); }
 

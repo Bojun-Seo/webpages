@@ -1,13 +1,13 @@
 // Fetches the round-trip economy fares of every airline for the routes the
-// page knows (routes.json, and its origins to each destination) from the
-// Travelpayouts (Aviasales) Data API, nonstop or with one connection each
-// way, and writes the ones the page can offer where it looks for live
-// fares, each with its airline, its connections, the checked bags it
-// includes and the times its flights leave and land where the API gives
-// them. The API takes no cabin: asked for business or first with
-// `trip_class`, it answers with the same economy tickets. The API serves
-// prices that Aviasales users found in the last 48 hours, so a route few
-// people search there can come back empty.
+// page knows, from each of routes.json's origins to each of its
+// destinations, from the Travelpayouts (Aviasales) Data API, nonstop or
+// with one connection each way, and writes the ones the page can offer
+// where it looks for live fares, each with its airline, its connections,
+// the checked bags it includes and the times its flights leave and land
+// where the API gives them. The API takes no cabin: asked for business or
+// first with `trip_class`, it answers with the same economy tickets. The
+// API serves prices that Aviasales users found in the last 48 hours, so a
+// route few people search there can come back empty.
 //
 //   TRAVELPAYOUTS_TOKEN=... node tools/fetch-fares.js \
 //       [--routes site/data/routes.json] [--out site/data/live-fares.json] [--months 6]
@@ -254,7 +254,7 @@ async function main(argv) {
           }
           for (const fare of pickFares(response, route, seen)) {
             if (!TRIP_NIGHTS.includes(daysBetween(fare.depart, fare.return))) counts.nights++;
-            else if (landsLate(route, fare)) counts.late++;
+            else if (landsLate(fare)) counts.late++;
             else fares.push(fare);
           }
           ok++;
