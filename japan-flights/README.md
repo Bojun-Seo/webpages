@@ -8,8 +8,8 @@ Bangkok's two airports, Guam and Saipan. It knows the days Korean Air flies its 
 Taiwan and Hong Kong and lists the round trips that schedule allows; other trips come from the fares
 known for them. It counts the days of leave each trip takes against a Monday, Tuesday and Thursday
 work week and Korean public holidays, offers only the trips that take none, without showing the
-count, and puts those with a known fare first, cheapest first, with Korean Air, Asiana, business and
-first given a head start. GitHub Pages serves it; there is no server.
+count, and puts those with a known fare first, cheapest first, with Korean Air and Asiana given a
+head start. GitHub Pages serves it; there is no server.
 
 The page is in Korean. It is not affiliated with any airline.
 
@@ -43,18 +43,17 @@ the number of people and of checked bags between them, one each unless picked, t
 3. marks the trips whose flight back lands in Korea before noon (오전 도착, or 다음 날 오전 도착 when it lands
    the day after it leaves), from the fare's own times, or for a Korean Air trip without them from
    the route's flight times, and the trips that connect (갈 때 경유, 올 때 경유 or 왕복 경유);
-4. for each cabin picked, economy, business or first, attaches to each trip its best known fare
-   among the airlines picked, one nonstop both ways and one that connects, each as a trip of its
-   own, and names its airline and cabin. A fare costs its price for each person, and the fee from
+4. attaches to each trip its best known fare among the airlines picked, one nonstop both ways and
+   one that connects, each as a trip of its own, and names its airline. Every fare is economy, the
+   only cabin the fare API gives. A fare costs its price for each person, and the fee from
    `data/baggage.json` both ways for each bag it does not include, shown under the price: a fare
    with a checked bag includes one for each person, a fare without one none. Two people with one bag
    thus pay two fares, and the fee for one bag only on a fare without one. The budget holds that
-   total. A fare ranks at its total less a head start for each person, 50,000 won for Korean Air and
-   Asiana, 200,000 for business and 500,000 for first, together for Korean Air's business
-   (`ADVANTAGE` in `site/plan.js`); the price shown is the total. The best fare is the one that
-   ranks lowest of those whose trip takes no leave. A trip from Korean Air's days without a nonstop
-   fare is offered without one, in the cheaper cabin picked of economy and business, but never in
-   first, which Korean Air hardly sells on these routes;
+   total. A fare ranks at its total less a head start of 50,000 won for each person on Korean Air
+   and Asiana (`ADVANTAGE` in `site/plan.js`); the price shown is the total. The best fare is the
+   one that ranks lowest of those whose trip takes no leave. A trip from Korean Air's days without a
+   nonstop fare is offered without one, in economy, or in business, with searches for that cabin,
+   when only business is picked;
 5. lists the trips with a known fare first, lowest rank first, then the rest by departure date,
    soonest first; on the same day, the shorter trip first, and a nonstop one before one that
    connects.
@@ -67,12 +66,15 @@ and the KAYAK search for its airline too, nonstop unless the trip connects.
 
 Korean Air publishes no fare API, and the page does not scrape koreanair.com: airline sites
 commonly forbid automated access in their terms, and a scraper breaks whenever the site changes.
-Amadeus closed its free Self-Service APIs on 17 July 2026. That leaves two sources, both optional:
-
-| File | Written by | What it holds |
-|---|---|---|
-| `site/data/fares.json` | you, by hand | fares you saw yourself, kept in the repository |
-| `site/data/live-fares.json` | the workflow, at each deploy | fares of every airline, nonstop or with one connection each way, that Aviasales users found in the last 48 hours, from the [Travelpayouts Data API](https://support.travelpayouts.com/hc/en-us/articles/203956163-Aviasales-Data-API), for trips of two to six nights whose flight out lands before 6 p.m. local time: the cheapest economy fare for each route, pair of dates and airline, with and without a checked bag, nonstop and connecting, and for each day and time of day the flight back lands, with the times the flights leave and land where the API gives them |
+Amadeus closed its free Self-Service APIs on 17 July 2026. The fares come instead from the
+[Travelpayouts Data
+API](https://support.travelpayouts.com/hc/en-us/articles/203956163-Aviasales-Data-API): at each
+deploy the workflow writes `site/data/live-fares.json` with the fares of every airline, nonstop or
+with one connection each way, that Aviasales users found in the last 48 hours, for trips of two to
+six nights whose flight out lands before 6 p.m. local time: the cheapest economy fare for each
+route, pair of dates and airline, with and without a checked bag, nonstop and connecting, and for
+each day and time of day the flight back lands, with the times the flights leave and land where the
+API gives them.
 
 `live-fares.json` is never committed; the workflow fetches it into the build. Without a token the
 workflow writes an empty one and the page says live fares are not set up. Aviasales data comes from
@@ -91,27 +93,8 @@ that include one or more, and those whose link does not say, and the fares left 
 flight out lands late. `prices_for_dates` documents no cabin, and asked for business and first with
 `trip_class` (`1` and `2`), as the API's older methods take it, it answered all 143 queries that had
 tickets on 12 October 2026 with the economy answer's tickets; so the fetcher asks for economy only,
-and business and first fares come only from `fares.json`. The tests use the response format the API
-documents; each run logs the fields a real ticket has, to check it against.
-
-A hand-written fare looks like this. `airline` is the airline's two-letter code (`KE`, `7C`, `LJ`
-...), and a fare without one counts as Korean Air's; `cabin` is `business` or `first` for those
-cabins, and a fare without one is economy; `bags` is the number of checked bags the fare includes
-for each person, `0` for none, and a fare without it includes one; `stops` is `[1, 0]`, `[0, 1]` or
-`[1, 1]` for a fare that connects out, back or both ways; `price` is the round trip for one adult,
-in won; `seen` is when you saw it, and the page shows how long ago that was.
-
-```json
-{
-  "fares": [
-    { "route": "ICN-OIT", "airline": "KE", "depart": "2026-12-25", "return": "2026-12-27",
-      "price": 289000, "seen": "2026-10-11", "source": "대한항공" }
-  ]
-}
-```
-
-Fares for trips that have left are ignored, so old entries do no harm. A fare also shows a trip on
-a route whose days are not known yet.
+and the page has no business or first fares. The tests use the response format the API documents;
+each run logs the fields a real ticket has, to check it against.
 
 ## Publish on GitHub Pages
 
@@ -167,7 +150,6 @@ Schedules change every season (late March and late October). Everything is in `s
   since the usual fee is a low-cost airline's, shows a bag beyond that as 요금 미확인 (fee not known) and
   adds nothing for it. Add an airline when the deploy log counts fares of its without a checked bag,
   the first of its three numbers there.
-- `fares.json`: see above.
 
 The tests check that every route has the fields the page reads and that the 2027 holidays add up
 to the 119 days off the official calendar gives, so run them after editing.
@@ -246,22 +228,21 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   their trips: on 13 October 2026 it left out 122 of the 257 tickets from Incheon to Da Nang and
   every one to Guam and Saipan of two to six nights. The page does not say where a trip connects or
   for how long; the search links show it.
-- Prices are a fare for each person picked, all as adults, in economy unless the trip is marked 비즈니스
-  or 퍼스트, and may differ from what a booking finally costs. Business and first fares come only from
-  `fares.json`, since the API gives economy alone. Bag fees are the cheapest price online in
-  advance, from the airlines' own pages for Jeju Air, Trinity, Air Seoul, Eastar Jet, Aero K, HK
-  Express and ZIPAIR (whose won price out of Incheon the page also takes for the way back, charged
-  in yen, and marks 약), and from a travel blog for Tigerair Taiwan, converted from Taiwan dollars,
-  and for Jeju Air to Vietnam and Thailand. Peach, Air Busan, Scoot, Vietjet, Thai Vietjet, Thai
-  AirAsia X, United, China Eastern, China Southern, Philippine Airlines and Malaysia Airlines
-  published none that could be found, nor Eastar Jet to Taiwan or Hong Kong and Air Seoul to Guam,
-  so they take the usual fee, Jeju Air's and Trinity's, which the page marks 약. An airline may
-  charge more for a bag bought late: Air Seoul 5,000 won more within 48 hours of departure, HK
-  Express 72,000 won after booking. A second bag for one person is charged the same as the first,
-  though an airline may charge more. A connecting fare pays the bag fee of the airline Aviasales
-  names for it, once each way, though separate tickets on two airlines may each charge for the bag.
-  A fare with a checked bag counts as including one for each person. Of the airlines that always
-  include one, Korean Air, Asiana, Jin Air, Parata Air and Air Premia say so on their own pages, and
-  the airlines added for Vietnam, Bangkok, Guam and Saipan were checked only through search results;
-  JAL and ANA have given two in economy, and ANA's Basic fares, sold on some routes since November
-  2024, can include none.
+- Prices are economy fares, one for each person picked, all as adults, and may differ from what a
+  booking finally costs; the API gives no other cabin, so a trip in business has no price. Bag fees
+  are the cheapest price online in advance, from the airlines' own pages for Jeju Air, Trinity, Air
+  Seoul, Eastar Jet, Aero K, HK Express and ZIPAIR (whose won price out of Incheon the page also
+  takes for the way back, charged in yen, and marks 약), and from a travel blog for Tigerair Taiwan,
+  converted from Taiwan dollars, and for Jeju Air to Vietnam and Thailand. Peach, Air Busan, Scoot,
+  Vietjet, Thai Vietjet, Thai AirAsia X, United, China Eastern, China Southern, Philippine Airlines
+  and Malaysia Airlines published none that could be found, nor Eastar Jet to Taiwan or Hong Kong
+  and Air Seoul to Guam, so they take the usual fee, Jeju Air's and Trinity's, which the page marks
+  약. An airline may charge more for a bag bought late: Air Seoul 5,000 won more within 48 hours of
+  departure, HK Express 72,000 won after booking. A second bag for one person is charged the same as
+  the first, though an airline may charge more. A connecting fare pays the bag fee of the airline
+  Aviasales names for it, once each way, though separate tickets on two airlines may each charge for
+  the bag. A fare with a checked bag counts as including one for each person. Of the airlines that
+  always include one, Korean Air, Asiana, Jin Air, Parata Air and Air Premia say so on their own
+  pages, and the airlines added for Vietnam, Bangkok, Guam and Saipan were checked only through
+  search results; JAL and ANA have given two in economy, and ANA's Basic fares, sold on some routes
+  since November 2024, can include none.
