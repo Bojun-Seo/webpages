@@ -35,7 +35,7 @@ picks, and the number of people and of checked bags between them, one each unles
    was made for; `WORKDAYS` in `site/plan.js` sets them;
 3. marks the trips whose flight back lands in Korea before noon (오전 도착, or 다음 날 오전 도착 when it lands
    the day after it leaves), where the fare gives the time, which the mark shows on hover, and the
-   trips that connect (갈 때 경유, 올 때 경유 or 왕복 경유);
+   trips that connect (갈 때 경유, 올 때 경유 or 왕복 경유), with the airports they connect at on hover;
 4. offers for each pair of dates on a route its best fare among the airlines picked, one nonstop
    both ways and one that connects, each as a trip of its own, and names its airline. Every fare is
    economy, the only cabin the fare API gives. A fare costs its price for each person, and the fee
@@ -75,16 +75,20 @@ tickets, since then the dearest tickets are missing. A ticket counts only on the
 airports it names. The `static_fare_key` in its link says what its fare includes: `L0` for no
 checked bag, `L1_1_15` for one bag of 15 kg, and so on. A fare gives the bags it includes for each
 person in `bags`, `0` for none, when its link says, and its connections out and back in `stops` when
-it makes any. The cheapest fare without a bag is kept apart from the cheapest other, so that the
-page can weigh the first with its bag fee against the second, and a connecting fare from a nonstop
-one, and so is a fare whose flight back lands on another day or at another time of day, since the
-leave a trip takes depends on it. The log counts each airline's fares that include no bag, those
-that include one or more, and those whose link does not say, and the fares left out because the
-flight out lands late. `prices_for_dates` documents no cabin, and asked for business and first with
-`trip_class` (`1` and `2`), as the API's older methods take it, it answered all 143 queries that had
-tickets on 12 October 2026 with the economy answer's tickets; so the fetcher asks for economy only,
-and the page has no business or first fares. The tests use the response format the API documents;
-each run logs the fields a real ticket has, to check it against.
+it makes any. The link's `t` lists the ticket's flights, out first, then back, each with the Unix
+times it leaves and lands, its minutes in the air and its two airports, after its airline's code
+where that changes, so a connecting fare names the airports it connects at in `via`: `[["PVG"], []]`
+for one connection on the way out at Shanghai Pudong. The log counts the connecting fares that say
+where, and shows the link of one ticket that does not. The cheapest fare without a bag is kept apart
+from the cheapest other, so that the page can weigh the first with its bag fee against the second,
+and a connecting fare from a nonstop one, and so is a fare whose flight back lands on another day or
+at another time of day, since the leave a trip takes depends on it. The log counts each airline's
+fares that include no bag, those that include one or more, and those whose link does not say, and
+the fares left out because the flight out lands late. `prices_for_dates` documents no cabin, and
+asked for business and first with `trip_class` (`1` and `2`), as the API's older methods take it, it
+answered all 143 queries that had tickets on 12 October 2026 with the economy answer's tickets; so
+the fetcher asks for economy only, and the page has no business or first fares. The tests use the
+response format the API documents; each run logs the fields a real ticket has, to check it against.
 
 ## Publish on GitHub Pages
 
@@ -177,7 +181,9 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   flights from Korea to Vietnam, Guam and Saipan leave in the evening and land at night, so the rule
   against a late flight out leaves few of their trips: on 13 October 2026 it left out 122 of the 257
   tickets from Incheon to Da Nang and every one to Guam and Saipan of two to six nights. The page
-  does not say where a trip connects or for how long; the search links show it.
+  says where a trip connects, but not for how long; the search links show that. A ticket's link
+  lists its flights in a format Aviasales does not document, so where a trip connects can go
+  missing should the format change.
 - Prices are economy fares, the only cabin the API gives, one for each person picked, all as adults,
   and may differ from what a booking finally costs. Bag fees are the cheapest price online in
   advance, from the airlines' own pages for Jeju Air, Trinity, Air Seoul, Eastar Jet, Aero K, HK
