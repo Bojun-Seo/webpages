@@ -216,7 +216,7 @@ function renderTrips() {
   const first = trips.filter((t) => t.daysOff.length > 0).length;
   $('summary').textContent = trips.length
     ? [`조건에 맞는 일정 ${trips.length.toLocaleString('ko-KR')}개`,
-      state.daysOff.size > 0 && (first ? `내 휴일이 들어간 ${first.toLocaleString('ko-KR')}개 먼저` : '내 휴일이 들어간 일정 없음'),
+      state.daysOff.size > 0 && (first ? `내 휴일로 새로 생긴 ${first.toLocaleString('ko-KR')}개 먼저` : '내 휴일로 새로 생긴 일정 없음'),
       `${party.people}명·위탁수하물 ${party.bags ? `${party.bags}개` : '없음'} 기준`].filter(Boolean).join(' · ')
     : '';
   $('price-head').textContent = `${party.people}인 왕복`;

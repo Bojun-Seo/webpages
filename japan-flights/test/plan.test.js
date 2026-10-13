@@ -80,7 +80,7 @@ test('a day off the viewer adds is a Monday, Tuesday or Thursday that is no holi
   assert.equal(dayOffProblem('', holidays, today), 'invalid');
 });
 
-test('a day off the viewer adds takes no leave, and the trip says it spans it', () => {
+test('a day off the viewer adds takes no leave, and the trip says which it needs', () => {
   // Saturday to Tuesday afternoon takes Monday and Tuesday.
   assert.deepEqual(leaveFor('2026-11-14', '2026-11-17', holidays), { leave: 2, holidays: [], daysOff: [] });
   assert.deepEqual(leaveFor('2026-11-14', '2026-11-17', holidays, { daysOff: new Set(['2026-11-16']) }),
@@ -91,9 +91,12 @@ test('a day off the viewer adds takes no leave, and the trip says it spans it', 
   // Only a workday that is no holiday counts as a day off.
   assert.deepEqual(leaveFor('2027-02-26', '2027-03-01', holidays, { daysOff: new Set(['2027-02-27', '2027-03-01']) }),
     { leave: 0, holidays: ['삼일절'], daysOff: [] });
+  // Back on Monday morning, a trip needs no Monday off.
+  assert.deepEqual(leaveFor('2026-11-13', '2026-11-16', holidays,
+    { morningArrival: true, daysOff: new Set(['2026-11-16']) }), { leave: 0, holidays: [], daysOff: [] });
 });
 
-test('the trips that span a day off the viewer added come first, however dear', () => {
+test('the trips that only the days off the viewer added make possible come first, however dear', () => {
   const fare = (depart, ret, price) => ({ route: 'ICN-NRT', airline: '7C', depart, return: ret, price });
   // Friday to Sunday twice, and Saturday to Tuesday, which takes Monday and Tuesday.
   const fares = [fare('2026-12-04', '2026-12-06', 150000), fare('2026-12-11', '2026-12-13', 140000),
@@ -105,11 +108,11 @@ test('the trips that span a day off the viewer added come first, however dear', 
   assert.deepEqual(order(new Set(['2026-12-07'])), ['2026-12-11', '2026-12-04']);
   assert.deepEqual(order(new Set(['2026-12-07', '2026-12-08'])),
     ['2026-12-05 2026-12-07,2026-12-08', '2026-12-11', '2026-12-04']);
-  // A trip that took no leave already comes first too when it spans a day off: back on Monday morning.
+  // A trip that takes no leave anyway keeps its place, though it spans a day off: back on Monday morning.
   const morning = { ...fare('2026-12-11', '2026-12-14', 200000), arrives: '09:30' };
   assert.deepEqual(recommend({ routes, fares: [...fares, morning], holidays, today },
-    { ...december, nights: null, daysOff: new Set(['2026-12-14']) }).map((t) => `${t.depart} ${t.nights}`),
-  ['2026-12-11 3', '2026-12-11 2', '2026-12-04 2']);
+    { ...december, nights: null, daysOff: new Set(['2026-12-14']) }).map((t) => `${t.depart} ${t.nights} ${t.daysOff}`),
+  ['2026-12-11 2 ', '2026-12-04 2 ', '2026-12-11 3 ']);
 });
 
 test('a flight back that lands before noon frees the return day', () => {
