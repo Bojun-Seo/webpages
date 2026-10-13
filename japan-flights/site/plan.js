@@ -91,25 +91,26 @@ export function dayOffProblem(date, holidays, today) {
 // days, except that the landing day takes none when the flight lands
 // before noon (`morningArrival`), since there is still time to go to work.
 // Also gives the holidays the trip spans, a substitute day under the name
-// of the holiday it stands in for, and the days off it spans.
+// of the holiday it stands in for, and the days off it needs: those it
+// would take as leave were they not off.
 export function leaveFor(depart, lands, holidays, { morningArrival = false, daysOff } = {}) {
   const named = holidayDays(holidays);
   const off = new Map([...(daysOff || [])].map((date) => [dayNumber(date), date]));
   let leave = 0;
   const names = [];
-  const spanned = [];
+  const needed = [];
   const last = dayNumber(lands);
   for (let day = dayNumber(depart); day <= last; day++) {
     const name = named.get(day);
     if (name) {
       const shown = name.replace(/ 대체공휴일$/, '');
       if (!names.includes(shown)) names.push(shown);
-    } else if (WORKDAYS.has(weekday(day))) {
-      if (off.has(day)) spanned.push(off.get(day));
-      else if (!(day === last && morningArrival)) leave++;
+    } else if (WORKDAYS.has(weekday(day)) && !(day === last && morningArrival)) {
+      if (off.has(day)) needed.push(off.get(day));
+      else leave++;
     }
   }
-  return { leave, holidays: names, daysOff: spanned };
+  return { leave, holidays: names, daysOff: needed };
 }
 
 // Times are 'HH:MM', so they compare as strings.
@@ -224,9 +225,9 @@ function byString(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-// The trips that span a day off the viewer added first; then the lowest
-// rank, then the soonest departure, and on the same day the shorter trip,
-// and a nonstop one before one that connects.
+// The trips that only the days off the viewer added make possible first;
+// then the lowest rank, then the soonest departure, and on the same day
+// the shorter trip, and a nonstop one before one that connects.
 function byOrder(a, b) {
   return Number(!a.daysOff.length) - Number(!b.daysOff.length)
     || byNumber(a.rank, b.rank) || byString(a.depart, b.depart)
@@ -238,12 +239,12 @@ function byOrder(a, b) {
 // page works out the leave of each (`leaveFor`) to tell which to offer, and
 // keeps it in `leave`, but does not show it. Of the fares of the airlines
 // asked for, it offers for each pair of dates on a route the one nonstop
-// both ways and the one that connects once on the way out, back or both
-// that rank lowest, each with its airline and the airline's alliance, its
-// connections, the day its flight back lands, the holidays and days off it
-// spans and whether it lands in the morning; those that span a day off
-// first, then the lowest rank, then the soonest departure. A fare costs
-// its price for each of the people in `party` and the fee for the bags
+// both ways and the one that connects once on the way out, back or both that
+// rank lowest, each with its airline and the airline's alliance, its
+// connections, the day its flight back lands, the holidays it spans, the
+// days off it needs and whether it lands in the morning; those that need a
+// day off first, then the lowest rank, then the soonest departure. A fare
+// costs its price for each of the people in `party` and the fee for the bags
 // they check that it does not include, each both ways (`bag`, from
 // `bagFee`), and is held to the budget by that `total`; it ranks at that
 // less its advantage for each person (`advantageOf`). A fare whose flight

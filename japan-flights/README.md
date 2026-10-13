@@ -53,8 +53,10 @@ and the days off the visitor adds, the page:
    total. A fare ranks at its total less a head start of 50,000 won for each person on an airline of
    any of the three alliances (`ADVANTAGE` in `site/plan.js`); the price shown is the total. The
    best fare is the one that ranks lowest of those whose trip takes no leave;
-5. lists first the trips that span a day off the visitor added, marked 내 휴일 with its date, then the
-   rest; each lot lowest rank first, then by departure date, soonest first; on the same day, the
+5. lists first the trips that only the days off the visitor added make possible, those that would
+   take leave on one were it not off, marked 내 휴일 with its date, then the rest; a trip that takes no
+   leave anyway keeps its place, though it spans a day off, as one back before noon on it does. Each
+   lot is listed lowest rank first, then by departure date, soonest first; on the same day, the
    shorter trip first, and a nonstop one before one that connects.
 
 Every trip links to searches with the route and dates filled in, for the live price: first on
