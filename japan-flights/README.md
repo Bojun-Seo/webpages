@@ -87,9 +87,11 @@ depends on it. The log counts each airline's fares that include no bag, those th
 more, and those whose link does not say, and the fares left out because the flight out lands late.
 `prices_for_dates` documents no cabin, and asked for business and first with `trip_class` (`1` and
 `2`), as the API's older methods take it, it answered all 143 queries that had tickets on 12 October
-2026 with the economy answer's tickets; so the fetcher asks for economy only, and the page has no
-business or first fares. The tests use the response format the API documents; each run logs the
-fields a real ticket has, to check it against.
+2026 with the economy answer's tickets; and the older latest-prices method, which documents
+`trip_class`, answered every query for business or first on 13 October 2026, by airport or by city,
+with HTTP 400 and "Only economy trip class is supported". So the fetcher asks for economy only, and
+the page has no business or first fares. The tests use the response format the API documents; each
+run logs the fields a real ticket has, to check it against.
 
 ## Publish on GitHub Pages
 
