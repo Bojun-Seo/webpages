@@ -190,6 +190,7 @@ h2 { font-size: 1.25rem; font-weight: 600; }
   color: var(--ink);
   white-space: nowrap;
 }
+.badge[title] { cursor: help; }
 .badge-holiday { background: var(--holiday-soft); color: var(--holiday); }
 .badge-stops { background: var(--caution-soft); color: var(--caution); }
 .price { grid-area: price; display: grid; justify-items: end; align-content: start; text-align: right; }

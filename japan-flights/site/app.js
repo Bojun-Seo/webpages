@@ -133,10 +133,12 @@ function tripRow(trip) {
   const { data } = state;
   const route = data.byId.get(trip.route);
   const stops = stopsLabel(trip.stops);
+  const morning = trip.lands > trip.return ? '다음 날 오전 도착' : '오전 도착';
+  // A mark that says more on hover gives it as its title.
   const badges = [
     stops && el('span', { class: 'badge badge-stops' }, stops),
     ...trip.holidays.map((name) => el('span', { class: 'badge badge-holiday' }, name)),
-    trip.morningArrival && el('span', { class: 'badge' }, trip.lands > trip.return ? '다음 날 오전 도착' : '오전 도착'),
+    trip.morningArrival && el('span', { class: 'badge', title: `${trip.fare.arrives} 도착` }, morning),
   ];
   const price = el('div', { class: 'price' },
     el('strong', null, won(trip.total)),

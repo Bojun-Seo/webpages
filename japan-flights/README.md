@@ -34,8 +34,8 @@ picks, and the number of people and of checked bags between them, one each unles
    leaves counts too. The workdays are Monday, Tuesday and Thursday, the week of the person the page
    was made for; `WORKDAYS` in `site/plan.js` sets them;
 3. marks the trips whose flight back lands in Korea before noon (오전 도착, or 다음 날 오전 도착 when it lands
-   the day after it leaves), where the fare gives the time, and the trips that connect (갈 때 경유, 올 때
-   경유 or 왕복 경유);
+   the day after it leaves), where the fare gives the time, which the mark shows on hover, and the
+   trips that connect (갈 때 경유, 올 때 경유 or 왕복 경유);
 4. offers for each pair of dates on a route its best fare among the airlines picked, one nonstop
    both ways and one that connects, each as a trip of its own, and names its airline. Every fare is
    economy, the only cabin the fare API gives. A fare costs its price for each person, and the fee
