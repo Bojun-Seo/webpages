@@ -83,7 +83,7 @@ test('a flight back that lands before noon frees the return day', () => {
 test('a flight back that lands after midnight frees the day it lands, not the day it leaves', () => {
   // Hong Kong at 23:30, Incheon at 04:05 the next day.
   const fare = (ret, lands) => ({ route: 'ICN-HKG', airline: 'CX', depart: '2026-11-20', return: ret,
-    price: 400000, seen: today, departs: '10:00', arrives: '04:05', lands });
+    price: 400000, departs: '10:00', arrives: '04:05', lands });
   const fares = [fare('2026-11-22', '2026-11-23'), fare('2026-11-23', '2026-11-24')];
   const trips = recommend({ routes, fares, holidays, today },
     { from: '2026-11-01', to: '2026-11-30', airlines: new Set(['CX']) });
@@ -187,7 +187,7 @@ test('a trip gets a nonstop row and a connecting row, each with its cheapest far
 
 test('Korean Air and Asiana rank 50,000 won lower for each person', () => {
   const fare = (airline, price, depart) => ({ route: 'ICN-OIT', airline, depart, return: addDays(depart, 2),
-    price, seen: today });
+    price });
   const order = (fares, party) => recommend({ routes, holidays, today, fares }, { ...december, party })
     .map((t) => `${t.airline} ${t.total} ${t.rank}`);
   // Trinity at 330,000 and Korean Air at 360,000 for the same days: Korean Air's fare is the one shown.
@@ -250,7 +250,7 @@ test('the bag fee follows the airline, then the country of the destination', () 
 test('a fare without a checked bag costs a bag each way, and the cheapest all in is offered', () => {
   const baggage = { usual: { JP: 45000 }, airlines: {} };
   const fare = (airline, price, bags) => ({ route: 'ICN-NRT', airline, depart: '2026-11-20', return: '2026-11-22',
-    price, seen: today, ...(bags === 0 ? { bags } : {}) });
+    price, ...(bags === 0 ? { bags } : {}) });
   const november = { from: '2026-11-01', to: '2026-11-30', cities: new Set(['NRT']), origins: new Set(['ICN']) };
   const row = (fares, filter = november) => recommend({ routes, fares, holidays, today, baggage }, filter)
     .find((t) => t.depart === '2026-11-20' && t.return === '2026-11-22');
@@ -286,7 +286,7 @@ test('a party pays a fare each and the fee for each bag its fares do not include
   assert.deepEqual(fee({ airline: 'KE', bags: 0 }, 1, 2), [0, 1, 1, true]);
 
   const fare = (airline, price, bags) => ({ route: 'ICN-NRT', airline, depart: '2026-11-20', return: '2026-11-22',
-    price, seen: today, ...(bags === 0 ? { bags } : {}) });
+    price, ...(bags === 0 ? { bags } : {}) });
   const fares = [fare('MM', 120000, 0), fare('7C', 155000)];
   const november = { from: '2026-11-01', to: '2026-11-30', cities: new Set(['NRT']), origins: new Set(['ICN']) };
   const row = (party, filter = november) => recommend({ routes, fares, holidays, today, baggage }, { ...filter, party })

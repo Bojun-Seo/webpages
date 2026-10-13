@@ -40,7 +40,7 @@ const toHongKong = (fields) => ticket({ destination: 'HKG', destination_airport:
 
 test('the flight back takes the local date where it leaves', () => {
   const late = { success: true, data: [toHongKong({ return_at: '2026-11-15T23:30:00+08:00' })] };
-  assert.equal(pickFares(late, hongKong, '2026-10-11')[0].return, '2026-11-15');
+  assert.equal(pickFares(late, hongKong)[0].return, '2026-11-15');
   assert.equal(localDate('2026-11-15T23:30:00+08:00'), '2026-11-16'); // what Korea's clock says
 });
 
@@ -52,7 +52,7 @@ test('a flight back that lands after midnight gives the day it lands', () => {
       toHongKong({ return_at: '2026-11-15T15:00:00+08:00', duration_back: 215 }),
     ],
   };
-  const [late, day] = pickFares(response, hongKong, '2026-10-11');
+  const [late, day] = pickFares(response, hongKong);
   assert.deepEqual([late.return, late.arrives, late.lands], ['2026-11-15', '04:05', '2026-11-16']);
   assert.deepEqual([day.return, day.arrives, 'lands' in day], ['2026-11-15', '19:35', false]);
 });
@@ -82,8 +82,8 @@ test("every airline's round trips with no more than one connection each way are 
       ticket({ departure_at: '2026-11-12T23:20:00Z', return_at: '2026-11-16T02:35:00Z', price: 251000.4 }),
     ],
   };
-  const fare = (fields) => ({ route: 'ICN-OIT', seen: '2026-10-11', source: 'Aviasales', ...fields });
-  assert.deepEqual(pickFares(response, oita, '2026-10-11'), [
+  const fare = (fields) => ({ route: 'ICN-OIT', ...fields });
+  assert.deepEqual(pickFares(response, oita), [
     fare({ airline: 'KE', depart: '2026-11-13', return: '2026-11-15', price: 236500, departs: '09:15' }),
     fare({ airline: '7C', depart: '2026-11-13', return: '2026-11-15', price: 150000, departs: '18:40',
       arrivesAbroad: '20:05', arrives: '13:35' }),
@@ -98,7 +98,7 @@ test('the flight out lands abroad at local time, with its day when that is a lat
   const toHanoi = (departure_at, duration_to) => ticket({ destination: 'HAN', destination_airport: 'HAN',
     departure_at, duration_to, return_at: '2026-11-16T10:00:00+07:00' });
   const [day, night] = pickFares({ success: true, data: [toHanoi('2026-11-13T10:00:00+09:00', 290),
-    toHanoi('2026-11-13T22:30:00+09:00', 300)] }, vietnam, '2026-10-11');
+    toHanoi('2026-11-13T22:30:00+09:00', 300)] }, vietnam);
   assert.deepEqual([day.arrivesAbroad, 'landsAbroad' in day], ['12:50', false]);
   assert.deepEqual([night.arrivesAbroad, night.landsAbroad], ['01:30', '2026-11-14']);
 });
@@ -112,7 +112,7 @@ test("a ticket counts only between the route's own airports", () => {
     success: true,
     data: [tokyo('ICN', 'NRT', 200000), tokyo('GMP', 'HND', 310000), tokyo('ICN', 'HND', 250000), tokyo('GMP', 'NRT', 220000)],
   };
-  assert.deepEqual(pickFares(response, haneda, '2026-10-11').map((f) => f.price), [310000]);
+  assert.deepEqual(pickFares(response, haneda).map((f) => f.price), [310000]);
   assert.deepEqual(response.data.map((t) => leftOut(t, haneda)), ['ICN-NRT', null, 'ICN-HND', 'GMP-NRT']);
   assert.equal(leftOut(ticket({ transfers: 2 }), oita), 'connections');
   assert.equal(leftOut(ticket({ price: 0 }), oita), 'incomplete');
@@ -145,7 +145,7 @@ test('the link of a ticket tells whether its fare includes a checked bag', () =>
   assert.equal(checkedBags(undefined), null);
   const response = { success: true, data: [ticket({ link: link('L0') }), ticket({ link: link('L1_1_15'), price: 260000 }),
     ticket({ price: 270000 })] };
-  const fares = pickFares(response, oita, '2026-10-11');
+  const fares = pickFares(response, oita);
   assert.deepEqual(fares.map((f) => f.bags), [0, 1, undefined]);
   assert.equal(bagTally([...fares, { airline: '7C', bags: 0 }]), '7C 1/0/0, KE 1/1/1');
 });
@@ -158,8 +158,8 @@ test('the cheapest fare with a checked bag is kept apart from the cheapest witho
 });
 
 test('an error response yields no fares', () => {
-  assert.deepEqual(pickFares({ success: false, error: 'Unauthorized' }, oita, '2026-10-11'), []);
-  assert.deepEqual(pickFares(null, oita, '2026-10-11'), []);
+  assert.deepEqual(pickFares({ success: false, error: 'Unauthorized' }, oita), []);
+  assert.deepEqual(pickFares(null, oita), []);
 });
 
 test('without a token the script writes an empty file and succeeds', () => {
