@@ -107,13 +107,11 @@ const state = {
 function readFilter() {
   const { data } = state;
   const month = $('month').value;
-  const leave = $('leave').value;
   const budget = Number($('budget').value);
   return {
     from: month === 'all' ? data.today : `${month}-01`,
     to: month === 'all' ? lastDayOfMonth(data.months.at(-1)) : lastDayOfMonth(month),
     nights: state.nights.size ? state.nights : null,
-    maxLeave: leave === 'any' ? null : Number(leave),
     maxPrice: budget > 0 ? budget * 10000 : null,
     origins: $('origin').value === 'all' ? null : new Set([$('origin').value]),
     cities: state.cities.size ? state.cities : null,
@@ -146,7 +144,6 @@ function tripRow(trip) {
   const route = data.byId.get(trip.route);
   const stops = stopsLabel(trip.stops);
   const badges = [
-    el('span', { class: `badge ${trip.leave === 0 ? 'badge-good' : ''}` }, `연차 ${trip.leave}일`),
     trip.cabin !== 'economy' && el('span', { class: 'badge badge-cabin' }, CABIN_NAMES[trip.cabin]),
     stops && el('span', { class: 'badge badge-stops' }, stops),
     ...trip.holidays.map((name) => el('span', { class: 'badge badge-holiday' }, name)),
@@ -296,7 +293,7 @@ async function main() {
   $('people').replaceChildren(...counts(1, MAX_PEOPLE, (n) => `${n}명`, DEFAULT_PARTY.people));
   $('bags').replaceChildren(...counts(0, MAX_BAGS, (n) => (n ? `${n}개` : '없음'), DEFAULT_PARTY.bags));
 
-  for (const id of ['origin', 'month', 'leave', 'people', 'bags']) $(id).addEventListener('change', update);
+  for (const id of ['origin', 'month', 'people', 'bags']) $(id).addEventListener('change', update);
   $('budget').addEventListener('input', update);
   $('filters').addEventListener('submit', (event) => event.preventDefault());
   $('more').addEventListener('click', () => {

@@ -9,8 +9,6 @@
   --on-accent: #ffffff;
   --accent-soft: #e3e9f5;
   --price: #8a5600;
-  --good: #1c6a44;
-  --good-soft: #def1e6;
   --holiday: #b1352a;
   --holiday-soft: #f9e4e1;
   --caution: #7a4a00;
@@ -36,8 +34,6 @@
     --on-accent: #0e131c;
     --accent-soft: #1d2a42;
     --price: #f2b84b;
-    --good: #72cf9f;
-    --good-soft: #15301f;
     --holiday: #ff8e7e;
     --holiday-soft: #3a1c19;
     --caution: #f2c46b;
@@ -56,8 +52,6 @@
   --on-accent: #0e131c;
   --accent-soft: #1d2a42;
   --price: #f2b84b;
-  --good: #72cf9f;
-  --good-soft: #15301f;
   --holiday: #ff8e7e;
   --holiday-soft: #3a1c19;
   --caution: #f2c46b;
@@ -203,7 +197,6 @@ h2 { font-size: 1.25rem; font-weight: 600; }
   color: var(--ink);
   white-space: nowrap;
 }
-.badge-good { background: var(--good-soft); color: var(--good); font-weight: 600; }
 .badge-holiday { background: var(--holiday-soft); color: var(--holiday); }
 .badge-cabin { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .badge-stops { background: var(--caution-soft); color: var(--caution); }
