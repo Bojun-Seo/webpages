@@ -49,6 +49,8 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+      - id: pages
+        uses: actions/configure-pages@v5
       - name: Build the site
         # Pages lets browsers keep a file for ten minutes, so a page fetched after a deploy could
         # run a script from before it. The script and style URLs carry the commit (?v=...) so a
@@ -64,6 +66,13 @@ jobs:
           grep -q "style.css?v=$v" _site/japan-flights/index.html
           grep -q "app.js?v=$v" _site/japan-flights/index.html
           grep -q "plan.js?v=$v" _site/japan-flights/app.js
+      - name: Download the fares the site has now
+        # The fetcher keeps them for the queries the API does not answer, all of them if it answers
+        # none. Nothing to download before the first deploy.
+        continue-on-error: true
+        run: >-
+          curl -fsSL --retry 2 -o previous-fares.json
+          "${{ steps.pages.outputs.base_url }}/japan-flights/data/live-fares.json"
       - name: Fetch live fares
         # Writes an empty file when the secret is not set. The page publishes even if this fails.
         continue-on-error: true
@@ -73,7 +82,7 @@ jobs:
           node japan-flights/tools/fetch-fares.js
           --routes _site/japan-flights/data/routes.json
           --out _site/japan-flights/data/live-fares.json
-      - uses: actions/configure-pages@v5
+          --previous previous-fares.json
       - uses: actions/upload-pages-artifact@v4
         with:
           path: _site
