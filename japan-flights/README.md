@@ -59,9 +59,9 @@ the number of people and of checked bags between them, one each unless picked, t
    soonest first; on the same day, the shorter trip first, and a nonstop one before one that
    connects.
 
-Every trip links to Naver, Google Flights, Skyscanner and KAYAK searches with the route and dates
-filled in, for the live price; each asks for the trip's cabin and for as many adults as there are
-people, and the KAYAK search for its airline too, nonstop unless the trip connects.
+Every trip links to Google Flights, Skyscanner and KAYAK searches with the route and dates filled
+in, for the live price; each asks for the trip's cabin and for as many adults as there are people,
+and the KAYAK search for its airline too, nonstop unless the trip connects.
 
 ## Where the fares come from
 
