@@ -38,13 +38,13 @@ picks, and the number of people and of checked bags between them, one each unles
    trips that connect (갈 때 경유, 올 때 경유 or 왕복 경유), with the airports they connect at on hover;
 4. offers for each pair of dates on a route its best fare among the airlines picked, one nonstop
    both ways and one that connects, each as a trip of its own, and names its airline. Every fare is
-   economy, the only cabin the fare API gives. A fare costs its price for each person, and the fee
-   from `data/baggage.json` both ways for each bag it does not include, shown under the price: a
-   fare with a checked bag includes one for each person, a fare without one none. Two people with
-   one bag thus pay two fares, and the fee for one bag only on a fare without one. The budget holds
-   that total. A fare ranks at its total less a head start of 50,000 won for each person on Korean
-   Air and Asiana (`ADVANTAGE` in `site/plan.js`); the price shown is the total. The best fare is
-   the one that ranks lowest of those whose trip takes no leave;
+   economy. A fare costs its price for each person, and the fee from `data/baggage.json` both ways
+   for each bag it does not include, shown under the price: a fare with a checked bag includes one
+   for each person, a fare without one none. Two people with one bag thus pay two fares, and the fee
+   for one bag only on a fare without one. The budget holds that total. A fare ranks at its total
+   less a head start of 50,000 won for each person on Korean Air and Asiana (`ADVANTAGE` in
+   `site/plan.js`); the price shown is the total. The best fare is the one that ranks lowest of
+   those whose trip takes no leave;
 5. lists the trips lowest rank first, then by departure date, soonest first; on the same day, the
    shorter trip first, and a nonstop one before one that connects.
 
@@ -85,13 +85,8 @@ first with its bag fee against the second, and a connecting fare from a nonstop 
 fare whose flight back lands on another day or at another time of day, since the leave a trip takes
 depends on it. The log counts each airline's fares that include no bag, those that include one or
 more, and those whose link does not say, and the fares left out because the flight out lands late.
-`prices_for_dates` documents no cabin, and asked for business and first with `trip_class` (`1` and
-`2`), as the API's older methods take it, it answered all 143 queries that had tickets on 12 October
-2026 with the economy answer's tickets; and the older latest-prices method, which documents
-`trip_class`, answered every query for business or first on 13 October 2026, by airport or by city,
-with HTTP 400 and "Only economy trip class is supported". So the fetcher asks for economy only, and
-the page has no business or first fares. The tests use the response format the API documents; each
-run logs the fields a real ticket has, to check it against.
+The tests use the response format the API documents; each run logs the fields a real ticket has, to
+check it against.
 
 ## Publish on GitHub Pages
 
@@ -190,21 +185,20 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   says where a trip connects, but not for how long; the search links show that. A ticket's link
   lists its flights in a format Aviasales does not document, so where a trip connects can go
   missing should the format change.
-- Prices are economy fares, the only cabin the API gives, one for each person picked, all as adults,
-  and may differ from what a booking finally costs. Bag fees are the cheapest price online in
-  advance, from the airlines' own pages for Jeju Air, Trinity, Air Seoul, Eastar Jet, Aero K, HK
-  Express and ZIPAIR (whose won price out of Incheon the page also takes for the way back, charged
-  in yen, and marks 약), and from a travel blog for Tigerair Taiwan, converted from Taiwan dollars,
-  and for Jeju Air to Vietnam and Thailand. Peach, Air Busan, Scoot, Vietjet, Thai Vietjet, Thai
-  AirAsia X, United, China Eastern, China Southern, Philippine Airlines and Malaysia Airlines
-  published none that could be found, nor Eastar Jet to Taiwan or Hong Kong and Air Seoul to Guam,
-  so they take the usual fee, Jeju Air's and Trinity's, which the page marks 약. An airline may
-  charge more for a bag bought late: Air Seoul 5,000 won more within 48 hours of departure, HK
-  Express 72,000 won after booking. A second bag for one person is charged the same as the first,
-  though an airline may charge more. A connecting fare pays the bag fee of the airline Aviasales
-  names for it, once each way, though separate tickets on two airlines may each charge for the bag.
-  A fare with a checked bag counts as including one for each person. Of the airlines that always
-  include one, Korean Air, Asiana, Jin Air, Parata Air and Air Premia say so on their own pages, and
-  the airlines added for Vietnam, Bangkok, Guam and Saipan were checked only through search results;
-  JAL and ANA have given two in economy, and ANA's Basic fares, sold on some routes since November
-  2024, can include none.
+- Prices are economy fares, one for each person picked, all as adults, and may differ from what a
+  booking finally costs. Bag fees are the cheapest price online in advance, from the airlines' own
+  pages for Jeju Air, Trinity, Air Seoul, Eastar Jet, Aero K, HK Express and ZIPAIR (whose won price
+  out of Incheon the page also takes for the way back, charged in yen, and marks 약), and from a
+  travel blog for Tigerair Taiwan, converted from Taiwan dollars, and for Jeju Air to Vietnam and
+  Thailand. Peach, Air Busan, Scoot, Vietjet, Thai Vietjet, Thai AirAsia X, United, China Eastern,
+  China Southern, Philippine Airlines and Malaysia Airlines published none that could be found, nor
+  Eastar Jet to Taiwan or Hong Kong and Air Seoul to Guam, so they take the usual fee, Jeju Air's
+  and Trinity's, which the page marks 약. An airline may charge more for a bag bought late: Air Seoul
+  5,000 won more within 48 hours of departure, HK Express 72,000 won after booking. A second bag for
+  one person is charged the same as the first, though an airline may charge more. A connecting fare
+  pays the bag fee of the airline Aviasales names for it, once each way, though separate tickets on
+  two airlines may each charge for the bag. A fare with a checked bag counts as including one for
+  each person. Of the airlines that always include one, Korean Air, Asiana, Jin Air, Parata Air and
+  Air Premia say so on their own pages, and the airlines added for Vietnam, Bangkok, Guam and Saipan
+  were checked only through search results; JAL and ANA have given two in economy, and ANA's Basic
+  fares, sold on some routes since November 2024, can include none.
