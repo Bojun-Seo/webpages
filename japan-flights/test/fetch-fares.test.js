@@ -161,6 +161,11 @@ test('the link of a real ticket lists its ways out and back, and so says where i
       + '17930190001793044200000420NRTKOJICN_ed75cbc3f2cf3ba1c32033b311ad3ba2_23920&search_date=09102026'
       + '&static_fare_key=TY%7CP1%7CH1%7CL0%7CCH0%7CR0%7CTBC0&origin_airports=0,1&destination_airports=0,1' });
   assert.deepEqual(connections(through), [['KIX'], ['KOJ']]);
+  // Peach to Haneda, and back from Haneda to Kobe, then from Kansai: one connection that changes airports.
+  const change = ticket({ airline: 'MM', destination: 'TYO', destination_airport: 'HND', return_transfers: 1,
+    link: '/search/ICN2510HND29101?t=MM17929686001792976100000125ICNHND17932584001793281800000390HNDUKBKIXICN'
+      + '_635a3012c0e3b1b1ee11b556ad39cdfe_38201&static_fare_key=TY%7CP0%7CH1%7CL0%7CCH0%7CR0%7CTBC0' });
+  assert.deepEqual(connections(change), [[], ['UKB', 'KIX']]);
 });
 
 // A link that lists a ticket's ways as a real one does: each the Unix times it leaves and lands, its

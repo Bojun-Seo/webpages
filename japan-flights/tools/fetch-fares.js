@@ -187,9 +187,12 @@ const WAY = new RegExp(`${AIRLINE}?\\d{26}((?:[A-Z]{3}){2,})`, 'g');
 
 // The airports a ticket connects at, on the way out and on the way back,
 // from the ways its link lists: [["KIX"], []] for one connection out at
-// Kansai. Null when the link does not list a way out and a way back, they
-// do not make as many connections as the ticket says, or the way out does
-// not end where the ticket goes.
+// Kansai. A connection that changes airports lists both, the one the
+// flight lands at and the one the next leaves from: "HNDUKBKIXICN" for
+// Haneda to Kobe, then from Kansai to Incheon. Null when the link does
+// not list a way out and a way back, they pass fewer airports or more than
+// the ticket's connections can, or the way out does not end where the
+// ticket goes.
 export function connections(t) {
   const query = String(t.link || '').split('?')[1];
   const listed = ((query && new URLSearchParams(query).get('t')) || '').split('_')[0];
@@ -197,7 +200,8 @@ export function connections(t) {
   const ways = [...listed.matchAll(WAY)].map((match) => match[1].match(/.{3}/g));
   if (ways.length !== 2) return null;
   const [out, back] = ways.map((airports) => airports.slice(1, -1));
-  if (out.length !== (t.transfers || 0) || back.length !== (t.return_transfers || 0)) return null;
+  const fits = (between, connections) => between.length >= connections && between.length <= 2 * connections;
+  if (!fits(out, t.transfers || 0) || !fits(back, t.return_transfers || 0)) return null;
   if (t.destination_airport && ways[0].at(-1) !== t.destination_airport) return null;
   return [out, back];
 }
