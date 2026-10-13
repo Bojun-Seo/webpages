@@ -258,6 +258,38 @@ export async function query(route, departMonth, returnMonth, token, wait = sleep
   }
 }
 
+// An experiment, to come out once its log is read: whether the API's
+// latest-prices method, which takes a cabin as `trip_class` (1 business,
+// 2 first) where prices_for_dates takes none, knows business and first
+// fares for a few busy routes, and what it gives for one.
+const LATEST = 'https://api.travelpayouts.com/v2/prices/latest';
+const PROBED = [['ICN', 'NRT'], ['ICN', 'KIX'], ['ICN', 'BKK'], ['ICN', 'DAD'], ['GMP', 'HND']];
+
+async function probeCabins(token) {
+  for (const [origin, destination] of PROBED) {
+    for (const tripClass of [1, 2]) {
+      await sleep(PAUSE_MS);
+      const asked = `Cabin probe ${origin}-${destination} trip_class ${tripClass}`;
+      try {
+        const url = new URL(LATEST);
+        url.search = new URLSearchParams({
+          origin, destination, period_type: 'year', one_way: 'false', currency: 'krw', limit: '30', sorting: 'price',
+          trip_class: String(tripClass),
+        });
+        const res = await fetch(url, { headers: { 'X-Access-Token': token } });
+        const body = res.ok ? await res.json() : null;
+        const prices = Array.isArray(body?.data) ? body.data : [];
+        const inClass = prices.filter((p) => p.trip_class === tripClass);
+        const cheapest = inClass[0] || prices[0];
+        console.log(`${asked}: HTTP ${res.status}, ${prices.length} prices, ${inClass.length} in that cabin`
+          + (cheapest ? `; the cheapest: ${JSON.stringify(cheapest)}` : ''));
+      } catch (error) {
+        console.log(`${asked}: ${error.message}`);
+      }
+    }
+  }
+}
+
 async function main(argv) {
   const here = (path) => fileURLToPath(new URL(path, import.meta.url));
   const { values } = parseArgs({
@@ -349,6 +381,7 @@ async function main(argv) {
     + `from ${ok} queries (${failed} failed) to ${values.out}; left out ${late} whose flight out lands late.`);
   if (unread) console.log(`A connecting ticket's link that does not say where: ${unread}`);
   console.log(`Checked bags, by airline (none/included/not said): ${bagTally(fares) || 'no fares'}.`);
+  if (refused < REFUSED_IN_A_ROW) await probeCabins(token);
   return ok === 0 ? 1 : 0;
 }
 
