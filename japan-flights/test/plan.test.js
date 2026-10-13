@@ -473,8 +473,7 @@ test('months run from this one to the end of the last known schedule', () => {
 test('search links carry the route and both dates', () => {
   const links = Object.fromEntries(
     searchLinks(route('ICN-OIT'), '2026-12-25', '2026-12-27').map((l) => [l.name, l.url]));
-  assert.equal(links['네이버'],
-    'https://flight.naver.com/flights/international/ICN-OIT-20261225/OIT-ICN-20261227?adult=1&fareType=Y');
+  assert.deepEqual(Object.keys(links), ['Google', '스카이스캐너', '카약']);
   assert.equal(links['스카이스캐너'], 'https://www.skyscanner.co.kr/transport/flights/icn/oit/261225/261227/'
     + '?adultsv2=1&cabinclass=economy&rtn=1&preferdirects=true');
   assert.match(links.Google, /q=Flights%20from%20ICN%20to%20OIT%20on%202026-12-25%20through%202026-12-27/);
@@ -491,17 +490,15 @@ test('search links carry the route and both dates', () => {
 test('search links ask for the cabin of the fare', () => {
   const links = Object.fromEntries(
     searchLinks(route('ICN-OIT'), '2026-12-25', '2026-12-27', { cabin: 'business' }).map((l) => [l.name, l.url]));
-  assert.match(links['네이버'], /fareType=C$/);
   assert.match(links['스카이스캐너'], /cabinclass=business/);
   assert.match(links.Google, /through%202026-12-27%20in%20business%20class/);
   assert.match(links['카약'], /\/2026-12-27\/business\?sort=/);
-  assert.match(searchLinks(route('ICN-OIT'), '2026-12-25', '2026-12-27', { cabin: 'first' })[0].url, /fareType=F$/);
+  assert.match(searchLinks(route('ICN-OIT'), '2026-12-25', '2026-12-27', { cabin: 'first' })[1].url, /cabinclass=first/);
 });
 
 test('search links ask for as many adults as there are people', () => {
   const links = Object.fromEntries(
     searchLinks(route('ICN-OIT'), '2026-12-25', '2026-12-27', { cabin: 'business', people: 2 }).map((l) => [l.name, l.url]));
-  assert.match(links['네이버'], /\?adult=2&/);
   assert.match(links['스카이스캐너'], /\?adultsv2=2&/);
   assert.match(links.Google, /in%20business%20class%20for%202%20adults&/);
   assert.match(links['카약'], /\/2026-12-27\/business\/2adults\?sort=/);

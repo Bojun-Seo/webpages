@@ -394,13 +394,7 @@ export function searchLinks(route, depart, ret, {
   const query = `Flights from ${from} to ${to} on ${depart} through ${ret}`
     + (cabin === 'economy' ? '' : ` in ${cabin} class`)
     + (people === 1 ? '' : ` for ${people} adults`);
-  const fareType = { economy: 'Y', business: 'C', first: 'F' }[cabin];
   return [
-    {
-      name: '네이버',
-      url: `https://flight.naver.com/flights/international/${from}-${to}-${compact(depart)}/`
-        + `${to}-${from}-${compact(ret)}?adult=${people}&fareType=${fareType}`,
-    },
     {
       name: 'Google',
       url: `https://www.google.com/travel/flights?q=${encodeURIComponent(query)}&hl=ko&gl=kr&curr=KRW`,
