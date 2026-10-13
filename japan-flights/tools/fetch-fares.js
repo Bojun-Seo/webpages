@@ -297,7 +297,11 @@ async function main(argv) {
     },
   });
   const token = process.env.TRAVELPAYOUTS_TOKEN;
-  const write = (doc) => writeFile(values.out, `${JSON.stringify(doc, null, 1)}\n`);
+  // The partner marker that credits the bookings the page's Aviasales links
+  // bring, if set. Every write takes it from here, even one that keeps the
+  // fares fetched before, and leaves it out when it is not set.
+  const marker = process.env.TRAVELPAYOUTS_MARKER || undefined;
+  const write = (doc) => writeFile(values.out, `${JSON.stringify({ ...doc, marker }, null, 1)}\n`);
   if (!token) {
     await write({ updated: null, fares: [] });
     console.log('TRAVELPAYOUTS_TOKEN is not set; wrote no live fares.');

@@ -192,7 +192,7 @@ function tripRow(trip) {
     price,
     el('div', { class: 'links' },
       searchLinks(route, trip.depart, trip.return, {
-        airline: trip.airline, people: state.party.people, nonstop: !stops,
+        airline: trip.airline, people: state.party.people, nonstop: !stops, marker: data.marker,
       }).map((l) => link(l.url, l.name))));
 }
 
@@ -296,6 +296,8 @@ async function main() {
     today,
     byId: new Map(routes.map((r) => [r.id, r])),
     places: new Map(routes.map((r) => [r.dest, r.city])),
+    // The Travelpayouts partner marker the Aviasales links carry, where the fetch was given one.
+    marker: live?.marker || null,
     months: fareMonths(fares, today),
     fareCount: fares.filter((f) => f.depart >= today).length,
     airlines: [...new Set(fares.filter((f) => f.depart >= today).map((f) => f.airline))]

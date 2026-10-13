@@ -78,6 +78,9 @@ jobs:
         continue-on-error: true
         env:
           TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
+          # The partner marker the page's Aviasales links carry; a variable, not a secret, since
+          # every link shows it.
+          TRAVELPAYOUTS_MARKER: ${{ vars.TRAVELPAYOUTS_MARKER }}
         run: >-
           node japan-flights/tools/fetch-fares.js
           --routes _site/japan-flights/data/routes.json
