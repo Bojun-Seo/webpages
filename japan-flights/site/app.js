@@ -2,8 +2,8 @@
 // The working out lives in plan.js.
 
 import {
-  CABINS, DAY_NAMES, DEFAULT_PARTY, TRIP_NIGHTS, daysBetween, dayOf, lastDayOfMonth, monthsAhead,
-  recommend, routesOf, searchLinks,
+  DAY_NAMES, DEFAULT_PARTY, TRIP_NIGHTS, daysBetween, dayOf, fareMonths, lastDayOfMonth, recommend, routesOf,
+  searchLinks,
 } from './plan.js';
 
 const PAGE_SIZE = 30;
@@ -28,8 +28,6 @@ const AIRLINE_NAMES = {
   HO: '길상항공', '9C': '춘추항공', MF: '샤먼항공', SC: '산둥항공', PR: '필리핀항공', '5J': '세부퍼시픽',
   SQ: '싱가포르항공', MH: '말레이시아항공', AK: '에어아시아', D7: '에어아시아엑스', OD: '바틱에어 말레이시아',
 };
-
-const CABIN_NAMES = { economy: '이코노미', business: '비즈니스' };
 
 function airlineName(code) {
   return AIRLINE_NAMES[code] || code;
@@ -97,7 +95,6 @@ const state = {
   data: null,
   party: DEFAULT_PARTY,
   nights: new Set(),
-  cabins: new Set(),
   cities: new Set(),
   airlines: new Set(),
   trips: [],
@@ -110,13 +107,12 @@ function readFilter() {
   const budget = Number($('budget').value);
   return {
     from: month === 'all' ? data.today : `${month}-01`,
-    to: month === 'all' ? lastDayOfMonth(data.months.at(-1)) : lastDayOfMonth(month),
+    to: month === 'all' ? null : lastDayOfMonth(month),
     nights: state.nights.size ? state.nights : null,
     maxPrice: budget > 0 ? budget * 10000 : null,
     origins: $('origin').value === 'all' ? null : new Set([$('origin').value]),
     cities: state.cities.size ? state.cities : null,
     airlines: state.airlines.size ? state.airlines : null,
-    cabins: state.cabins.size ? state.cabins : null,
     party: { people: Number($('people').value), bags: Number($('bags').value) },
   };
 }
@@ -144,19 +140,14 @@ function tripRow(trip) {
   const route = data.byId.get(trip.route);
   const stops = stopsLabel(trip.stops);
   const badges = [
-    trip.cabin !== 'economy' && el('span', { class: 'badge badge-cabin' }, CABIN_NAMES[trip.cabin]),
     stops && el('span', { class: 'badge badge-stops' }, stops),
     ...trip.holidays.map((name) => el('span', { class: 'badge badge-holiday' }, name)),
     trip.morningArrival && el('span', { class: 'badge' }, trip.lands > trip.return ? '다음 날 오전 도착' : '오전 도착'),
-    route.tag && el('span', { class: 'badge' }, route.tag),
   ];
-  const price = trip.fare
-    ? el('div', { class: 'price' },
-      el('strong', null, won(trip.total)),
-      trip.bag.count > 0 && el('small', { class: 'bag-fee' }, bagLine(trip.bag)),
-      el('span', null, `${airlineName(trip.airline)} · ${seenLabel(trip.fare.seen, data.today)}`))
-    : el('div', { class: 'price price-unknown' }, el('strong', null, '가격 미확인'),
-      el('span', null, `${airlineName(trip.airline)} · 검색 링크로 확인`));
+  const price = el('div', { class: 'price' },
+    el('strong', null, won(trip.total)),
+    trip.bag.count > 0 && el('small', { class: 'bag-fee' }, bagLine(trip.bag)),
+    el('span', null, `${airlineName(trip.airline)} · ${seenLabel(trip.fare.seen, data.today)}`));
   return el('li', { class: 'trip' },
     el('div', { class: 'when' },
       el('span', { class: 'dates' }, `${dayLabel(trip.depart)} → ${dayLabel(trip.return)}`),
@@ -168,27 +159,24 @@ function tripRow(trip) {
     price,
     el('div', { class: 'links' },
       searchLinks(route, trip.depart, trip.return, {
-        airline: trip.airline, cabin: trip.cabin, people: state.party.people, nonstop: !stops,
+        airline: trip.airline, people: state.party.people, nonstop: !stops,
       }).map((l) => link(l.url, l.name))));
 }
 
 function renderTrips() {
   const { data, trips, party } = state;
-  const priced = trips.filter((t) => t.fare).length;
   $('summary').textContent = trips.length
-    ? `조건에 맞는 일정 ${trips.length.toLocaleString('ko-KR')}개 · 가격 확인 ${priced}개 · `
+    ? `조건에 맞는 일정 ${trips.length.toLocaleString('ko-KR')}개 · `
       + `${party.people}명·위탁수하물 ${party.bags ? `${party.bags}개` : '없음'} 기준`
     : '';
   $('price-head').textContent = `${party.people}인 왕복`;
-  const hint = $('hint');
-  hint.hidden = data.fareCount > 0 || trips.length === 0;
-  hint.textContent = '아직 확인된 운임이 없습니다. 일정마다 있는 링크로 실시간 가격을 확인하세요.';
 
   const list = $('trips');
   list.replaceChildren(...trips.slice(0, state.shown).map(tripRow));
   if (trips.length === 0) {
-    list.append(el('li', { class: 'empty' },
-      '조건에 맞는 일정이 없습니다. 출발 시기나 여행 기간을 넓히거나, 다른 도시나 항공사를 골라 보세요.'));
+    list.append(el('li', { class: 'empty' }, data.fareCount > 0
+      ? '조건에 맞는 일정이 없습니다. 출발 시기나 여행 기간을 넓히거나, 다른 도시나 항공사를 골라 보세요.'
+      : '아직 받아 온 운임이 없습니다.'));
   }
   const more = $('more');
   more.hidden = trips.length <= state.shown;
@@ -213,11 +201,6 @@ function renderNights() {
     TRIP_NIGHTS.map((n) => ({ value: n, label: `${n}박` })));
 }
 
-function renderCabins() {
-  renderChips($('cabins'), '모든 좌석', state.cabins,
-    CABINS.map((cabin) => ({ value: cabin, label: CABIN_NAMES[cabin] })));
-}
-
 // One chip per destination airport, whichever Korean airport its routes leave.
 function renderCities() {
   const airports = new Map();
@@ -239,7 +222,6 @@ function update() {
   state.party = filter.party;
   state.trips = recommend(state.data, filter);
   renderNights();
-  renderCabins();
   renderCities();
   renderAirlines();
   renderTrips();
@@ -274,12 +256,10 @@ async function main() {
     baggage,
     today,
     byId: new Map(routes.map((r) => [r.id, r])),
-    months: monthsAhead(routes, today),
+    months: fareMonths(fares, today),
     fareCount: fares.filter((f) => f.depart >= today).length,
-    // Korean Air, whose schedules the page knows, then the airlines with fares.
-    airlines: ['KE', ...[...new Set(fares.filter((f) => f.depart >= today).map((f) => f.airline))]
-      .filter((code) => code !== 'KE')
-      .sort((a, b) => airlineName(a).localeCompare(airlineName(b), 'ko'))],
+    airlines: [...new Set(fares.filter((f) => f.depart >= today).map((f) => f.airline))]
+      .sort((a, b) => airlineName(a).localeCompare(airlineName(b), 'ko')),
   };
 
   $('status').textContent = statusLine(routesDoc, live);
