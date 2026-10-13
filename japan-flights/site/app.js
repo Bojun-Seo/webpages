@@ -252,15 +252,15 @@ function update() {
   renderTrips();
 }
 
-function statusLine(routesDoc, live) {
-  const parts = [`노선 정보 ${routesDoc.updated} 기준`];
-  if (live && live.updated) {
-    const at = new Date(live.updated);
-    parts.push(`실시간 운임 ${live.fares.length}건 (${at.getMonth() + 1}.${at.getDate()} 갱신)`);
-  } else if (live) {
-    parts.push('실시간 운임 미설정');
-  }
-  return parts.join(' · ');
+// How many fares there are and when they were fetched, in the viewer's
+// time: "실시간 운임 742건 (10.13 06:41 갱신)".
+function statusLine(live) {
+  if (!live) return '운임을 불러오지 못했습니다.';
+  if (!live.updated) return '실시간 운임 미설정';
+  const at = new Date(live.updated);
+  const pad = (n) => String(n).padStart(2, '0');
+  const time = `${pad(at.getHours())}:${pad(at.getMinutes())}`;
+  return `실시간 운임 ${live.fares.length.toLocaleString('ko-KR')}건 (${at.getMonth() + 1}.${at.getDate()} ${time} 갱신)`;
 }
 
 async function main() {
@@ -288,7 +288,7 @@ async function main() {
       .sort((a, b) => airlineName(a).localeCompare(airlineName(b), 'ko')),
   };
 
-  $('status').textContent = statusLine(routesDoc, live);
+  $('status').textContent = statusLine(live);
   $('month').replaceChildren(
     el('option', { value: 'all' }, '전체 기간'),
     ...state.data.months.map((m) => el('option', { value: m }, monthLabel(m))));
