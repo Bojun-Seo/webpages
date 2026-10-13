@@ -1,14 +1,11 @@
 # Short-Haul Flights
 
 A static page that recommends round trips, nonstop or with one connection each way, from Incheon,
-Gimpo and Cheongju to Japan, Taiwan, Hong Kong, Macau, Vietnam, Bangkok, Guam and Saipan: Tokyo,
-Osaka, Fukuoka and the other main Japanese cities, regional airports such as Oita, Hiroshima and
-Aomori, Taipei, Taichung, Kaohsiung, Hong Kong, Macau, every Vietnamese city with an airport,
-Bangkok's two airports, Guam and Saipan. Its trips are those the fares Aviasales users found in the
-last 48 hours give. It counts the days of leave each trip takes against a Monday, Tuesday and
-Thursday work week and Korean public holidays, offers only the trips that take none, without showing
-the count, and lists them cheapest first, with Korean Air and Asiana given a head start. GitHub
-Pages serves it; there is no server.
+Gimpo and Cheongju to Japan, Taiwan, Hong Kong, Macau, Vietnam, Thailand, Guam and Saipan, from the
+fares Aviasales users found in the last 48 hours. It counts the days of leave each trip takes
+against a Monday, Tuesday and Thursday work week and Korean public holidays, offers only the trips
+that take none, without showing the count, and lists them cheapest first, with Korean Air and Asiana
+given a head start. GitHub Pages serves it; there is no server.
 
 The page is in Korean. It is not affiliated with any airline.
 
