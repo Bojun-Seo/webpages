@@ -178,19 +178,31 @@ const listing = (...ways) => '/search/ICN1311OIT15111?t='
 
 test('a connecting fare names the airports it connects at, where its link lists its ways', () => {
   const nonstop = ticket({ link: listing(['7C', 'ICN', 'OIT'], ['7C', 'OIT', 'ICN']) });
-  const out = ticket({ transfers: 1, price: 180000, link: listing(['MU', 'ICN', 'PVG', 'OIT'], ['KE', 'OIT', 'ICN']) });
+  const out = ticket({ transfers: 1, price: 180000, link: listing(['CI', 'ICN', 'TPE', 'OIT'], ['KE', 'OIT', 'ICN']) });
   const both = ticket({ transfers: 1, return_transfers: 1, price: 170000,
-    link: listing(['9C', 'ICN', 'PVG', 'OIT'], ['D7', 'OIT', 'TPE', 'ICN']) });
-  assert.deepEqual(connections(out), [['PVG'], []]);
-  assert.deepEqual(connections(both), [['PVG'], ['TPE']]);
+    link: listing(['CX', 'ICN', 'HKG', 'OIT'], ['D7', 'OIT', 'TPE', 'ICN']) });
+  assert.deepEqual(connections(out), [['TPE'], []]);
+  assert.deepEqual(connections(both), [['HKG'], ['TPE']]);
   assert.deepEqual(pickFares({ success: true, data: [nonstop, out, both] }, oita).map((f) => f.via),
-    [undefined, [['PVG'], []], [['PVG'], ['TPE']]]);
+    [undefined, [['TPE'], []], [['HKG'], ['TPE']]]);
   // Ways that make other connections than the ticket says, a way out that ends elsewhere, or none
   // listed say nothing.
   assert.equal(connections(ticket({ transfers: 1, link: nonstop.link })), null);
   assert.equal(connections(ticket({ transfers: 1, link: listing(['MU', 'ICN', 'PVG', 'TPE'], ['CI', 'OIT', 'ICN']) })),
     null);
   assert.equal(connections(ticket({ transfers: 1 })), null);
+});
+
+test('a ticket on a mainland Chinese airline does not count, by its own airline or one its link names', () => {
+  // Jeju Air out, and China Eastern back through Shanghai.
+  const back = ticket({ airline: '7C', return_transfers: 1,
+    link: listing(['7C', 'ICN', 'OIT'], ['MU', 'OIT', 'PVG', 'ICN']) });
+  assert.deepEqual([ticket({ airline: 'MU' }), back, ticket({ airline: '9C', transfers: 1 })].map((t) => leftOut(t, oita)),
+    ['china', 'china', 'china']);
+  // China Airlines is Taiwan's, and Hong Kong Airlines Hong Kong's.
+  const kept = [ticket({ airline: 'CI' }), ticket({ airline: 'HX', link: listing(['HX', 'ICN', 'OIT'], ['HX', 'OIT', 'ICN']) })];
+  assert.deepEqual(kept.map((t) => leftOut(t, oita)), [null, null]);
+  assert.deepEqual(pickFares({ success: true, data: [back, ...kept] }, oita).map((f) => f.airline), ['CI', 'HX']);
 });
 
 test('the cheapest fare with a checked bag is kept apart from the cheapest without', () => {
@@ -291,9 +303,11 @@ test('when the API answers no query, the fares fetched before stay as they were,
 test('when the API answers some queries, the fares fetched before stand in for the others', () => {
   const today = localDate(new Date().toISOString());
   const ret = addDays(today, 2);
+  // The China Eastern fare was fetched before the page left out mainland Chinese airlines.
   const previous = { updated: '2026-10-12T21:40:00.000Z', source: 'Aviasales', fares: [
     { route: 'ICN-NRT', airline: '7C', depart: today, return: ret, price: 99000 },
-    { route: 'ICN-KIX', airline: 'MM', depart: today, return: ret, price: 120000 }] };
+    { route: 'ICN-KIX', airline: 'MM', depart: today, return: ret, price: 120000 },
+    { route: 'ICN-KIX', airline: 'MU', depart: today, return: ret, price: 110000 }] };
   // Narita answers with a fare; Kansai fails.
   const narita = `(url) => url.searchParams.get('destination') === 'KIX'
     ? { ok: false, status: 500, headers: { get: () => null } }
