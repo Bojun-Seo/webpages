@@ -69,7 +69,9 @@ export function monthsFrom(today, count) {
 // when the flight back lands in Korea, with `lands` for its day when that
 // is not the day it left, as for a flight that leaves late at night.
 // `bags` is the checked bags the fare includes for each person, 0 for
-// none, where the ticket's link says.
+// none, where the ticket's link says, and `via` the airports a connecting
+// fare connects at on the way out and on the way back, where it lists its
+// flights.
 export function pickFares(response, route) {
   if (!response || response.success === false || !Array.isArray(response.data)) return [];
   const abroad = route.utcOffset ?? KOREA;
@@ -77,6 +79,7 @@ export function pickFares(response, route) {
     .filter((t) => !leftOut(t, route))
     .map((t) => {
       const bags = checkedBags(t.link);
+      const via = t.transfers || t.return_transfers ? connections(t) : null;
       const fare = {
         route: route.id,
         airline: t.airline,
@@ -86,6 +89,7 @@ export function pickFares(response, route) {
         departs: localTime(t.departure_at),
         ...(t.transfers || t.return_transfers ? { stops: [t.transfers || 0, t.return_transfers || 0] } : {}),
         ...(bags == null ? {} : { bags }),
+        ...(via ? { via } : {}),
       };
       if (Number.isFinite(t.duration_to)) {
         const there = landing(t.departure_at, t.duration_to);
@@ -158,6 +162,34 @@ export function checkedBags(link) {
   return part === 'L0' ? 0 : Number(part.split('_')[1] || 1);
 }
 
+// The flights a ticket's link lists in `t`, out first, then back, before a
+// hash and the price: each the Unix times it leaves and lands, its minutes
+// in the air and the airports it flies from and to, after its airline's
+// code where that is not the one before's, as in
+// "7C17923068001792312500000095ICNMYJ17925753001792581300000100MYJICN".
+// An airline's code is never two digits, so it cannot be mistaken for the
+// start of the times.
+const AIRLINE = '(?:[A-Z][A-Z0-9]|\\d[A-Z])';
+const FLIGHTS = new RegExp(`^(?:${AIRLINE}?\\d{26}[A-Z]{6})+$`);
+const FLIGHT = new RegExp(`${AIRLINE}?\\d{26}([A-Z]{3})([A-Z]{3})`, 'g');
+
+// The airports a ticket connects at, on the way out and on the way back,
+// from the flights its link lists: [["PVG"], []] for one connection out at
+// Shanghai. Null when the link does not list as many flights as the
+// ticket's connections make, or the flights out do not end where the
+// ticket goes.
+export function connections(t) {
+  const query = String(t.link || '').split('?')[1];
+  const listed = ((query && new URLSearchParams(query).get('t')) || '').split('_')[0];
+  if (!FLIGHTS.test(listed)) return null;
+  const flights = [...listed.matchAll(FLIGHT)].map((match) => ({ from: match[1], to: match[2] }));
+  const out = (t.transfers || 0) + 1;
+  if (flights.length !== out + (t.return_transfers || 0) + 1) return null;
+  if (t.destination_airport && flights[out - 1].to !== t.destination_airport) return null;
+  const via = (legs) => legs.slice(0, -1).map((leg) => leg.to);
+  return [via(flights.slice(0, out)), via(flights.slice(out))];
+}
+
 // How many `fares` there are, with their airlines, for the log:
 // "12 fares (7C, KE)".
 function tally(fares) {
@@ -223,6 +255,9 @@ async function main(argv) {
   // so the log names the fields a real ticket has, once a run, and the
   // airlines of each route's fares.
   let shown = false;
+  // A connecting ticket whose link does not list where it connects, to
+  // show in the log what such a link looks like.
+  let unread = null;
   for (const route of routes) {
     const before = fares.length;
     const counts = { tickets: 0, others: {}, connections: 0, incomplete: 0, nights: 0, late: 0 };
@@ -248,6 +283,7 @@ async function main(argv) {
             const why = leftOut(t, route);
             if (why && why.includes('-')) counts.others[why] = (counts.others[why] || 0) + 1;
             else if (why) counts[why]++;
+            else if (!unread && (t.transfers || t.return_transfers) && !connections(t)) unread = t.link;
           }
           for (const fare of pickFares(response, route)) {
             if (!TRIP_NIGHTS.includes(daysBetween(fare.depart, fare.return))) counts.nights++;
@@ -267,8 +303,11 @@ async function main(argv) {
 
   fares = keepCheapest(fares);
   await write({ updated: new Date().toISOString(), source: 'Aviasales', fares });
-  console.log(`Wrote ${tally(fares)}, ${fares.filter((f) => f.stops).length} of them connecting, `
+  const connecting = fares.filter((f) => f.stops);
+  console.log(`Wrote ${tally(fares)}, ${connecting.length} of them connecting, `
+    + `${connecting.filter((f) => f.via).length} of those saying where, `
     + `from ${ok} queries (${failed} failed) to ${values.out}; left out ${late} whose flight out lands late.`);
+  if (unread) console.log(`A connecting ticket's link that does not say where: ${unread}`);
   console.log(`Checked bags, by airline (none/included/not said): ${bagTally(fares) || 'no fares'}.`);
   return ok === 0 ? 1 : 0;
 }

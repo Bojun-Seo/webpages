@@ -32,6 +32,35 @@ function airlineName(code) {
   return AIRLINE_NAMES[code] || code;
 }
 
+// Names for the airports trips connect at that are not destinations, whose
+// names routes.json gives; any other shows its code alone.
+const AIRPORT_NAMES = {
+  ICN: '인천', GMP: '김포', CJJ: '청주', CJU: '제주', PUS: '부산', TAE: '대구', ITM: '오사카 이타미',
+  PVG: '상하이 푸둥', SHA: '상하이 훙차오', PEK: '베이징 서우두', PKX: '베이징 다싱', TSN: '톈진', CAN: '광저우',
+  SZX: '선전', XMN: '샤먼', FOC: '푸저우', TAO: '칭다오', TNA: '지난', YNT: '옌타이', WEH: '웨이하이', DLC: '다롄',
+  SHE: '선양', HRB: '하얼빈', YNJ: '옌지', CGO: '정저우', NKG: '난징', HGH: '항저우', WUH: '우한', CSX: '창사',
+  CTU: '청두 솽류', TFU: '청두 톈푸', CKG: '충칭', KMG: '쿤밍', NNG: '난닝', HAK: '하이커우', SYX: '싼야',
+  MNL: '마닐라', CRK: '클라크', CEB: '세부', KUL: '쿠알라룸푸르', BKI: '코타키나발루', SIN: '싱가포르',
+  CGK: '자카르타', DPS: '발리', HKT: '푸껫', CNX: '치앙마이', PNH: '프놈펜', VTE: '비엔티안', RGN: '양곤',
+  UBN: '울란바토르', HNL: '호놀룰루', ROR: '팔라우',
+};
+
+function airportName(code) {
+  const name = AIRPORT_NAMES[code] || state.data.places.get(code);
+  return name ? `${name}(${code})` : code;
+}
+
+// Where a trip connects, from the airports its fare names (`via`): "갈 때
+// 상하이 푸둥(PVG), 올 때 타이베이 타오위안(TPE) 경유", or "왕복 ... 경유" for
+// the same both ways. Null for a fare that does not say.
+function viaLabel(via) {
+  if (!via) return null;
+  const [out, back] = via.map((airports) => airports.map(airportName).join('·'));
+  if (out && out === back) return `왕복 ${out} 경유`;
+  const ways = [out && `갈 때 ${out}`, back && `올 때 ${back}`].filter(Boolean);
+  return ways.length ? `${ways.join(', ')} 경유` : null;
+}
+
 const $ = (id) => document.getElementById(id);
 
 function el(tag, props, ...children) {
@@ -136,7 +165,7 @@ function tripRow(trip) {
   const morning = trip.lands > trip.return ? '다음 날 오전 도착' : '오전 도착';
   // A mark that says more on hover gives it as its title.
   const badges = [
-    stops && el('span', { class: 'badge badge-stops' }, stops),
+    stops && el('span', { class: 'badge badge-stops', title: viaLabel(trip.fare.via) }, stops),
     ...trip.holidays.map((name) => el('span', { class: 'badge badge-holiday' }, name)),
     trip.morningArrival && el('span', { class: 'badge', title: `${trip.fare.arrives} 도착` }, morning),
   ];
@@ -252,6 +281,7 @@ async function main() {
     baggage,
     today,
     byId: new Map(routes.map((r) => [r.id, r])),
+    places: new Map(routes.map((r) => [r.dest, r.city])),
     months: fareMonths(fares, today),
     fareCount: fares.filter((f) => f.depart >= today).length,
     airlines: [...new Set(fares.filter((f) => f.depart >= today).map((f) => f.airline))]

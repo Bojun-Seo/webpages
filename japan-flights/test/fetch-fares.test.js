@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  bagTally, checkedBags, keepCheapest, leftOut, localDate, localTime, monthsFrom, pickFares,
+  bagTally, checkedBags, connections, keepCheapest, leftOut, localDate, localTime, monthsFrom, pickFares,
 } from '../tools/fetch-fares.js';
 
 const oita = { id: 'ICN-OIT', origin: 'ICN', dest: 'OIT' };
@@ -134,7 +134,8 @@ test('a connecting fare, and one back by noon or on another day, is kept apart f
 });
 
 // The link of a real ticket, which says in its static_fare_key what the fare includes.
-const link = (bags) => '/search/ICN1410NRT22101?t=TW17920086001792017600000150ICNNRT_09b1_14980'
+const link = (bags) => '/search/ICN1410NRT22101'
+  + '?t=TW17920086001792017600000150ICNNRT17927055001792715100000160NRTICN_09b109b912e1556e10d7a64a938bcc92_14980'
   + `&static_fare_key=TY%7CP1_JW%7CH1%7C${bags}%7CCH0%7CR0%7CTBC1&expected_price_currency=krw`;
 
 test('the link of a ticket tells whether its fare includes a checked bag', () => {
@@ -148,6 +149,39 @@ test('the link of a ticket tells whether its fare includes a checked bag', () =>
   const fares = pickFares(response, oita);
   assert.deepEqual(fares.map((f) => f.bags), [0, 1, undefined]);
   assert.equal(bagTally([...fares, { airline: '7C', bags: 0 }]), '7C 1/0/0, KE 1/1/1');
+});
+
+test("the link of a real ticket lists its flights, out and back, and so says where it connects", () => {
+  const toNarita = ticket({ destination: 'TYO', destination_airport: 'NRT', link: link('L0') });
+  assert.deepEqual(connections(toNarita), [[], []]);
+});
+
+// A link that lists a ticket's flights as a real one does: each the Unix times it leaves and lands,
+// its minutes in the air and its airports, after its airline's code where that changes.
+const listing = (...flights) => '/search/ICN1311OIT15111?t='
+  + flights.map(([airline, from, to], i) => `${i > 0 && flights[i - 1][0] === airline ? '' : airline}`
+    + `17923068001792312500000095${from}${to}`).join('')
+  + '_e44efbf0187589ac43b5421875bdebd7_25135';
+
+test('a connecting fare names the airports it connects at, where its link lists its flights', () => {
+  const nonstop = ticket({ link: listing(['7C', 'ICN', 'OIT'], ['7C', 'OIT', 'ICN']) });
+  const out = ticket({ transfers: 1, price: 180000,
+    link: listing(['MU', 'ICN', 'PVG'], ['MU', 'PVG', 'OIT'], ['KE', 'OIT', 'ICN']) });
+  const both = ticket({ transfers: 1, return_transfers: 1, price: 170000,
+    link: listing(['9C', 'ICN', 'PVG'], ['9C', 'PVG', 'OIT'], ['CI', 'OIT', 'TPE'], ['CI', 'TPE', 'ICN']) });
+  assert.deepEqual(connections(out), [['PVG'], []]);
+  assert.deepEqual(connections(both), [['PVG'], ['TPE']]);
+  assert.deepEqual(pickFares({ success: true, data: [nonstop, out, both] }, oita).map((f) => f.via),
+    [undefined, [['PVG'], []], [['PVG'], ['TPE']]]);
+  // An airline's code before every flight reads the same.
+  const every = '/search/ICN1311OIT15111?t=MU17923068001792312500000095ICNPVGMU17923068001792312500000095PVGOIT'
+    + 'KE17923068001792312500000095OITICN_e44efbf0187589ac43b5421875bdebd7_25135';
+  assert.deepEqual(connections(ticket({ transfers: 1, link: every })), [['PVG'], []]);
+  // Too few flights for the connections, flights out that end elsewhere, or none listed say nothing.
+  assert.equal(connections(ticket({ transfers: 1, link: nonstop.link })), null);
+  assert.equal(connections(ticket({ transfers: 1,
+    link: listing(['MU', 'ICN', 'PVG'], ['MU', 'PVG', 'TPE'], ['CI', 'OIT', 'ICN']) })), null);
+  assert.equal(connections(ticket({ transfers: 1 })), null);
 });
 
 test('the cheapest fare with a checked bag is kept apart from the cheapest without', () => {
