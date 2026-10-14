@@ -12,6 +12,8 @@ const holidays = data('holidays.json').dates;
 const route = (id) => routes.find((r) => r.id === id);
 const today = '2026-10-11';
 const december = { from: '2026-12-01', to: '2026-12-31', nights: new Set([2, 3]) };
+// One person with one bag, for the tests that price a fare for one.
+const one = { people: 1, bags: 1 };
 
 test('dates step across months and years', () => {
   assert.equal(addDays('2026-12-31', 1), '2027-01-01');
@@ -236,7 +238,7 @@ test('a trip gets a nonstop row and a connecting row, each with its cheapest far
 test('the airlines of the three alliances rank 50,000 won lower for each person', () => {
   const fare = (airline, price, depart) => ({ route: 'ICN-OIT', airline, depart, return: addDays(depart, 2),
     price });
-  const order = (fares, party) => recommend({ routes, holidays, today, fares }, { ...december, party })
+  const order = (fares, party = one) => recommend({ routes, holidays, today, fares }, { ...december, party })
     .map((t) => `${t.airline} ${t.total} ${t.rank}`);
   // Trinity at 330,000 and Korean Air at 360,000 for the same days: Korean Air's fare is the one shown.
   assert.deepEqual(order([fare('TW', 330000, '2026-12-25'), fare('KE', 360000, '2026-12-25')]),
@@ -312,7 +314,8 @@ test('a fare without a checked bag costs a bag each way, and the cheapest all in
   const baggage = { usual: { JP: 45000 }, airlines: {} };
   const fare = (airline, price, bags) => ({ route: 'ICN-NRT', airline, depart: '2026-11-20', return: '2026-11-22',
     price, ...(bags === 0 ? { bags } : {}) });
-  const november = { from: '2026-11-01', to: '2026-11-30', cities: new Set(['NRT']), origins: new Set(['ICN']) };
+  const november = { from: '2026-11-01', to: '2026-11-30', cities: new Set(['NRT']), origins: new Set(['ICN']),
+    party: one };
   const row = (fares, filter = november) => recommend({ routes, fares, holidays, today, baggage }, filter)
     .find((t) => t.depart === '2026-11-20' && t.return === '2026-11-22');
   // Peach without a bag, 120,000 and 2 × 45,000, comes to 210,000 and beats Jeju Air's 230,000 with one.
@@ -359,6 +362,8 @@ test('a party pays a fare each and the fee for each bag its fares do not include
   assert.deepEqual(offer(row({ people: 3, bags: 1 })), ['MM', 450000, 1]);
   // No bag at all: the cheaper fare as it is.
   assert.deepEqual(offer(row({ people: 1, bags: 0 })), ['MM', 120000, 0]);
+  // Unless picked otherwise, two people share one bag: Jeju Air's 2 × 155,000 beats Peach's 2 × 120,000 and 90,000.
+  assert.deepEqual(offer(row(undefined)), ['7C', 310000, 0]);
   // The budget holds the party's total.
   assert.equal(row({ people: 3, bags: 1 }, { ...november, maxPrice: 449999 }), undefined);
   assert.equal(row({ people: 3, bags: 1 }, { ...november, maxPrice: 450000 }).total, 450000);
@@ -380,7 +385,7 @@ test('the budget holds the total, and a trip that takes leave is left out howeve
   const ctx = { routes, fares, holidays, today };
   // Friday to Sunday takes no leave; Monday to Wednesday does.
   assert.deepEqual(recommend(ctx, december).map((t) => t.depart), ['2026-12-18', '2026-12-25']);
-  assert.deepEqual(recommend(ctx, { ...december, maxPrice: 250000 }).map((t) => t.depart), ['2026-12-18']);
+  assert.deepEqual(recommend(ctx, { ...december, party: one, maxPrice: 250000 }).map((t) => t.depart), ['2026-12-18']);
 });
 
 test('the trips that already left are not offered, and with no end every fare ahead is', () => {

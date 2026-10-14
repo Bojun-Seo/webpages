@@ -22,8 +22,8 @@ The page is in Korean. It is not affiliated with any airline.
 ## What it does
 
 For the departure month, trip length, budget, Korean airport, destinations, alliances and airlines
-the visitor picks, the number of people and of checked bags between them, one each unless picked,
-and the days off the visitor adds, the page:
+the visitor picks, the number of people and of checked bags between them, two people with one bag
+unless picked, and the days off the visitor adds, the page:
 
 1. lists the round trips of two to six nights, or of the lengths picked among them, that a fare of
    one of the airlines picked gives, nonstop or with one connection on the way out, back or both;
