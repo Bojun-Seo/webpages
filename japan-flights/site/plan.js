@@ -139,9 +139,9 @@ export function bagsIncluded(fare, country, baggage) {
   return fare.bags === 0 && !alwaysIncludesBag(fare.airline, country, baggage) ? 0 : 1;
 }
 
-// Whom the page prices a trip for when not told otherwise: one person
-// checking one bag.
-export const DEFAULT_PARTY = { people: 1, bags: 1 };
+// Whom the page prices a trip for when not told otherwise: two people
+// checking one bag between them.
+export const DEFAULT_PARTY = { people: 2, bags: 1 };
 
 // What `party`, its `people` checking `bags` bags between them, pays for
 // the bags `fare` on `route` does not include (`count`), each both ways:
