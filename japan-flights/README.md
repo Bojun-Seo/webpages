@@ -2,11 +2,11 @@
 
 A static page that recommends round trips, nonstop or with one connection each way, from Incheon,
 Gimpo and Cheongju to Japan, Taiwan, Hong Kong, Macau, Vietnam, Thailand, Guam and Saipan, from the
-fares, on any airline outside mainland China, that Aviasales users found in the last 48 hours. It
-counts the days of leave each trip takes against a Monday, Tuesday and Thursday work week and Korean
-public holidays, offers only the trips that take none, without showing the count, and lists them
-cheapest first, with the airlines of SkyTeam, Star Alliance and oneworld given a head start. GitHub
-Pages serves it; there is no server.
+fares, on any airline but those of mainland China and the AirAsia group, that Aviasales users found
+in the last 48 hours. It counts the days of leave each trip takes against a Monday, Tuesday and
+Thursday work week and Korean public holidays, offers only the trips that take none, without showing
+the count, and lists them cheapest first, with the airlines of SkyTeam, Star Alliance and oneworld
+given a head start. GitHub Pages serves it; there is no server.
 
 The page is in Korean. It is not affiliated with any airline.
 
@@ -72,36 +72,36 @@ Korean Air publishes no fare API, and the page does not scrape koreanair.com: ai
 forbid automated access in their terms, and a scraper breaks whenever the site changes. Amadeus
 closed its free Self-Service APIs on 17 July 2026. The fares come instead from the [Travelpayouts
 Data API](https://support.travelpayouts.com/hc/en-us/articles/203956163-Aviasales-Data-API): at each
-deploy the workflow writes `site/data/live-fares.json` with the fares of every airline outside
-mainland China, nonstop or with one connection each way, that Aviasales users found in the last 48
-hours, for trips of two to six nights whose flight out lands before 6 p.m. local time: the cheapest
-economy fare for each route, pair of dates and airline, with and without a checked bag, nonstop and
-connecting, and for each day and time of day the flight back lands, with the times the flights leave
-and land where the API gives them.
+deploy the workflow writes `site/data/live-fares.json` with the fares of every airline but those of
+mainland China and the AirAsia group, nonstop or with one connection each way, that Aviasales users
+found in the last 48 hours, for trips of two to six nights whose flight out lands before 6 p.m.
+local time: the cheapest economy fare for each route, pair of dates and airline, with and without a
+checked bag, nonstop and connecting, and for each day and time of day the flight back lands, with
+the times the flights leave and land where the API gives them.
 
 `live-fares.json` is never committed; the workflow fetches it into the build. Without a token the
 workflow writes an empty one and the page says live fares are not set up. Aviasales data comes from
 its own users' searches, so regional routes may have few fares or none. The fetcher asks about every
 route the page knows (`routesOf` in `site/plan.js`) with `direct=false`, keeps the tickets with no
-more than one connection each way and none on an airline of mainland China (`MAINLAND_CHINA` in
-`tools/fetch-fares.js`), and logs any query whose answer reaches the limit of 1,000 tickets, since
-then the dearest tickets are missing. A ticket counts only on the route between the airports it
-names. The `static_fare_key` in its link says what its fare includes: `L0` for no checked bag,
-`L1_1_15` for one bag of 15 kg, and so on. A fare gives the bags it includes for each person in
-`bags`, `0` for none, when its link says, and its connections out and back in `stops` when it makes
-any. The link's `t` lists the ticket's way out and way back, each with the Unix times it leaves and
-lands, its minutes on the way and every airport it passes, `ICNKIXNRT` for Incheon to Narita through
-Kansai, after its airline's code where that changes, so a connecting fare names the airports it
-connects at in `via`: `[["KIX"], []]` for one connection on the way out at Kansai, and a ticket
-whose way out or back the link puts on an airline of mainland China is left out, whatever airline
-Aviasales names for it. The log counts the connecting fares that say where, and shows the link of
-one ticket that does not. The cheapest fare without a bag is kept apart from the cheapest other, so
-that the page can weigh the first with its bag fee against the second, and a connecting fare from a
-nonstop one, and so is a fare whose flight back lands on another day or at another time of day,
-since the leave a trip takes depends on it. The log counts each airline's fares that include no bag,
-those that include one or more, and those whose link does not say, and the fares left out because
-the flight out lands late. The tests use the response format the API documents; each run logs the
-fields a real ticket has, to check it against.
+more than one connection each way and none on an airline it leaves out, those of mainland China and
+the AirAsia group (`LEFT_OUT_AIRLINES` in `tools/fetch-fares.js`), and logs any query whose answer
+reaches the limit of 1,000 tickets, since then the dearest tickets are missing. A ticket counts only
+on the route between the airports it names. The `static_fare_key` in its link says what its fare
+includes: `L0` for no checked bag, `L1_1_15` for one bag of 15 kg, and so on. A fare gives the bags
+it includes for each person in `bags`, `0` for none, when its link says, and its connections out and
+back in `stops` when it makes any. The link's `t` lists the ticket's way out and way back, each with
+the Unix times it leaves and lands, its minutes on the way and every airport it passes, `ICNKIXNRT`
+for Incheon to Narita through Kansai, after its airline's code where that changes, so a connecting
+fare names the airports it connects at in `via`: `[["KIX"], []]` for one connection on the way out
+at Kansai, and a ticket whose way out or back the link puts on one of the airlines left out is left
+out too, whatever airline Aviasales names for it. The log counts the connecting fares that say
+where, and shows the link of one ticket that does not. The cheapest fare without a bag is kept apart
+from the cheapest other, so that the page can weigh the first with its bag fee against the second,
+and a connecting fare from a nonstop one, and so is a fare whose flight back lands on another day or
+at another time of day, since the leave a trip takes depends on it. The log counts each airline's
+fares that include no bag, those that include one or more, and those whose link does not say, and
+the fares left out because the flight out lands late. The tests use the response format the API
+documents; each run logs the fields a real ticket has, to check it against.
 
 ## Publish on GitHub Pages
 
@@ -210,15 +210,15 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   pages for Jeju Air, Trinity, Air Seoul, Eastar Jet, Aero K, HK Express and ZIPAIR (whose won price
   out of Incheon the page also takes for the way back, charged in yen, and marks 약), and from a
   travel blog for Tigerair Taiwan, converted from Taiwan dollars, and for Jeju Air to Vietnam and
-  Thailand. Peach, Air Busan, Scoot, Vietjet, Thai Vietjet, Thai AirAsia X, United, Philippine
-  Airlines and Malaysia Airlines published none that could be found, nor Eastar Jet to Taiwan or
-  Hong Kong and Air Seoul to Guam, so they take the usual fee, Jeju Air's and Trinity's, which the
-  page marks 약. An airline may charge more for a bag bought late: Air Seoul 5,000 won more within 48
-  hours of departure, HK Express 72,000 won after booking. A second bag for one person is charged
-  the same as the first, though an airline may charge more. A connecting fare pays the bag fee of
-  the airline Aviasales names for it, once each way, though separate tickets on two airlines may
-  each charge for the bag. A fare with a checked bag counts as including one for each person. Of the
-  airlines that always include one, Korean Air, Asiana, Jin Air, Parata Air and Air Premia say so on
-  their own pages, and the airlines added for Vietnam, Bangkok, Guam and Saipan were checked only
-  through search results; JAL and ANA have given two in economy, and ANA's Basic fares, sold on some
-  routes since November 2024, can include none.
+  Thailand. Peach, Air Busan, Scoot, Vietjet, Thai Vietjet, United, Philippine Airlines and Malaysia
+  Airlines published none that could be found, nor Eastar Jet to Taiwan or Hong Kong and Air Seoul
+  to Guam, so they take the usual fee, Jeju Air's and Trinity's, which the page marks 약. An airline
+  may charge more for a bag bought late: Air Seoul 5,000 won more within 48 hours of departure, HK
+  Express 72,000 won after booking. A second bag for one person is charged the same as the first,
+  though an airline may charge more. A connecting fare pays the bag fee of the airline Aviasales
+  names for it, once each way, though separate tickets on two airlines may each charge for the bag.
+  A fare with a checked bag counts as including one for each person. Of the airlines that always
+  include one, Korean Air, Asiana, Jin Air, Parata Air and Air Premia say so on their own pages, and
+  the airlines added for Vietnam, Bangkok, Guam and Saipan were checked only through search results;
+  JAL and ANA have given two in economy, and ANA's Basic fares, sold on some routes since November
+  2024, can include none.
