@@ -1,12 +1,12 @@
-// Fetches the round-trip economy fares of every airline outside mainland
-// China for the routes the page knows, from each of routes.json's origins to
-// each of its destinations, from the Travelpayouts (Aviasales) Data API,
-// nonstop or with one connection each way, and writes the ones the page can
-// offer where it looks for live fares, each with its airline, its
-// connections, the checked bags it includes and the times its flights leave
-// and land where the API gives them. The API serves prices that Aviasales
-// users found in the last 48 hours, so a route few people search there can
-// come back empty.
+// Fetches the round-trip economy fares of every airline but those it leaves
+// out, mainland China's and the AirAsia group's, for the routes the page
+// knows, from each of routes.json's origins to each of its destinations,
+// from the Travelpayouts (Aviasales) Data API, nonstop or with one
+// connection each way, and writes the ones the page can offer where it looks
+// for live fares, each with its airline, its connections, the checked bags
+// it includes and the times its flights leave and land where the API gives
+// them. The API serves prices that Aviasales users found in the last 48
+// hours, so a route few people search there can come back empty.
 //
 //   TRAVELPAYOUTS_TOKEN=... node tools/fetch-fares.js \
 //       [--routes site/data/routes.json] [--out site/data/live-fares.json] [--months 6] \
@@ -120,18 +120,21 @@ export function pickFares(response, route) {
     });
 }
 
-// The passenger airlines of mainland China, whose tickets the page leaves
-// out. Those of Hong Kong, Macau and Taiwan, China Airlines among them, are
-// not of mainland China.
-export const MAINLAND_CHINA = [
+// The airlines whose tickets the page leaves out: the passenger airlines of
+// mainland China, though not those of Hong Kong, Macau and Taiwan, China
+// Airlines among them; and those of the AirAsia group: AirAsia, AirAsia X,
+// Thai AirAsia, Thai AirAsia X, Philippines AirAsia and Indonesia AirAsia.
+export const LEFT_OUT_AIRLINES = [
   'CA', 'ZH', 'SC', 'KY', 'TV', 'MU', 'FM', 'KN', 'CZ', 'MF', 'OQ', 'NS', 'RY', 'HU', 'JD', 'GS', '8L', 'PN', 'UQ',
   'FU', 'GX', 'GT', 'CN', '9H', '3U', '9C', 'HO', 'QW', 'BK', 'DZ', 'GJ', 'G5', 'EU', 'DR', 'A6', 'LT', 'JR', 'GY',
+  'AK', 'D7', 'FD', 'XJ', 'Z2', 'QZ',
 ];
 
 // Why a ticket in an answer for `route` does not count, for the log: it
 // lacks what a fare needs, connects more than once a way, flies between
-// other airports, or flies a mainland Chinese airline, as its own or as one
-// its link names for a way out or back. Null for a ticket that counts.
+// other airports, or flies an airline left out (`LEFT_OUT_AIRLINES`), as its
+// own or as one its link names for a way out or back. Null for a ticket
+// that counts.
 export function leftOut(t, route) {
   if (!t.airline || !t.departure_at || !t.return_at || !(t.price > 0)) return 'incomplete';
   if ((t.transfers || 0) > 1 || (t.return_transfers || 0) > 1) return 'connections';
@@ -139,23 +142,23 @@ export function leftOut(t, route) {
     || (t.destination_airport && t.destination_airport !== route.dest)) {
     return `${t.origin_airport || route.origin}-${t.destination_airport || route.dest}`;
   }
-  if ([t.airline, ...waysOf(t).map((way) => way.airline)].some((code) => MAINLAND_CHINA.includes(code))) {
-    return 'china';
+  if ([t.airline, ...waysOf(t).map((way) => way.airline)].some((code) => LEFT_OUT_AIRLINES.includes(code))) {
+    return 'airline';
   }
   return null;
 }
 
 // What became of the tickets in the answers for one route, for the log:
 // "312 tickets: 150 between other airports (ICN-NRT 140), 40 connecting
-// more than once, 12 on mainland Chinese airlines, 100 not of 2 to 6
-// nights, 22 landing late".
+// more than once, 12 on airlines left out, 100 not of 2 to 6 nights, 22
+// landing late".
 function ticketTally(counts) {
   const others = Object.entries(counts.others).sort((a, b) => b[1] - a[1]);
   const parts = [
     others.length && `${others.reduce((n, [, k]) => n + k, 0)} between other airports `
       + `(${others.slice(0, 3).map(([pair, k]) => `${pair} ${k}`).join(', ')})`,
     counts.connections && `${counts.connections} connecting more than once`,
-    counts.china && `${counts.china} on mainland Chinese airlines`,
+    counts.airline && `${counts.airline} on airlines left out`,
     counts.incomplete && `${counts.incomplete} incomplete`,
     counts.nights && `${counts.nights} not of ${TRIP_NIGHTS[0]} to ${TRIP_NIGHTS.at(-1)} nights`,
     counts.late && `${counts.late} landing late`,
@@ -350,7 +353,7 @@ async function main(argv) {
   const unanswered = [];
   for (const route of routes) {
     const before = fares.length;
-    const counts = { tickets: 0, others: {}, connections: 0, china: 0, incomplete: 0, nights: 0, late: 0 };
+    const counts = { tickets: 0, others: {}, connections: 0, airline: 0, incomplete: 0, nights: 0, late: 0 };
     let asked = 0;
     for (const out of months) {
       // Ask for returns in the same month and the next, so a trip over a
@@ -404,8 +407,8 @@ async function main(argv) {
     console.warn(`The API refused ${refused} queries in a row with HTTP 429, so the fetch stopped there.`);
   }
   const previous = values.previous ? await readFares(values.previous) : null;
-  // Fares fetched before an airline joined MAINLAND_CHINA may be on it.
-  if (previous) previous.fares = previous.fares.filter((f) => !MAINLAND_CHINA.includes(f.airline));
+  // Fares fetched before an airline joined LEFT_OUT_AIRLINES may be on it.
+  if (previous) previous.fares = previous.fares.filter((f) => !LEFT_OUT_AIRLINES.includes(f.airline));
   if (ok === 0 && previous?.fares.length) {
     await write(previous);
     console.warn(`No query was answered, so the ${previous.fares.length} fares fetched at ${previous.updated} stay.`);

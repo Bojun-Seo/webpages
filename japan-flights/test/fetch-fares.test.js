@@ -180,7 +180,7 @@ test('a connecting fare names the airports it connects at, where its link lists 
   const nonstop = ticket({ link: listing(['7C', 'ICN', 'OIT'], ['7C', 'OIT', 'ICN']) });
   const out = ticket({ transfers: 1, price: 180000, link: listing(['CI', 'ICN', 'TPE', 'OIT'], ['KE', 'OIT', 'ICN']) });
   const both = ticket({ transfers: 1, return_transfers: 1, price: 170000,
-    link: listing(['CX', 'ICN', 'HKG', 'OIT'], ['D7', 'OIT', 'TPE', 'ICN']) });
+    link: listing(['CX', 'ICN', 'HKG', 'OIT'], ['IT', 'OIT', 'TPE', 'ICN']) });
   assert.deepEqual(connections(out), [['TPE'], []]);
   assert.deepEqual(connections(both), [['HKG'], ['TPE']]);
   assert.deepEqual(pickFares({ success: true, data: [nonstop, out, both] }, oita).map((f) => f.via),
@@ -193,16 +193,17 @@ test('a connecting fare names the airports it connects at, where its link lists 
   assert.equal(connections(ticket({ transfers: 1 })), null);
 });
 
-test('a ticket on a mainland Chinese airline does not count, by its own airline or one its link names', () => {
-  // Jeju Air out, and China Eastern back through Shanghai.
+test('a ticket on an airline left out does not count, by its own airline or one its link names', () => {
+  // Jeju Air out, and China Eastern back through Shanghai or Thai AirAsia back.
   const back = ticket({ airline: '7C', return_transfers: 1,
     link: listing(['7C', 'ICN', 'OIT'], ['MU', 'OIT', 'PVG', 'ICN']) });
-  assert.deepEqual([ticket({ airline: 'MU' }), back, ticket({ airline: '9C', transfers: 1 })].map((t) => leftOut(t, oita)),
-    ['china', 'china', 'china']);
+  const thai = ticket({ airline: '7C', link: listing(['7C', 'ICN', 'OIT'], ['FD', 'OIT', 'ICN']) });
+  const out = [ticket({ airline: 'MU' }), back, ticket({ airline: '9C', transfers: 1 }), ticket({ airline: 'AK' }), thai];
+  assert.deepEqual(out.map((t) => leftOut(t, oita)), ['airline', 'airline', 'airline', 'airline', 'airline']);
   // China Airlines is Taiwan's, and Hong Kong Airlines Hong Kong's.
   const kept = [ticket({ airline: 'CI' }), ticket({ airline: 'HX', link: listing(['HX', 'ICN', 'OIT'], ['HX', 'OIT', 'ICN']) })];
   assert.deepEqual(kept.map((t) => leftOut(t, oita)), [null, null]);
-  assert.deepEqual(pickFares({ success: true, data: [back, ...kept] }, oita).map((f) => f.airline), ['CI', 'HX']);
+  assert.deepEqual(pickFares({ success: true, data: [...out, ...kept] }, oita).map((f) => f.airline), ['CI', 'HX']);
 });
 
 test('the cheapest fare with a checked bag is kept apart from the cheapest without', () => {
