@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>대한항공 마일 카드 계산기</title>
+<meta name="description" content="한 달 지출과 1년 여행 경비를 넣으면, 대한항공 스카이패스 마일을 쌓는 신용카드마다 1년에 쌓이는 마일과 연회비를 빼고 남는 가치를 계산하는 개인 페이지">
+<link rel="stylesheet" href="style.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow">대한항공 스카이패스 마일을 쌓는 신용카드</p>
+    <h1>대한항공 마일 카드 계산기</h1>
+    <p class="lede">한 달에 쓰는 돈과 1년에 여행에 쓰는 돈을 넣으면, 카드마다 1년에 쌓이는 대한항공 마일과 연회비를 빼고 남는 가치를 계산합니다.</p>
+    <p class="status" id="status">불러오는 중…</p>
+  </header>
+
+  <form id="form" class="panel" aria-label="지출과 계산 기준">
+    <fieldset>
+      <legend>매달 쓰는 돈</legend>
+      <div class="controls">
+        <label class="field">
+          <span>국내 결제 (만원)</span>
+          <input id="domestic" type="number" inputmode="numeric" min="0" step="1">
+        </label>
+        <label class="field">
+          <span>그중 백화점·주유·커피·편의점·택시 (만원)</span>
+          <input id="daily" type="number" inputmode="numeric" min="0" step="1">
+        </label>
+        <label class="field">
+          <span>해외 직구 (만원)</span>
+          <input id="online" type="number" inputmode="numeric" min="0" step="1">
+        </label>
+      </div>
+      <p class="fine">관리비·세금·공과금·상품권·무이자 할부는 대부분 카드에서 적립하지 않으니 빼고 넣으세요.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>1년에 여행으로 쓰는 돈</legend>
+      <div class="controls">
+        <label class="field">
+          <span>여행 중 해외 결제 (만원)</span>
+          <input id="travel" type="number" inputmode="numeric" min="0" step="1">
+        </label>
+        <label class="field">
+          <span>면세점 (만원)</span>
+          <input id="duty-free" type="number" inputmode="numeric" min="0" step="1">
+        </label>
+        <label class="field">
+          <span>대한항공 항공권 (만원)</span>
+          <input id="korean-air" type="number" inputmode="numeric" min="0" step="1">
+        </label>
+        <label class="field">
+          <span>여행 횟수</span>
+          <select id="trips"></select>
+        </label>
+      </div>
+      <p class="fine">대한항공 항공권은 대한항공 홈페이지·앱·지점에서 직접 산 것만 넣으세요. 여행사나 예약 사이트에서 산 항공권은 결제한 곳에 따라 국내 결제나 해외 결제에 넣으면 됩니다.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>계산 기준</legend>
+      <div class="controls">
+        <label class="field">
+          <span>1마일 가치 (원)</span>
+          <input id="mile-value" type="number" inputmode="decimal" min="0" step="0.1">
+        </label>
+        <label class="field">
+          <span>연회비</span>
+          <select id="max-fee">
+            <option value="">제한 없음</option>
+            <option value="50000">5만 원 이하</option>
+            <option value="100000">10만 원 이하</option>
+            <option value="200000">20만 원 이하</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>순서</span>
+          <select id="sort">
+            <option value="value">남는 가치가 큰 순서</option>
+            <option value="miles">마일이 많은 순서</option>
+            <option value="perMile">마일당 연회비가 싼 순서</option>
+          </select>
+        </label>
+      </div>
+      <p class="fine">1마일 가치는 마일을 어디에 쓰느냐에 따라 다릅니다. 흔히 15원 안팎으로 보고, 비즈니스석에 쓰면 더 높게 보기도 합니다. 남는 가치는 1년에 쌓이는 마일에 이 가치를 곱하고 연회비를 뺀 값입니다.</p>
+    </fieldset>
+
+    <div class="form-foot">
+      <p class="fine" id="example-note">처음 넣어 둔 값은 예시입니다. 내 지출로 바꿔 보세요.</p>
+      <button type="button" class="reset" id="reset">예시 값으로 되돌리기</button>
+    </div>
+  </form>
+
+  <section aria-labelledby="results-title">
+    <div class="section-head">
+      <h2 id="results-title">카드별 1년 계산</h2>
+      <p class="summary" id="summary" aria-live="polite"></p>
+    </div>
+    <div class="board">
+      <div class="board-head" aria-hidden="true">
+        <span>카드</span><span>1년 마일</span><span>연회비</span><span>남는 가치</span><span>마일당 연회비</span>
+      </div>
+      <ol class="board-rows" id="results"></ol>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <p>대한항공·카드사와 관계없는 개인이 만든 계산기입니다. 카드를 광고하거나 발급을 권유·중개하지 않고, 어떤 회사에서도 대가를 받지 않으며, 카드 신청 링크도 두지 않습니다. 순서는 넣은 지출로 계산한 숫자로만 정합니다.</p>
+    <p>카드 조건은 카드마다 적어 둔 날에 카드사 상품 안내와 공개된 자료로 확인한 것이고, 카드사가 언제든 바꿀 수 있습니다. '확인 못 한 조건'은 확인하지 못한 채 가정한 부분입니다. 카드를 만들기 전에 카드사 상품설명서에서 꼭 확인하세요.</p>
+    <p>1년을 열두 달로 나눠 달마다 계산합니다. 매달 같은 금액을 쓰고, 여행 중 해외 결제와 면세점 금액은 여행 횟수만큼의 달에 고르게 나눠 쓰며, 대한항공 항공권은 여행 한 달 전에 산다고 봅니다. 전월실적은 지난달에 넣은 지출을 모두 더해 판단하고, 한 달·1년 적립 한도도 그대로 적용합니다. 연간 보너스 마일은 2년 차부터의 조건으로 계산합니다. 카드사는 결제 건마다 1,000원이나 1,500원에 못 미치는 금액을 버리기도 해서, 실제로는 조금 덜 쌓일 수 있습니다.</p>
+    <p>입력한 값은 이 브라우저에만 저장되고 어디로도 보내지 않습니다.</p>
+    <p>새로 발급하지 않는 씨티카드, 계산에 필요한 조건을 확인하지 못한 신한카드 The BEST-F와 현대카드 대한항공카드 the First Edition2, 포인트를 마일로 바꾸는 카드, 체크카드, 아시아나항공 마일리지 카드는 넣지 않았습니다.</p>
+    <p>대한항공, SKYPASS와 각 카드 이름은 해당 회사의 상표입니다.</p>
+  </footer>
+</div>
+<noscript><p class="wrap">이 페이지는 자바스크립트가 있어야 계산합니다.</p></noscript>
+</body>
+</html>
