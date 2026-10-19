@@ -1,0 +1,279 @@
+{
+  "updated": "2026-10-19",
+  "cards": [
+    {
+      "id": "samsung-and-mileage-platinum",
+      "issuer": "삼성카드",
+      "name": "삼성카드 & MILEAGE PLATINUM (스카이패스)",
+      "fee": { "domestic": 47000, "overseas": 49000 },
+      "base": { "per": 1000, "miles": 1 },
+      "options": [
+        {
+          "name": "해외형",
+          "overseasOnly": true,
+          "extra": [{ "on": ["overseas"], "per": 1000, "miles": 1, "cap": "option" }]
+        },
+        {
+          "name": "국내형",
+          "extra": [{ "on": ["daily"], "per": 1000, "miles": 1, "cap": "option" }]
+        }
+      ],
+      "caps": { "option": { "miles": 2000, "per": "month" } },
+      "notes": [
+        "기본 적립은 전월실적과 한도가 없습니다.",
+        "해외형은 해외 가맹점, 국내형은 백화점·주유·커피·편의점·택시에 1,000원당 1마일을 더 주고, 더 주는 마일은 합쳐서 한 달 2,000마일까지입니다.",
+        "해외형과 국내형은 달마다 바꿀 수 있지만, 1년 내내 더 많이 쌓이는 한쪽을 쓴다고 보고 계산합니다. 해외형은 해외겸용 카드에만 있습니다.",
+        "무이자 할부, 공과금, 등록금, 대중교통, 고속도로 통행료 등은 적립하지 않습니다."
+      ],
+      "perks": ["아멕스(해외겸용) 카드의 공항 서비스"],
+      "unverified": [],
+      "checked": "2026-10-19",
+      "sources": [
+        {
+          "title": "아메리칸 익스프레스 코리아, 삼성 & 마일리지 카드 소개",
+          "url": "https://www.americanexpress.com/ko-kr/network/credit-cards/samsung/and-mileage-platinum-card.html"
+        },
+        {
+          "title": "뱅크샐러드, 삼성카드 & MILEAGE PLATINUM (스카이패스)",
+          "url": "https://www.banksalad.com/product/cards/CARD000081"
+        },
+        {
+          "title": "나무위키, 삼성카드 & MILEAGE PLATINUM (스카이패스)",
+          "url": "https://namu.wiki/w/%EC%82%BC%EC%84%B1%EC%B9%B4%EB%93%9C%20&%20MILEAGE%20PLATINUM%20(%EC%8A%A4%EC%B9%B4%EC%9D%B4%ED%8C%A8%EC%8A%A4)"
+        }
+      ]
+    },
+    {
+      "id": "shinhan-air-one",
+      "issuer": "신한카드",
+      "name": "신한카드 Air One",
+      "fee": { "domestic": 49000, "overseas": 51000 },
+      "base": { "per": 1000, "miles": 1, "minPrev": 500000 },
+      "extra": [
+        { "on": ["koreanAir", "dutyFree", "overseas"], "per": 1000, "miles": 1, "minPrev": 500000, "cap": "extra" }
+      ],
+      "caps": { "extra": { "miles": 2000, "per": "month" } },
+      "notes": [
+        "전월 이용금액이 50만 원에 못 미친 달에는 대한항공 마일을 하나도 적립하지 않습니다.",
+        "국내 항공·면세점 업종과 해외 일시불 결제에 1,000원당 1마일을 더 줍니다.",
+        "신라면세점 앱·웹 결제에 1마일을 더 주는 혜택은 계산에 넣지 않았습니다.",
+        "국세, 지방세, 아파트관리비, 공과금, 4대보험 등은 적립하지 않습니다."
+      ],
+      "perks": [],
+      "unverified": ["더 주는 마일의 한 달 한도는 자료마다 달라, 2,000마일로 보고 계산했습니다."],
+      "checked": "2026-10-19",
+      "sources": [
+        {
+          "title": "신한카드, 신한카드 Air One 상품 안내",
+          "url": "https://www.shinhancard.com/pconts/html/card/apply/credit/1187901_2207.html"
+        },
+        {
+          "title": "뱅크샐러드, 신한카드 Air One",
+          "url": "https://www.banksalad.com/product/cards/CARD004324"
+        },
+        {
+          "title": "나무위키, 신한카드 Air One",
+          "url": "https://namu.wiki/w/%EC%8B%A0%ED%95%9C%EC%B9%B4%EB%93%9C%20Air%20One"
+        }
+      ]
+    },
+    {
+      "id": "woori-every-mile-skypass",
+      "issuer": "우리카드",
+      "name": "카드의정석 EVERY MILE SKYPASS",
+      "fee": { "domestic": 39000, "overseas": 39000 },
+      "base": { "per": 1000, "miles": 1 },
+      "extra": [{ "on": ["overseas"], "per": 1000, "miles": 1, "cap": "overseas" }],
+      "caps": { "overseas": { "miles": 1000, "per": "month" } },
+      "notes": [
+        "적립에 전월실적 조건이 없습니다.",
+        "해외 가맹점에 1,000원당 1마일을 더 주고, 더 주는 마일은 본인과 가족카드를 합쳐 한 달 1,000마일까지입니다."
+      ],
+      "perks": [
+        "국내 공항 라운지 1년 2회(전월 국내 이용 50만 원 이상)",
+        "해외 결제 수수료(국제브랜드 1%, 해외이용 0.3%) 면제"
+      ],
+      "unverified": ["국내전용 카드의 연회비를 확인하지 못해, 해외겸용과 같은 39,000원으로 보고 계산했습니다."],
+      "checked": "2026-10-19",
+      "sources": [
+        {
+          "title": "우리카드, 카드의정석 EVERY MILE SKYPASS 상품 안내",
+          "url": "https://m.wooricard.com/ai-data/cardDetail_standardEveryMileSkypass.html"
+        },
+        {
+          "title": "뱅크샐러드, 우리카드 카드의정석 EVERY MILE SKYPASS",
+          "url": "https://www.banksalad.com/product/cards/CARD004241"
+        },
+        {
+          "title": "카드고릴라, 카드의정석 EVERY MILE SKYPASS 리뷰",
+          "url": "https://www.card-gorilla.com/contents/detail/3923"
+        }
+      ]
+    },
+    {
+      "id": "hyundai-korean-air-060",
+      "issuer": "현대카드",
+      "name": "대한항공카드 060",
+      "fee": { "domestic": 60000, "overseas": 60000 },
+      "base": { "per": 1000, "miles": 1, "minPrev": 500000 },
+      "extra": [
+        { "on": ["overseas"], "per": 1000, "miles": 1, "minPrev": 500000, "cap": "overseas" },
+        { "on": ["koreanAir"], "per": 1000, "miles": 1, "minPrev": 500000, "cap": "koreanAir" }
+      ],
+      "caps": {
+        "overseas": { "miles": 4000, "per": "month", "counts": "total" },
+        "koreanAir": { "miles": 20000, "per": "year", "counts": "total" }
+      },
+      "annualBonus": { "miles": 1000, "minYearSpend": 6000000 },
+      "notes": [
+        "전월 이용금액이 50만 원 이상인 달에만 적립합니다.",
+        "해외 가맹점은 한 달 4,000마일까지, 대한항공 직판 항공권은 1년 20,000마일까지 1,000원당 2마일이고, 넘는 금액은 1마일입니다.",
+        "연간 보너스 1,000마일은 2년 차부터 전년도 이용금액이 600만 원 이상일 때 받습니다. 발급 첫해에는 누적 100만 원 이상이면 받습니다."
+      ],
+      "perks": ["대한항공 직판 국제선 항공권 5만 원 할인 쿠폰(1년에 1장)"],
+      "unverified": [],
+      "checked": "2026-10-19",
+      "sources": [
+        {
+          "title": "현대카드, 대한항공카드 060 가이드북 (2025년 12월)",
+          "url": "https://www.hyundaicard.com/upload/card/T_AZW-20251203-1632-25_%EA%B0%80%EC%9D%B4%EB%93%9C%EB%B6%81_%EB%8C%80%ED%95%9C%ED%95%AD%EA%B3%B5%20Ed2_060_V2_%EA%B3%B5%EC%8B%9C%EC%8B%A4%EC%9A%A9.pdf"
+        },
+        {
+          "title": "뱅크샐러드, 현대카드 대한항공카드 060",
+          "url": "https://www.banksalad.com/product/cards/CARD004617"
+        }
+      ]
+    },
+    {
+      "id": "hyundai-korean-air-120",
+      "issuer": "현대카드",
+      "name": "대한항공카드 120",
+      "fee": { "domestic": 120000, "overseas": 120000 },
+      "base": { "per": 1000, "miles": 1, "minPrev": 500000 },
+      "extra": [
+        { "on": ["overseas"], "per": 1000, "miles": 1, "minPrev": 500000, "cap": "overseas" },
+        { "on": ["koreanAir"], "per": 1000, "miles": 1, "minPrev": 500000, "cap": "koreanAir" }
+      ],
+      "caps": {
+        "overseas": { "miles": 4000, "per": "month", "counts": "total" },
+        "koreanAir": { "miles": 20000, "per": "year", "counts": "total" }
+      },
+      "annualBonus": { "miles": 6000, "minYearSpend": 12000000 },
+      "notes": [
+        "전월 이용금액이 50만 원 이상인 달에만 적립합니다.",
+        "해외 가맹점은 한 달 4,000마일까지, 대한항공 직판 항공권은 1년 20,000마일까지 1,000원당 2마일이고, 넘는 금액은 1마일입니다.",
+        "연간 보너스 6,000마일은 2년 차부터 전년도 이용금액이 1,200만 원 이상일 때 받습니다. 발급 첫해에는 누적 100만 원 이상이면 받습니다."
+      ],
+      "perks": ["대한항공 항공권 할인 쿠폰(1년에 1장)과 공항 서비스"],
+      "unverified": [],
+      "checked": "2026-10-19",
+      "sources": [
+        {
+          "title": "현대카드, 대한항공카드 120 가이드북 (2025년 2월)",
+          "url": "https://www.hyundaicard.com/upload/card/T_AZW-20250204-1347-63_%EB%8C%80%ED%95%9C%ED%95%AD%EA%B3%B5%EC%B9%B4%EB%93%9C%20Ed2_120_V1_%EA%B3%B5%EC%8B%9C%EC%8B%A4%EC%9A%A9.pdf"
+        },
+        {
+          "title": "뱅크샐러드, 현대카드 대한항공카드 120",
+          "url": "https://www.banksalad.com/product/cards/CARD004621"
+        },
+        {
+          "title": "토스 카드라운지, 대한항공카드 120",
+          "url": "https://card-lounge.toss.im/card/10239"
+        }
+      ]
+    },
+    {
+      "id": "hyundai-korean-air-300",
+      "issuer": "현대카드",
+      "name": "대한항공카드 300",
+      "fee": { "domestic": 300000, "overseas": 300000 },
+      "base": { "per": 1000, "miles": 1, "minPrev": 500000 },
+      "extra": [
+        { "on": ["overseas"], "per": 1000, "miles": 2, "minPrev": 500000, "cap": "overseas" },
+        { "on": ["koreanAir"], "per": 1000, "miles": 2, "minPrev": 500000, "cap": "koreanAir" }
+      ],
+      "caps": {
+        "overseas": { "miles": 6000, "per": "month", "counts": "total" },
+        "koreanAir": { "miles": 30000, "per": "year", "counts": "total" }
+      },
+      "annualBonus": { "miles": 10000, "minYearSpend": 24000000 },
+      "notes": [
+        "전월 이용금액이 50만 원 이상인 달에만 적립합니다.",
+        "해외 가맹점은 한 달 6,000마일까지, 대한항공 직판 항공권은 1년 30,000마일까지 1,000원당 3마일이고, 넘는 금액은 1마일입니다.",
+        "연간 보너스 10,000마일은 2년 차부터 전년도 이용금액이 2,400만 원 이상일 때 받습니다. 발급 첫해에는 누적 100만 원 이상이면 받습니다."
+      ],
+      "perks": ["대한항공 항공권 할인 쿠폰(1년에 1장)과 공항 서비스"],
+      "unverified": ["국내 특급호텔·백화점·골프장에 더 주는 마일이 있다는 자료가 있지만 공식 자료에서 확인하지 못해 넣지 않았습니다."],
+      "checked": "2026-10-19",
+      "sources": [
+        {
+          "title": "현대카드, 대한항공카드 300 가이드북 (2025년 2월)",
+          "url": "https://www.hyundaicard.com/upload/card/T_AZW-20250204-1347-63_%EB%8C%80%ED%95%9C%ED%95%AD%EA%B3%B5%EC%B9%B4%EB%93%9C%20Ed2_300_V1_%EA%B3%B5%EC%8B%9C%EC%8B%A4%EC%9A%A9.pdf"
+        },
+        {
+          "title": "토스 카드라운지, 대한항공카드 300",
+          "url": "https://card-lounge.toss.im/card/10277"
+        }
+      ]
+    },
+    {
+      "id": "kb-gaon-skypass",
+      "issuer": "KB국민카드",
+      "name": "마일리지 가온카드(대한항공)",
+      "fee": { "domestic": 15000, "overseas": 20000 },
+      "base": { "per": 1500, "miles": 1 },
+      "extra": [{ "on": ["overseas", "dutyFree"], "per": 1500, "miles": 1 }],
+      "caps": {},
+      "notes": [
+        "결제 건마다 1,500원 단위로 적립합니다.",
+        "해외 가맹점(해외 직구 등 온라인 결제 포함)과 면세점은 1,500원당 2마일입니다.",
+        "무이자 할부, 등록금, 상품권·선불카드 구입 등은 적립하지 않습니다."
+      ],
+      "perks": [],
+      "unverified": [
+        "한 달 적립 한도가 있다고 안내하지만 금액을 확인하지 못해, 한도 없이 계산했습니다.",
+        "전월실적 조건을 확인하지 못해, 없다고 보고 계산했습니다."
+      ],
+      "checked": "2026-10-19",
+      "sources": [
+        {
+          "title": "KB국민카드, 마일리지 가온카드(대한항공) 상품 안내",
+          "url": "https://m.kbcard.com/c/09153"
+        },
+        {
+          "title": "이투데이, KB국민카드 항공마일리지 적립 '가온카드' 출시",
+          "url": "https://www.etoday.co.kr/news/view/1020297"
+        }
+      ]
+    },
+    {
+      "id": "hana-skypass-amex-platinum",
+      "issuer": "하나카드",
+      "name": "스카이패스 아멕스 플래티늄",
+      "fee": { "overseas": 45000 },
+      "base": { "per": 1000, "miles": 1 },
+      "extra": [{ "on": ["overseas"], "per": 1000, "miles": 1, "minPrev": 500000 }],
+      "caps": {},
+      "notes": [
+        "해외겸용(아멕스)으로만 나옵니다.",
+        "해외 가맹점 1,000원당 2마일은 전월 이용금액이 50만 원 이상인 달에만 붙고, 못 미치면 1마일입니다."
+      ],
+      "perks": ["인천공항 라운지(한 달 1회, 1년 2회)"],
+      "unverified": [
+        "지금도 새로 발급하는지 확인하지 못했습니다.",
+        "해외 2배 적립의 한 달 한도를 확인하지 못해, 한도 없이 계산했습니다."
+      ],
+      "checked": "2026-10-19",
+      "sources": [
+        {
+          "title": "아메리칸 익스프레스 코리아, 하나 스카이패스 아멕스 플래티늄 카드 소개",
+          "url": "https://www.americanexpress.com/ko-kr/network/credit-cards/hana/skypass-platinum-card.html"
+        },
+        {
+          "title": "토스피드, 연회비 저렴한 대한항공 마일리지 카드 3가지 비교",
+          "url": "https://toss.im/tossfeed/article/korean-air-mileage-card"
+        }
+      ]
+    }
+  ]
+}
