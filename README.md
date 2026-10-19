@@ -6,6 +6,7 @@ A collection of web pages built for personal use, published with GitHub Pages at
 | Directory | Page | Description |
 |---|---|---|
 | [`japan-flights/`](japan-flights/) | [Short-Haul Flights](https://bojun-seo.github.io/webpages/japan-flights/) | Recommends round trips that take no leave, nonstop or with one connection, from Seoul and Cheongju to Japan, Taiwan, Hong Kong, Macau, Vietnam, Thailand, Guam and Saipan |
+| [`skypass-cards/`](skypass-cards/) | [SKYPASS Card Calculator](https://bojun-seo.github.io/webpages/skypass-cards/) | Works out the Korean Air miles each SKYPASS credit card earns in a year for what the visitor spends, and what is left after the annual fee |
 
 ## Publishing
 

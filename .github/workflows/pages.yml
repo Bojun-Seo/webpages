@@ -11,6 +11,7 @@ on:
     paths:
       - index.html
       - japan-flights/**
+      - skypass-cards/**
       - .github/workflows/pages.yml
   schedule:
     - cron: '23 21 * * *' # 06:23 in Korea
@@ -30,8 +31,18 @@ jobs:
       - run: npm test
         working-directory: japan-flights
 
+  skypass-cards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm test
+        working-directory: skypass-cards
+
   deploy:
-    needs: japan-flights
+    needs: [japan-flights, skypass-cards]
     # Pages takes deployments from the default branch only. Scheduled runs always start there.
     if: github.event_name == 'schedule' || github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
@@ -59,13 +70,18 @@ jobs:
           mkdir _site
           cp index.html _site/
           cp -R japan-flights/site _site/japan-flights
+          cp -R skypass-cards/site _site/skypass-cards
           v=${GITHUB_SHA::7}
-          sed -i "s|href=\"style.css\"|href=\"style.css?v=$v\"|; s|src=\"app.js\"|src=\"app.js?v=$v\"|" \
-            _site/japan-flights/index.html
+          for page in japan-flights skypass-cards; do
+            sed -i "s|href=\"style.css\"|href=\"style.css?v=$v\"|; s|src=\"app.js\"|src=\"app.js?v=$v\"|" \
+              _site/$page/index.html
+            grep -q "style.css?v=$v" _site/$page/index.html
+            grep -q "app.js?v=$v" _site/$page/index.html
+          done
           sed -i "s|from './plan.js'|from './plan.js?v=$v'|" _site/japan-flights/app.js
-          grep -q "style.css?v=$v" _site/japan-flights/index.html
-          grep -q "app.js?v=$v" _site/japan-flights/index.html
           grep -q "plan.js?v=$v" _site/japan-flights/app.js
+          sed -i "s|from './calc.js'|from './calc.js?v=$v'|" _site/skypass-cards/app.js
+          grep -q "calc.js?v=$v" _site/skypass-cards/app.js
       - name: Download the fares the site has now
         # The fetcher keeps them for the queries the API does not answer, all of them if it answers
         # none. Nothing to download before the first deploy.
