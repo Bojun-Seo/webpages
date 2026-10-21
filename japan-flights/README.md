@@ -116,7 +116,7 @@ documents; each run logs the fields a real ticket has, to check it against.
    (**Settings → Secrets and variables → Actions**). For the Aviasales links to credit you, add your
    partner marker, the number the Travelpayouts dashboard shows for your account, as the repository
    variable `TRAVELPAYOUTS_MARKER` on the **Variables** tab of the same page. The fetch makes about
-   2,200 queries, one for each route and pair of months, 0.15 seconds apart to stay well under the
+   2,230 queries, one for each route and pair of months, 0.15 seconds apart to stay well under the
    API's limit of 600 a minute, so it adds about eleven minutes to a deploy. Should the API answer
    HTTP 429, too many queries, all the same, the fetcher waits as long as its Retry-After header
    says, a minute if it says nothing, and asks again, up to twice; three queries refused in a row
@@ -182,11 +182,11 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
 
 - The destinations are the airports in Japan and Taiwan with scheduled flights from Incheon, Gimpo
   or Cheongju, checked on 12 October 2026 against press reports, airline filings and airport pages,
-  with Hong Kong, Macau, every Vietnamese airport, Bangkok's two, Guam and Saipan. Airports served
-  only by charters, such as Toyama, Ube and Kushiro, and other Korean airports are left out. Kobe
-  takes international flights only as charters until it opens to scheduled ones, but Korean Air
-  flies there twice a day to a timetable and sells the seats like any other route's, so it is
-  listed.
+  with Hong Kong, Macau, every Vietnamese airport, Bangkok's two, Chiang Mai, Guam and Saipan.
+  Airports served only by charters, such as Toyama, Ube and Kushiro, and other Korean airports are
+  left out. Kobe takes international flights only as charters until it opens to scheduled ones, but
+  Korean Air flies there twice a day to a timetable and sells the seats like any other route's, so
+  it is listed.
 - The search links follow URL formats the sites do not document, and any of them can change. The
   KAYAK link asks for the trip's airline, nonstop for a nonstop trip; the others show every airline.
 - Leave counts the departure day as a whole day, and knows only Korean public holidays, the days off
@@ -201,10 +201,12 @@ To fetch live fares by hand, `TRAVELPAYOUTS_TOKEN=... npm run fares` writes
   query for it with HTTP 400 on 13 October 2026, so it is left out until the API knows it. Most
   flights from Korea to Vietnam, Guam and Saipan leave in the evening and land at night, so the rule
   against a late flight out leaves few of their trips: on 13 October 2026 it left out 122 of the 257
-  tickets from Incheon to Da Nang and every one to Guam and Saipan of two to six nights. The page
-  says where a trip connects, but not for how long; the search links show that. A ticket's link
-  lists its flights in a format Aviasales does not document, so where a trip connects can go
-  missing should the format change.
+  tickets from Incheon to Da Nang and every one to Guam and Saipan of two to six nights. The nonstop
+  flights from Incheon to Chiang Mai that search results showed on 21 October 2026, on Korean Air,
+  Jin Air, Jeju Air and Eastar Jet, all land after 8 p.m. local time, so nearly every trip there
+  that the page offers connects. The page says where a trip connects, but not for how long; the
+  search links show that. A ticket's link lists its flights in a format Aviasales does not document,
+  so where a trip connects can go missing should the format change.
 - Prices are economy fares, one for each person picked, all as adults, and may differ from what a
   booking finally costs. Bag fees are the cheapest price online in advance, from the airlines' own
   pages for Jeju Air, Trinity, Air Seoul, Eastar Jet, Aero K, HK Express and ZIPAIR (whose won price
