@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-13",
+  "updated": "2026-10-21",
   "origins": ["ICN", "GMP", "CJJ"],
   "destinations": [
     { "dest": "NRT", "city": "도쿄 나리타", "country": "JP" },
@@ -61,6 +61,7 @@
     { "dest": "CAH", "city": "까마우", "country": "VN", "utcOffset": 7 },
     { "dest": "BKK", "city": "방콕 수완나품", "country": "TH", "utcOffset": 7 },
     { "dest": "DMK", "city": "방콕 돈므앙", "country": "TH", "utcOffset": 7 },
+    { "dest": "CNX", "city": "치앙마이", "country": "TH", "utcOffset": 7 },
     { "dest": "GUM", "city": "괌", "country": "GU", "utcOffset": 10 },
     { "dest": "SPN", "city": "사이판", "country": "MP", "utcOffset": 10 }
   ]
