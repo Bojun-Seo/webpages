@@ -1,0 +1,146 @@
+# Builds the sparemine CLI from the (private) applications repository and
+# publishes the x86-64 binaries to a Release on THIS public repository, so the
+# launcher page can link to them with no login (the README calls this option
+# (a)). Push a tag like `sparemine-v0.1.0` to build and publish; a manual run
+# (Actions -> sparemine binaries -> Run workflow) builds the same binaries as
+# downloadable artifacts without creating a release.
+#
+# Requires a repository secret APPLICATIONS_TOKEN: a token that can read
+# bojun-seo/applications (a fine-grained PAT with Contents: Read on that repo).
+# Without it the checkout of the private source fails. The source ref defaults
+# to `master`; override it on a manual run until the miner is merged there.
+name: sparemine binaries
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: applications ref to build from
+        default: master
+  push:
+    tags:
+      - 'sparemine-v*'
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_REPO: bojun-seo/applications
+  SOURCE_REF: ${{ github.event.inputs.source_ref || 'master' }}
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-randomx
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bin: sparemine
+            asset: sparemine-linux-x86_64-randomx
+          - name: windows-randomx
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin: sparemine.exe
+            asset: sparemine-windows-x86_64-randomx.exe
+    steps:
+      - name: Check out the miner source
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.SOURCE_REPO }}
+          ref: ${{ env.SOURCE_REF }}
+          token: ${{ secrets.APPLICATIONS_TOKEN }}
+          path: src
+      - name: Install Rust
+        run: |
+          rustup update stable
+          rustup target add ${{ matrix.target }}
+      - name: Test
+        working-directory: src/sparemine
+        run: cargo test -p miner-core --features randomx
+      - name: Build CLI (release)
+        working-directory: src/sparemine
+        run: cargo build --release --target ${{ matrix.target }} -p miner-cli --features randomx
+      - name: Stage asset
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp "src/sparemine/target/${{ matrix.target }}/release/${{ matrix.bin }}" "dist/${{ matrix.asset }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: dist/${{ matrix.asset }}
+          if-no-files-found: error
+
+  # Fully static RandomX: musl libc + statically linked C++, built with zig as
+  # the cross C/C++ compiler (the same idea that lets xmrig ship static Linux
+  # binaries). This is the binary the launcher page recommends. Experimental —
+  # if it breaks, the glibc build above still ships.
+  build-linux-randomx-static:
+    name: linux-randomx-static
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the miner source
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.SOURCE_REPO }}
+          ref: ${{ env.SOURCE_REF }}
+          token: ${{ secrets.APPLICATIONS_TOKEN }}
+          path: src
+      - name: Install Rust + musl target
+        run: |
+          rustup update stable
+          rustup target add x86_64-unknown-linux-musl
+      - name: Install zig + cargo-zigbuild
+        run: |
+          python3 -m pip install --break-system-packages ziglang
+          cargo install cargo-zigbuild --locked
+      - name: Build (fully static)
+        working-directory: src/sparemine
+        run: cargo zigbuild --release --target x86_64-unknown-linux-musl -p miner-cli --features randomx
+      - name: Stage + show linkage
+        run: |
+          mkdir -p dist
+          cp src/sparemine/target/x86_64-unknown-linux-musl/release/sparemine dist/sparemine-linux-x86_64-randomx-static
+          file dist/sparemine-linux-x86_64-randomx-static
+          ldd dist/sparemine-linux-x86_64-randomx-static || echo "not a dynamic executable (static)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sparemine-linux-x86_64-randomx-static
+          path: dist/sparemine-linux-x86_64-randomx-static
+          if-no-files-found: error
+
+  release:
+    needs: [build, build-linux-randomx-static]
+    # Publish whatever built, even if one platform failed; only on a tag.
+    if: ${{ always() && startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the Release on this repository and upload assets
+    steps:
+      - name: Collect binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: List
+        run: ls -R dist
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**
+          body: |
+            sparemine CLI binaries (x86-64), built from bojun-seo/applications.
+            The launcher page links to these:
+            <https://bojun-seo.github.io/webpages/sparemine/>
+
+            - `sparemine-linux-x86_64-randomx-static` — RandomX + SHA256d, fully
+              static; runs on any x86-64 Linux. The page's default.
+            - `sparemine-linux-x86_64-randomx` — RandomX + SHA256d; needs
+              glibc >= 2.34 + libstdc++ (fallback).
+            - `sparemine-windows-x86_64-randomx.exe` — RandomX + SHA256d.
+
+            Linux: `chmod +x <file> && ./<file> --print-devices`
