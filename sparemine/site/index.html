@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>sparemine 설정 생성기</title>
+<meta name="description" content="BTC 수신 주소와 몇 가지 옵션을 넣으면 sparemine 채굴기를 내 컴퓨터에서 바로 실행할 한 줄 명령·config.toml·실행 스크립트를 만들어 주는 개인 페이지. 채굴은 브라우저가 아니라 내 컴퓨터에서 돕니다.">
+<link rel="stylesheet" href="style.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow">멀티플랫폼 채굴기 sparemine · 설정 생성기</p>
+    <h1>sparemine 설정 생성기</h1>
+    <p class="lede">BTC 수신 주소와 몇 가지 옵션을 넣으면, 내 컴퓨터에서 바로 실행할 <strong>한 줄 명령</strong>, <code>config.toml</code>, <strong>실행 스크립트</strong>를 만들어 줍니다. 플랫폼마다 설정을 손으로 고칠 필요 없이, 채우고 복사하면 끝입니다.</p>
+    <p class="status" id="status"></p>
+  </header>
+
+  <form id="form" class="panel" aria-label="채굴 설정">
+    <fieldset>
+      <legend>지급받을 지갑</legend>
+      <div class="controls">
+        <label class="field field-wide">
+          <span>BTC 수신 주소</span>
+          <input id="address" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="bc1... 또는 1... / 3...">
+        </label>
+        <label class="field">
+          <span>워커 이름</span>
+          <input id="worker" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="rig1">
+        </label>
+      </div>
+      <p class="fine">넣는 것은 <strong>공개 수신 주소</strong>뿐입니다. sparemine은 개인키나 시드 문구를 요구하지도, 저장하지도, 전송하지도 않습니다. 이 주소는 브라우저 밖으로 나가지 않고, 아래 명령에 글자로만 들어갑니다.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>무엇을, 어디서, 어디에</legend>
+      <div class="controls">
+        <label class="field">
+          <span>알고리즘</span>
+          <select id="algo"></select>
+        </label>
+        <label class="field">
+          <span>풀 (BTC 지급)</span>
+          <select id="pool"></select>
+        </label>
+        <label class="field field-wide" id="pool-url-field" hidden>
+          <span>풀 주소 (host:port)</span>
+          <input id="pool-url" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="randomxmonero.auto.nicehash.com:9200">
+        </label>
+        <label class="field">
+          <span>실행 플랫폼</span>
+          <select id="platform"></select>
+        </label>
+      </div>
+      <p class="fine" id="algo-note"></p>
+      <p class="fine" id="platform-note"></p>
+    </fieldset>
+
+    <fieldset>
+      <legend>자원 사용 (남는 만큼만)</legend>
+      <div class="controls">
+        <label class="field">
+          <span>CPU 사용 상한 (%)</span>
+          <input id="max-cpu-percent" type="number" inputmode="numeric" min="1" max="100" step="1">
+        </label>
+        <label class="field">
+          <span>스레드 수 (직접 지정)</span>
+          <input id="threads" type="number" inputmode="numeric" min="1" step="1" placeholder="비우면 % 로 계산">
+        </label>
+        <label class="field">
+          <span>다른 작업이 많을 때 (idle 임계)</span>
+          <input id="busy-threshold" type="number" inputmode="decimal" min="0.05" max="0.95" step="0.05">
+        </label>
+      </div>
+      <div class="toggles">
+        <label class="toggle"><input id="idle-only" type="checkbox"> <span>쓰고 있을 때는 멈춤 (<code>--idle-only</code>, 리눅스)</span></label>
+        <label class="toggle"><input id="lower-priority" type="checkbox"> <span>우선순위 낮춰 앞 작업에 양보 (기본 켜짐)</span></label>
+      </div>
+      <p class="fine">스레드 수를 넣으면 CPU 상한 대신 그 수가 쓰입니다. 기본값은 "방해하지 말 것"에 맞춰져 있어요.</p>
+    </fieldset>
+
+    <div class="form-foot">
+      <p class="fine" id="example-note">처음 넣어 둔 값은 예시입니다. 내 설정으로 바꿔 보세요.</p>
+      <button type="button" class="reset" id="reset">예시 값으로 되돌리기</button>
+    </div>
+  </form>
+
+  <section class="output" aria-labelledby="out-title">
+    <div class="section-head">
+      <h2 id="out-title">실행할 것</h2>
+      <p class="summary" id="summary" aria-live="polite"></p>
+    </div>
+
+    <article class="block">
+      <div class="block-head">
+        <h3>① 한 줄 명령 <span class="tag" id="oneliner-plat"></span></h3>
+        <div class="actions"><button type="button" class="act" data-copy="oneliner">복사</button></div>
+      </div>
+      <p class="fine">내려받기 · 실행 권한 · 실행을 한 번에. 터미널(또는 PowerShell)에 붙여넣으세요.</p>
+      <pre class="code"><code id="oneliner"></code></pre>
+    </article>
+
+    <article class="block">
+      <div class="block-head">
+        <h3>② config.toml</h3>
+        <div class="actions">
+          <button type="button" class="act" data-copy="toml">복사</button>
+          <button type="button" class="act" id="dl-toml">내려받기</button>
+        </div>
+      </div>
+      <p class="fine">바이너리와 같은 폴더에 두고 <code>sparemine --config config.toml</code> 로 실행합니다.</p>
+      <pre class="code"><code id="toml"></code></pre>
+    </article>
+
+    <article class="block">
+      <div class="block-head">
+        <h3>③ 실행 스크립트 <span class="tag" id="script-name"></span></h3>
+        <div class="actions">
+          <button type="button" class="act" data-copy="script">복사</button>
+          <button type="button" class="act" id="dl-script">내려받기</button>
+        </div>
+      </div>
+      <p class="fine">파일로 저장해 두고 쓰고 싶을 때. 내려받기 → 내용 확인 → 실행.</p>
+      <pre class="code"><code id="script"></code></pre>
+    </article>
+
+    <p class="fine tip">하드웨어부터 확인하려면: <code id="devices-cmd"></code></p>
+  </section>
+
+  <footer class="foot">
+    <p>sparemine은 <strong>브라우저가 아니라 내 컴퓨터에서 도는 네이티브 채굴기</strong>입니다. 이 페이지는 채굴을 하지 않고, 내가 실행할 명령과 설정 파일을 만들어 줄 뿐입니다. 웹페이지가 방문자 브라우저에서 몰래 채굴하는 방식(cryptojacking)이 아닙니다.</p>
+    <p>남의 전기·하드웨어를 쓰는 일이 없도록, <strong>내 컴퓨터나 소유자가 동의한 컴퓨터</strong>에서만 실행하세요. PC방·사무실 PC처럼 내 것이 아닌 기기에서 돌리는 것은 그 장소의 약관을 어기는 일일 수 있고, 잠금을 우회해 설치하는 것은 더 분명한 법적 문제입니다. (법률 자문이 아닙니다.)</p>
+    <p>넣은 값은 이 브라우저에만 저장되고 어디로도 보내지 않습니다. 바이너리는 <a id="releases-link" href="https://github.com/bojun-seo/webpages/releases">GitHub Releases</a>에서 받습니다. 쓰는 법은 <a href="https://github.com/bojun-seo/applications/tree/master/sparemine">sparemine README</a>에 있습니다.</p>
+  </footer>
+</div>
+<noscript><p class="wrap">이 페이지는 자바스크립트가 있어야 명령을 만듭니다.</p></noscript>
+</body>
+</html>
