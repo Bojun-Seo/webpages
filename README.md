@@ -7,6 +7,7 @@ A collection of web pages built for personal use, published with GitHub Pages at
 |---|---|---|
 | [`japan-flights/`](japan-flights/) | [Short-Haul Flights](https://bojun-seo.github.io/webpages/japan-flights/) | Recommends round trips that take no leave, nonstop or with one connection, from Seoul and Cheongju to Japan, Taiwan, Hong Kong, Macau, Vietnam, Thailand, Guam and Saipan |
 | [`skypass-cards/`](skypass-cards/) | [SKYPASS Card Calculator](https://bojun-seo.github.io/webpages/skypass-cards/) | Works out the Korean Air miles each SKYPASS credit card earns in a year for what the visitor spends, and what is left after the annual fee |
+| [`sparemine/`](sparemine/) | [sparemine launcher](https://bojun-seo.github.io/webpages/sparemine/) | Turns a BTC receive address and a few options into the one-line command, `config.toml` and run script that start the [sparemine](https://github.com/bojun-seo/applications/tree/master/sparemine) miner on your own machine; the page itself never mines |
 
 ## Publishing
 

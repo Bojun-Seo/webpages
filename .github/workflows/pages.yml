@@ -12,6 +12,7 @@ on:
       - index.html
       - japan-flights/**
       - skypass-cards/**
+      - sparemine/**
       - .github/workflows/pages.yml
   schedule:
     - cron: '23 21 * * *' # 06:23 in Korea
@@ -41,8 +42,18 @@ jobs:
       - run: npm test
         working-directory: skypass-cards
 
+  sparemine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm test
+        working-directory: sparemine
+
   deploy:
-    needs: [japan-flights, skypass-cards]
+    needs: [japan-flights, skypass-cards, sparemine]
     # Pages takes deployments from the default branch only. Scheduled runs always start there.
     if: github.event_name == 'schedule' || github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
@@ -71,8 +82,9 @@ jobs:
           cp index.html _site/
           cp -R japan-flights/site _site/japan-flights
           cp -R skypass-cards/site _site/skypass-cards
+          cp -R sparemine/site _site/sparemine
           v=${GITHUB_SHA::7}
-          for page in japan-flights skypass-cards; do
+          for page in japan-flights skypass-cards sparemine; do
             sed -i "s|href=\"style.css\"|href=\"style.css?v=$v\"|; s|src=\"app.js\"|src=\"app.js?v=$v\"|" \
               _site/$page/index.html
             grep -q "style.css?v=$v" _site/$page/index.html
@@ -82,6 +94,8 @@ jobs:
           grep -q "plan.js?v=$v" _site/japan-flights/app.js
           sed -i "s|from './calc.js'|from './calc.js?v=$v'|" _site/skypass-cards/app.js
           grep -q "calc.js?v=$v" _site/skypass-cards/app.js
+          sed -i "s|from './gen.js'|from './gen.js?v=$v'|" _site/sparemine/app.js
+          grep -q "gen.js?v=$v" _site/sparemine/app.js
       - name: Download the fares the site has now
         # The fetcher keeps them for the queries the API does not answer, all of them if it answers
         # none. Nothing to download before the first deploy.
