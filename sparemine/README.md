@@ -101,6 +101,15 @@ here. Push a tag like `sparemine-v0.1.0` to build and publish; a manual run
 (**Actions → sparemine binaries → Run workflow**) builds the same binaries as
 downloadable artifacts without creating a Release.
 
+The Release goes up only when the three builds and the miner's tests all pass,
+since the page links to the latest Release's files by name and a Release
+without one of them would break the command the page gives for it. All three
+builds take the same commit of the source, which the Release notes name, and
+the Release carries a `SHA256SUMS` of the binaries; the page points to it. The
+workflow publishes with the `gh` CLI the runner has, so no third-party action
+holds its write access, and keeps the token for the private source out of the
+checkout's git config.
+
 It needs one secret, **`APPLICATIONS_TOKEN`** — a fine-grained personal access
 token with **Contents: Read** on `bojun-seo/applications` — to check the miner
 source out of the private repo. Add it under **Settings → Secrets and variables
