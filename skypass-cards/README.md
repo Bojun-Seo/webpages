@@ -118,8 +118,9 @@ change, and `checked` on each card whose terms were checked again. A card has:
 
 The terms of 19 October 2026 were gathered through web search, which quoted the issuers' pages and
 guidebooks and the comparison sites named under `sources`; the issuers' sites themselves could not
-be opened from where the data was put together. Check each card against its issuer's page before
-publishing.
+be opened from where the data was put together. The page went up with those terms, so checking each
+card against its issuer's own page is still to be done; move the card's `checked` on when it has
+been, and take out of `unverified` what the issuer's page settles.
 
 The tests check that every card has the fields the page reads and that its rules name only caps it
 has and kinds of spending the page asks about, so run them after editing.

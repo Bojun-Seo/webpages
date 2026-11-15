@@ -71,7 +71,10 @@ function dotDate(date) {
   return date.replaceAll('-', '.');
 }
 
-const state = { cards: [] };
+// The cards, and the ids of those whose details the viewer has opened: the
+// list is drawn again on every change to the form, and a card opened stays
+// open through it.
+const state = { cards: [], open: new Set() };
 
 // The form as entered: amounts in 만원, the trips a year, a mile's value in
 // won, the fee limit ('' for none) and the order.
@@ -160,7 +163,7 @@ function resultRow(result) {
     figure('fee', '연회비', won(result.fee)),
     figure(`value${result.value < 0 ? ' negative' : ''}`, '남는 가치', won(result.value)),
     figure('per-mile', '마일당 연회비', result.perMile == null ? '—' : `${result.perMile.toFixed(1)}원`),
-    el('details', { class: 'detail' },
+    el('details', { class: 'detail', 'data-card': card.id, open: state.open.has(card.id) },
       el('summary', null, '계산 내역과 조건'),
       breakdown(result),
       list('알아 둘 조건', card.notes),
@@ -170,7 +173,18 @@ function resultRow(result) {
         `확인한 곳 (${dotDate(card.checked)}): ${card.sources.map((source) => source.title).join(' · ')}`)));
 }
 
+// Which cards' details are open in the list as drawn. It is read from the
+// page itself, not kept on toggling, since a browser says a details element
+// has toggled only after a moment, and the viewer may type before that.
+function readOpen() {
+  for (const details of $('results').querySelectorAll('details[data-card]')) {
+    if (details.open) state.open.add(details.dataset.card);
+    else state.open.delete(details.dataset.card);
+  }
+}
+
 function update() {
+  readOpen();
   const form = readForm();
   const spend = {
     ...Object.fromEntries(Object.keys(AMOUNTS).map((key) => [key, form[key] * MAN])), trips: form.trips,
