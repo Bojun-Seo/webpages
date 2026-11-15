@@ -2,8 +2,8 @@
 
 A static page that recommends round trips, nonstop or with one connection each way, from Incheon,
 Gimpo and Cheongju to Japan, Taiwan, Hong Kong, Macau, Vietnam, Thailand, Guam and Saipan, from the
-fares, on any airline but those of mainland China and the AirAsia group, that Aviasales users found
-in the last 48 hours. It counts the days of leave each trip takes against a Monday, Tuesday and
+fares, on any airline but those of mainland China and the AirAsia group, and not on tickets Hahn Air
+issues for other airlines' flights, that Aviasales users found in the last 48 hours. It counts the days of leave each trip takes against a Monday, Tuesday and
 Thursday work week and Korean public holidays, offers only the trips that take none, without showing
 the count, and lists them cheapest first, with the airlines of SkyTeam, Star Alliance and oneworld
 given a head start. GitHub Pages serves it; there is no server.
@@ -84,9 +84,14 @@ workflow writes an empty one and the page says live fares are not set up. Aviasa
 its own users' searches, so regional routes may have few fares or none. The fetcher asks about every
 route the page knows (`routesOf` in `site/plan.js`) with `direct=false`, keeps the tickets with no
 more than one connection each way and none on an airline it leaves out, those of mainland China and
-the AirAsia group (`LEFT_OUT_AIRLINES` in `tools/fetch-fares.js`), and logs any query whose answer
-reaches the limit of 1,000 tickets, since then the dearest tickets are missing. A ticket counts only
-on the route between the airports it names. The `static_fare_key` in its link says what its fare
+the AirAsia group, and H1, the code Hahn Air issues tickets under for flights other airlines fly,
+which says nothing of whose flights they are (`LEFT_OUT_AIRLINES` in `tools/fetch-fares.js`), and
+logs any query whose answer reaches the limit of 1,000 tickets, since then the dearest tickets are
+missing. A query the API has not answered in 30 seconds fails. A ticket counts only on the route
+between the airports it names, and, where its link lists its ways, only when the way out flies from
+the route's Korean airport to its airport abroad and the way back between the same two: a ticket to
+Narita that comes back from Haneda, or to Gimpo, is left out, since the page names one airport at
+each end. The `static_fare_key` in its link says what its fare
 includes: `L0` for no checked bag, `L1_1_15` for one bag of 15 kg, and so on. A fare gives the bags
 it includes for each person in `bags`, `0` for none, when its link says, and its connections out and
 back in `stops` when it makes any. The link's `t` lists the ticket's way out and way back, each with
@@ -139,7 +144,9 @@ Everything the page knows is in `site/data/`:
   on with each change.
 - `holidays.json`: public holidays by date, through 2027, from the 월력요항 that the Korea
   AeroSpace Administration publishes each June. A substitute holiday is named after the holiday it
-  stands in for.
+  stands in for. The page takes a day it does not list for a working day, so add each year before
+  the fares reach it: the fetcher fetches six months ahead and warns on the run's summary page, from
+  July 2027 for 2028, when they reach past the last holiday listed.
 - `baggage.json`: what a checked bag bought in advance costs one way, in won, for a bag a fare does
   not include. `airlines` gives an airline's own `fee`, one for all its routes or one for each
   destination country (`{ "JP": 40000, "TW": 50000 }`), with the `kg` it buys, its `source`,

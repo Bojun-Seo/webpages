@@ -1,14 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { addDays } from '../site/plan.js';
 import {
-  bagTally, carryOver, checkedBags, connections, keepCheapest, leftOut, localDate, localTime, monthsFrom, pickFares,
-  query, retryAfter,
+  bagTally, carryOver, checkedBags, connections, keepCheapest, keepPrevious, leftOut, localDate, localTime, monthsFrom,
+  pickFares, query, retryAfter,
 } from '../tools/fetch-fares.js';
 
 const oita = { id: 'ICN-OIT', origin: 'ICN', dest: 'OIT' };
@@ -146,9 +146,11 @@ test('the link of a ticket tells whether its fare includes a checked bag', () =>
   assert.equal(checkedBags(link('L1_2_0')), 2);
   assert.equal(checkedBags('/search/ICN1410NRT22101'), null);
   assert.equal(checkedBags(undefined), null);
-  const response = { success: true, data: [ticket({ link: link('L0') }), ticket({ link: link('L1_1_15'), price: 260000 }),
-    ticket({ price: 270000 })] };
-  const fares = pickFares(response, oita);
+  const narita = { id: 'ICN-NRT', origin: 'ICN', dest: 'NRT' };
+  const toNarita = (fields) => ticket({ destination: 'TYO', destination_airport: 'NRT', ...fields });
+  const response = { success: true, data: [toNarita({ link: link('L0') }),
+    toNarita({ link: link('L1_1_15'), price: 260000 }), toNarita({ price: 270000 })] };
+  const fares = pickFares(response, narita);
   assert.deepEqual(fares.map((f) => f.bags), [0, 1, undefined]);
   assert.equal(bagTally([...fares, { airline: '7C', bags: 0 }]), '7C 1/0/0, KE 1/1/1');
 });
@@ -204,6 +206,28 @@ test('a ticket on an airline left out does not count, by its own airline or one 
   const kept = [ticket({ airline: 'CI' }), ticket({ airline: 'HX', link: listing(['HX', 'ICN', 'OIT'], ['HX', 'OIT', 'ICN']) })];
   assert.deepEqual(kept.map((t) => leftOut(t, oita)), [null, null]);
   assert.deepEqual(pickFares({ success: true, data: [...out, ...kept] }, oita).map((f) => f.airline), ['CI', 'HX']);
+});
+
+test('a ticket Hahn Air issues for another airline\'s flights does not count', () => {
+  assert.equal(leftOut(ticket({ airline: 'H1', transfers: 1 }), oita), 'airline');
+  assert.deepEqual(pickFares({ success: true, data: [ticket({ airline: 'H1' }), ticket({ airline: 'NH' })] }, oita)
+    .map((f) => f.airline), ['NH']);
+});
+
+test('a ticket whose link flies a way between other airports does not count', () => {
+  const narita = { id: 'ICN-NRT', origin: 'ICN', dest: 'NRT' };
+  const toNarita = (link) => ticket({ airline: 'MM', destination: 'TYO', destination_airport: 'NRT', link });
+  // Out to Narita and back from Haneda, back to Gimpo, or out from Gimpo whatever the ticket says.
+  const fromHaneda = toNarita(listing(['MM', 'ICN', 'NRT'], ['MM', 'HND', 'ICN']));
+  const toGimpo = toNarita(listing(['MM', 'ICN', 'NRT'], ['MM', 'NRT', 'GMP']));
+  const fromGimpo = toNarita(listing(['MM', 'GMP', 'NRT'], ['MM', 'NRT', 'ICN']));
+  assert.deepEqual([fromHaneda, toGimpo, fromGimpo].map((t) => leftOut(t, narita)),
+    ['elsewhere', 'elsewhere', 'elsewhere']);
+  // Both ways between Incheon and Narita count, through wherever they connect, and so does a ticket
+  // whose link does not list its ways.
+  const through = { ...toNarita(listing(['MM', 'ICN', 'KIX', 'NRT'], ['MM', 'NRT', 'ICN'])), transfers: 1 };
+  assert.deepEqual([through, toNarita('/search/ICN1311NRT15111')].map((t) => leftOut(t, narita)), [null, null]);
+  assert.deepEqual(pickFares({ success: true, data: [fromHaneda, through] }, narita).map((f) => f.via), [[['KIX'], []]]);
 });
 
 test('the cheapest fare with a checked bag is kept apart from the cheapest without', () => {
@@ -265,14 +289,32 @@ test('fares fetched before stand in for the queries the API did not answer', () 
   const before = [fare('ICN-NRT', '2026-11-13', '2026-11-15', 150000), fare('ICN-NRT', '2026-11-27', '2026-12-01', 160000),
     fare('ICN-KIX', '2026-11-13', '2026-11-15', 140000), fare('ICN-NRT', '2026-10-09', '2026-10-11', 90000)];
   const unanswered = [{ route: 'ICN-NRT', out: '2026-11', back: '2026-12' }, { route: 'ICN-NRT', out: '2026-10', back: '2026-10' }];
+  const now = Date.parse('2026-10-13T21:40:00Z');
+  const fetched = (hours) => new Date(now - hours * 3600e3).toISOString();
   // A query's fares leave in its month out and come back in its month back; those that have left stay out.
-  assert.deepEqual(carryOver(before, unanswered, '2026-10-13').map((f) => f.price), [160000]);
+  // Each says when it was fetched: when the document it came in was written.
+  assert.deepEqual(carryOver({ updated: fetched(24), fares: before }, unanswered, '2026-10-13', now),
+    [{ ...before[1], fetched: fetched(24) }]);
+});
+
+test('a fare fetched before stands in for three days from when it was fetched, however often it is kept', () => {
+  const now = Date.parse('2026-10-13T21:40:00Z');
+  const fetched = (hours) => new Date(now - hours * 3600e3).toISOString();
+  const fare = (price, fields) => ({ route: 'ICN-NRT', airline: '7C', depart: '2026-11-27', return: '2026-11-29',
+    price, ...fields });
+  const unanswered = [{ route: 'ICN-NRT', out: '2026-11', back: '2026-11' }];
+  const kept = (updated, fares) => carryOver({ updated, fares }, unanswered, '2026-10-13', now).map((f) => f.price);
+  assert.deepEqual(kept(fetched(72), [fare(150000)]), [150000]);
+  assert.deepEqual(kept(fetched(73), [fare(150000)]), []);
+  // A fare kept yesterday, in a document written then, goes by when it was first fetched.
+  assert.deepEqual(kept(fetched(24), [fare(150000, { fetched: fetched(49) }), fare(160000, { fetched: fetched(80) })]),
+    [150000]);
 });
 
 // Runs the script on a route to Narita and one to Kansai, for this month, against an API that `answer`
-// stands in for, with `previous` as the fares fetched before and `marker` as the partner marker; gives
-// the fares it wrote and its exit code.
-function fetchWith(answer, previous, marker) {
+// stands in for, with `previous` as the fares fetched before, `marker` as the partner marker and `extra`
+// as more arguments; gives the fares it wrote and its exit code.
+function fetchWith(answer, previous, marker, extra = []) {
   const dir = mkdtempSync(join(tmpdir(), 'fares-'));
   const path = (name) => join(dir, name);
   writeFileSync(path('stub.mjs'), `globalThis.fetch = async (url) => (${answer})(new URL(url));\n`);
@@ -283,7 +325,7 @@ function fetchWith(answer, previous, marker) {
   let status = 0;
   try {
     execFileSync(process.execPath, ['--import', path('stub.mjs'), script, '--routes', path('routes.json'),
-      '--out', path('out.json'), '--months', '1', '--previous', path('previous.json')],
+      '--out', path('out.json'), '--months', '1', '--previous', path('previous.json'), ...extra],
     { env: { ...process.env, TRAVELPAYOUTS_TOKEN: 'token', TRAVELPAYOUTS_MARKER: marker || '' }, stdio: 'pipe' });
   } catch (error) {
     status = error.status;
@@ -305,7 +347,7 @@ test('when the API answers some queries, the fares fetched before stand in for t
   const today = localDate(new Date().toISOString());
   const ret = addDays(today, 2);
   // The China Eastern fare was fetched before the page left out mainland Chinese airlines.
-  const previous = { updated: '2026-10-12T21:40:00.000Z', source: 'Aviasales', fares: [
+  const previous = { updated: new Date(Date.now() - 3600e3).toISOString(), source: 'Aviasales', fares: [
     { route: 'ICN-NRT', airline: '7C', depart: today, return: ret, price: 99000 },
     { route: 'ICN-KIX', airline: 'MM', depart: today, return: ret, price: 120000 },
     { route: 'ICN-KIX', airline: 'MU', depart: today, return: ret, price: 110000 }] };
@@ -320,4 +362,47 @@ test('when the API answers some queries, the fares fetched before stand in for t
   assert.notEqual(doc.updated, previous.updated);
   assert.equal(doc.marker, '123456');
   assert.deepEqual(doc.fares.map((f) => `${f.route} ${f.airline} ${f.price}`), ['ICN-NRT 7C 150000', 'ICN-KIX MM 120000']);
+  // The fare kept says when it was fetched; the one fetched now was fetched when the document was written.
+  assert.deepEqual(doc.fares.map((f) => f.fetched), [undefined, previous.updated]);
+  // Fares fetched four days ago stand in for nothing.
+  const old = { ...previous, updated: new Date(Date.now() - 4 * 86400e3).toISOString() };
+  assert.deepEqual(fetchWith(narita, old).doc.fares.map((f) => `${f.route} ${f.airline}`), ['ICN-NRT 7C']);
+});
+
+test('the script warns when it fetches trips past the last holiday holidays.json lists', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fares-'));
+  const path = (name) => join(dir, name);
+  writeFileSync(path('stub.mjs'), 'globalThis.fetch = async () => '
+    + '({ ok: true, status: 200, json: async () => ({ success: true, data: [] }) });\n');
+  writeFileSync(path('routes.json'), JSON.stringify({ origins: ['ICN'], destinations: [
+    { dest: 'NRT', city: '도쿄 나리타', country: 'JP' }] }));
+  const script = fileURLToPath(new URL('../tools/fetch-fares.js', import.meta.url));
+  const warned = (dates) => {
+    writeFileSync(path('holidays.json'), JSON.stringify({ dates }));
+    const run = spawnSync(process.execPath, ['--import', path('stub.mjs'), script, '--routes', path('routes.json'),
+      '--out', path('out.json'), '--months', '1'],
+    { env: { ...process.env, TRAVELPAYOUTS_TOKEN: 'token' }, encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr);
+    return /holidays\.json lists public holidays through/.test(run.stderr);
+  };
+  assert.equal(warned({ '2020-12-25': '성탄절' }), true);
+  assert.equal(warned({ '2020-12-25': '성탄절', '2099-12-25': '성탄절' }), false);
+});
+
+test('on a push the fares fetched before are written again without asking the API', () => {
+  const today = localDate(new Date().toISOString());
+  const fare = (depart, airline, price) => ({ route: 'ICN-NRT', airline, depart, return: addDays(depart, 2), price });
+  const previous = { updated: '2026-10-12T21:40:00.000Z', source: 'Aviasales', marker: '111111', fares: [
+    fare(addDays(today, -1), '7C', 140000), fare(today, '7C', 150000), fare(today, 'H1', 130000)] };
+  assert.deepEqual(keepPrevious(previous, today).fares.map((f) => f.price), [150000]);
+  // An API that is never to be asked fails every query; the script still writes the fares and succeeds.
+  const unasked = `() => { throw new Error('asked the API'); }`;
+  const { doc, status } = fetchWith(unasked, previous, '123456', ['--keep-previous']);
+  assert.equal(status, 0);
+  assert.deepEqual(doc, { ...previous, marker: '123456', fares: [previous.fares[1]] });
+  // With none fetched before, it fetches them.
+  const answering = `() => ({ ok: true, status: 200, json: async () => ({ success: true, data: [] }) })`;
+  const fetched = fetchWith(answering, { updated: null, fares: [] }, '', ['--keep-previous']);
+  assert.equal(fetched.status, 0);
+  assert.notEqual(fetched.doc.updated, null);
 });

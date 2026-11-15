@@ -1,6 +1,7 @@
 // Fetches the round-trip economy fares of every airline but those it leaves
-// out, mainland China's and the AirAsia group's, for the routes the page
-// knows, from each of routes.json's origins to each of its destinations,
+// out, mainland China's, the AirAsia group's and the tickets issued under
+// Hahn Air's code, for the routes the page knows, from each of routes.json's
+// origins to each of its destinations,
 // from the Travelpayouts (Aviasales) Data API, nonstop or with one
 // connection each way, and writes the ones the page can offer where it looks
 // for live fares, each with its airline, its connections, the checked bags
@@ -10,16 +11,24 @@
 //
 //   TRAVELPAYOUTS_TOKEN=... node tools/fetch-fares.js \
 //       [--routes site/data/routes.json] [--out site/data/live-fares.json] [--months 6] \
-//       [--previous live-fares.json]
+//       [--previous live-fares.json [--keep-previous]]
 //
 // `--previous` names the fares fetched before, which the workflow downloads
 // from the published site: the fetcher keeps those of any query the API
-// does not answer, and should it answer none, writes them as they were.
+// does not answer, for three days from when they were fetched, and should
+// it answer none, writes them as they were.
+//
+// `--keep-previous` writes those fares again without asking the API, less
+// the ones that have left and those of airlines left out since; the
+// workflow passes it on a push, which changes the page but not the fares,
+// so that only the daily run spends some 2,200 queries. With no fares
+// before to keep, it fetches them.
 //
 // Without a token it writes an empty file, so the page can say live fares
 // are not set up. It exits 1 only when every query failed.
 
 import { readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { TRIP_NIGHTS, daysBetween, landsInTheMorning, landsLate, routesOf } from '../site/plan.js';
@@ -38,6 +47,13 @@ const RETRIES = 2;
 const RETRY_AFTER_S = 60;
 const MAX_WAIT_S = 300;
 const REFUSED_IN_A_ROW = 3;
+// A query the API has not answered in half a minute fails, as one it
+// answers with an error does.
+const TIMEOUT_MS = 30000;
+// How long a fare fetched before may stand in for a query the API does not
+// answer: three days from when it was fetched. The API's own fares are up to
+// two days old, and an older one says little of what the trip costs now.
+const KEEP_DAYS = 3;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -122,19 +138,23 @@ export function pickFares(response, route) {
 
 // The airlines whose tickets the page leaves out: the passenger airlines of
 // mainland China, though not those of Hong Kong, Macau and Taiwan, China
-// Airlines among them; and those of the AirAsia group: AirAsia, AirAsia X,
-// Thai AirAsia, Thai AirAsia X, Philippines AirAsia and Indonesia AirAsia.
+// Airlines among them; those of the AirAsia group: AirAsia, AirAsia X,
+// Thai AirAsia, Thai AirAsia X, Philippines AirAsia and Indonesia AirAsia;
+// and H1, the code Hahn Air issues tickets under for flights other airlines
+// fly, which says nothing of whose flights they are.
 export const LEFT_OUT_AIRLINES = [
   'CA', 'ZH', 'SC', 'KY', 'TV', 'MU', 'FM', 'KN', 'CZ', 'MF', 'OQ', 'NS', 'RY', 'HU', 'JD', 'GS', '8L', 'PN', 'UQ',
   'FU', 'GX', 'GT', 'CN', '9H', '3U', '9C', 'HO', 'QW', 'BK', 'DZ', 'GJ', 'G5', 'EU', 'DR', 'A6', 'LT', 'JR', 'GY',
   'AK', 'D7', 'FD', 'XJ', 'Z2', 'QZ',
+  'H1',
 ];
 
 // Why a ticket in an answer for `route` does not count, for the log: it
 // lacks what a fare needs, connects more than once a way, flies between
-// other airports, or flies an airline left out (`LEFT_OUT_AIRLINES`), as its
-// own or as one its link names for a way out or back. Null for a ticket
-// that counts.
+// other airports, flies an airline left out (`LEFT_OUT_AIRLINES`), as its
+// own or as one its link names for a way out or back, or flies a way
+// elsewhere than the route does (`alongRoute`). Null for a ticket that
+// counts.
 export function leftOut(t, route) {
   if (!t.airline || !t.departure_at || !t.return_at || !(t.price > 0)) return 'incomplete';
   if ((t.transfers || 0) > 1 || (t.return_transfers || 0) > 1) return 'connections';
@@ -142,16 +162,29 @@ export function leftOut(t, route) {
     || (t.destination_airport && t.destination_airport !== route.dest)) {
     return `${t.origin_airport || route.origin}-${t.destination_airport || route.dest}`;
   }
-  if ([t.airline, ...waysOf(t).map((way) => way.airline)].some((code) => LEFT_OUT_AIRLINES.includes(code))) {
+  const ways = waysOf(t);
+  if ([t.airline, ...ways.map((way) => way.airline)].some((code) => LEFT_OUT_AIRLINES.includes(code))) {
     return 'airline';
   }
+  if (ways.length === 2 && !alongRoute(ways, route)) return 'elsewhere';
   return null;
+}
+
+// Whether the way out and the way back a ticket's link lists fly the route:
+// out from its Korean airport to its airport abroad, and back from the one
+// to the other. The ticket's own fields name the airports of the way out
+// alone, and a ticket to Narita can come back from Haneda, or to Gimpo
+// from Incheon, while the page names one airport at each end.
+function alongRoute(ways, route) {
+  const [out, back] = ways.map((way) => way.airports);
+  return out[0] === route.origin && out.at(-1) === route.dest
+    && back[0] === route.dest && back.at(-1) === route.origin;
 }
 
 // What became of the tickets in the answers for one route, for the log:
 // "312 tickets: 150 between other airports (ICN-NRT 140), 40 connecting
-// more than once, 12 on airlines left out, 100 not of 2 to 6 nights, 22
-// landing late".
+// more than once, 12 on airlines left out, 3 flying a way elsewhere, 100
+// not of 2 to 6 nights, 22 landing late".
 function ticketTally(counts) {
   const others = Object.entries(counts.others).sort((a, b) => b[1] - a[1]);
   const parts = [
@@ -159,6 +192,7 @@ function ticketTally(counts) {
       + `(${others.slice(0, 3).map(([pair, k]) => `${pair} ${k}`).join(', ')})`,
     counts.connections && `${counts.connections} connecting more than once`,
     counts.airline && `${counts.airline} on airlines left out`,
+    counts.elsewhere && `${counts.elsewhere} flying a way elsewhere`,
     counts.incomplete && `${counts.incomplete} incomplete`,
     counts.nights && `${counts.nights} not of ${TRIP_NIGHTS[0]} to ${TRIP_NIGHTS.at(-1)} nights`,
     counts.late && `${counts.late} landing late`,
@@ -278,7 +312,7 @@ export async function query(route, departMonth, returnMonth, token, wait = sleep
     limit: String(LIMIT),
   });
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(url, { headers: { 'X-Access-Token': token } });
+    const res = await fetch(url, { headers: { 'X-Access-Token': token }, signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (res.status === 429 && attempt < RETRIES) {
       const seconds = retryAfter(res.headers.get('retry-after'));
       console.warn(`${route.id} ${departMonth}/${returnMonth}: HTTP 429, asking again in ${seconds} s`);
@@ -290,13 +324,29 @@ export async function query(route, departMonth, returnMonth, token, wait = sleep
   }
 }
 
-// The fares in `fares`, fetched before, that queries the API did not
-// answer this time (`unanswered`, each a route and the months of its way
-// out and back) would have given, and that leave today or later.
-export function carryOver(fares, unanswered, today) {
+// The fares in `previous`, the document fetched before, that queries the
+// API did not answer this time (`unanswered`, each a route and the months
+// of its way out and back) would have given, that leave today or later,
+// and that were fetched no more than `KEEP_DAYS` ago. Each says when it was
+// fetched (`fetched`): when the document it first came in was written,
+// which a fare kept from fetch to fetch carries along, so that it does not
+// stay for as long as the API gives no answer.
+export function carryOver(previous, unanswered, today, now = Date.now()) {
   const asked = new Set(unanswered.map((q) => `${q.route} ${q.out} ${q.back}`));
-  return fares.filter((f) => f.depart >= today
-    && asked.has(`${f.route} ${f.depart.slice(0, 7)} ${f.return.slice(0, 7)}`));
+  return previous.fares
+    .filter((f) => f.depart >= today && asked.has(`${f.route} ${f.depart.slice(0, 7)} ${f.return.slice(0, 7)}`))
+    .map((f) => ({ ...f, fetched: f.fetched || previous.updated }))
+    .filter((f) => now - Date.parse(f.fetched) <= KEEP_DAYS * 86400e3);
+}
+
+// The document fetched before (`previous`) as `--keep-previous` writes it
+// again: without the fares that leave before `today` and those of airlines
+// left out since they were fetched.
+export function keepPrevious(previous, today) {
+  return {
+    ...previous,
+    fares: previous.fares.filter((f) => f.depart >= today && !LEFT_OUT_AIRLINES.includes(f.airline)),
+  };
 }
 
 // The document of fares at `path`, or null when it is missing or not one.
@@ -309,6 +359,23 @@ async function readFares(path) {
   }
 }
 
+// The last month the public holidays in the file at `path` reach
+// ('2027-12'), or null when it is missing or lists none.
+async function holidaysThrough(path) {
+  try {
+    const dates = Object.keys(JSON.parse(await readFile(path, 'utf8')).dates).sort();
+    return dates.length ? dates.at(-1).slice(0, 7) : null;
+  } catch {
+    return null;
+  }
+}
+
+// A warning someone has to act on: GitHub Actions shows it on the run's
+// summary page, not only in the log.
+function flag(message) {
+  console.warn(process.env.GITHUB_ACTIONS ? `::warning title=japan-flights::${message}` : message);
+}
+
 async function main(argv) {
   const here = (path) => fileURLToPath(new URL(path, import.meta.url));
   const { values } = parseArgs({
@@ -318,6 +385,7 @@ async function main(argv) {
       out: { type: 'string', default: here('../site/data/live-fares.json') },
       months: { type: 'string', default: '6' },
       previous: { type: 'string' },
+      'keep-previous': { type: 'boolean', default: false },
     },
   });
   const token = process.env.TRAVELPAYOUTS_TOKEN;
@@ -326,6 +394,18 @@ async function main(argv) {
   // fares fetched before, and leaves it out when it is not set.
   const marker = process.env.TRAVELPAYOUTS_MARKER || undefined;
   const write = (doc) => writeFile(values.out, `${JSON.stringify({ ...doc, marker }, null, 1)}\n`);
+  const today = localDate(new Date().toISOString());
+  if (values['keep-previous']) {
+    const previous = values.previous ? await readFares(values.previous) : null;
+    if (previous?.fares.length) {
+      const doc = keepPrevious(previous, today);
+      await write(doc);
+      console.log(`Kept the ${doc.fares.length} fares fetched at ${previous.updated}, `
+        + `of ${previous.fares.length}, without asking the API.`);
+      return 0;
+    }
+    console.warn('There are no fares fetched before to keep, so they are fetched now.');
+  }
   if (!token) {
     await write({ updated: null, fares: [] });
     console.log('TRAVELPAYOUTS_TOKEN is not set; wrote no live fares.');
@@ -333,8 +413,15 @@ async function main(argv) {
   }
 
   const routes = routesOf(JSON.parse(await readFile(values.routes, 'utf8')));
-  const today = localDate(new Date().toISOString());
   const months = monthsFrom(today, Number(values.months));
+  // The page counts a trip's leave from holidays.json, beside routes.json,
+  // and takes a day it does not list for a working day.
+  const lastMonth = monthsFrom(`${months.at(-1)}-01`, 2)[1];
+  const through = await holidaysThrough(join(dirname(values.routes), 'holidays.json'));
+  if (through && lastMonth > through) {
+    flag(`holidays.json lists public holidays through ${through}, but fares are fetched for trips through `
+      + `${lastMonth}; add the next year's, or the page counts those holidays as working days.`);
+  }
   let fares = [];
   let ok = 0;
   let failed = 0;
@@ -353,7 +440,8 @@ async function main(argv) {
   const unanswered = [];
   for (const route of routes) {
     const before = fares.length;
-    const counts = { tickets: 0, others: {}, connections: 0, airline: 0, incomplete: 0, nights: 0, late: 0 };
+    const counts = { tickets: 0, others: {}, connections: 0, airline: 0, elsewhere: 0, incomplete: 0, nights: 0,
+      late: 0 };
     let asked = 0;
     for (const out of months) {
       // Ask for returns in the same month and the next, so a trip over a
@@ -414,10 +502,12 @@ async function main(argv) {
     console.warn(`No query was answered, so the ${previous.fares.length} fares fetched at ${previous.updated} stay.`);
     return 1;
   }
-  const kept = unanswered.length && previous ? carryOver(previous.fares, unanswered, today) : [];
+  const kept = unanswered.length && previous ? carryOver(previous, unanswered, today) : [];
   if (unanswered.length) {
     console.warn(`${unanswered.length} queries went unanswered; `
-      + (previous ? `${kept.length} fares fetched before stand in for theirs.` : 'no fares fetched before to keep.'));
+      + (previous
+        ? `${kept.length} fares fetched in the last ${KEEP_DAYS} days stand in for theirs.`
+        : 'no fares fetched before to keep.'));
   }
   fares = keepCheapest([...fares, ...kept]);
   await write({ updated: new Date().toISOString(), source: 'Aviasales', fares });
