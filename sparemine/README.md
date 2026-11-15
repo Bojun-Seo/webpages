@@ -38,6 +38,12 @@ The visitor enters:
   count** — and whether to **pause while the machine is busy** (`--idle-only`)
   and **lower the process priority** (both on by default).
 
+While a NiceHash pool is picked, the page says under the form that NiceHash is
+reported to pay to the mining address of a NiceHash account rather than to a
+wallet of one's own, and where its dashboard shows that address. NiceHash's own
+documentation could not be reached to confirm it, so the note says where to look
+rather than what the address must be.
+
 `site/gen.js` turns that into three things, shown live and copyable:
 
 1. **A one-line command** that downloads the right binary and starts it: a
@@ -47,16 +53,29 @@ The visitor enters:
 3. **A run script** (`run-sparemine.sh` or `run-sparemine.ps1`) that does the
    same as the one-liner but as a file you can read before running.
 
-Picking a preset pool lines the algorithm up with it; a thread count overrides
-the CPU percentage; and the busy threshold only shows while `--idle-only` is on,
-so the generated flags stay valid. Until a real address is entered the commands
-show `YOUR_BTC_ADDRESS`, so the shape is visible but nothing runs by accident.
-The address is validated loosely (bech32 or base58) — enough to catch an empty
-or obviously wrong entry without rejecting a valid one. What the visitor enters
-is kept in the browser's local storage and sent nowhere.
+Picking a preset pool lines the algorithm up with it; a thread count, a whole
+number of one or more, overrides the CPU percentage, and anything else in that
+field leaves the percentage to decide; and the busy threshold can be set only
+while `--idle-only` is on, so the generated flags stay valid. `--idle-only` is
+for Linux alone: the miner reads `/proc/stat` to tell that the machine is busy,
+and what the Windows build does with the flag has not been confirmed, so for
+Windows the box is off and disabled, the commands leave the flag out and
+`config.toml` says `idle_only = false`. Until a real address is entered the
+commands show `YOUR_BTC_ADDRESS`, and until a pool typed in by hand is entered
+`POOL_HOST:PORT`, so the shape is visible but nothing runs by accident. What the
+visitor types is quoted for the shell it goes to, and escaped in `config.toml`,
+whenever it holds a character the shell or TOML would read, so a space or a
+semicolon in it cannot end the command where it stands. On Windows the one-liner
+starts the miner only if the download worked. The address is validated loosely
+(bech32, in either case, or base58) — enough to catch an empty or obviously
+wrong entry without rejecting a valid one; the page says it has the form of an
+address, not that it is the visitor's. What the visitor enters is kept in the
+browser's local storage and sent nowhere.
 
-The flag names, the `config.toml` keys and the NiceHash endpoints are checked
-against sparemine itself in `test/gen.test.js`.
+`test/gen.test.js` pins the flags, the `config.toml` keys and the NiceHash
+endpoints the page writes. They follow sparemine's options and miner-core's
+`Config`, which live in the private `applications` repository the tests cannot
+read, so a change to the miner's options has to be carried here by hand.
 
 ## Why a generator and not in-browser mining
 
@@ -97,14 +116,16 @@ The assets it publishes, and that the page selects between, are:
 | `sparemine-windows-x86_64-randomx.exe` | RandomX + SHA256d, for Windows |
 
 Until the first Release exists the page still generates correct commands; only
-the download link 404s. The asset names and the release base URL live in
-`site/gen.js` (`RELEASE`, `PLATFORMS`), so moving the binaries elsewhere is a
-one-place change.
+the download link 404s. The asset names and the release URLs live in
+`site/gen.js` (`RELEASE`, `PLATFORMS`), and the page takes its link to the
+Releases from there too; the asset names in the workflow and its release notes
+have to follow by hand.
 
 ## Publish on GitHub Pages
 
-[`pages.yml`](../.github/workflows/pages.yml) runs the tests on every push that
-touches `sparemine/`, and on the default branch publishes `site/` to
+[`pages.yml`](../.github/workflows/pages.yml) runs the tests and opens the page
+in a browser on every push that touches `sparemine/`, and on the default branch
+publishes `site/` to
 <https://bojun-seo.github.io/webpages/sparemine/>. The
 [top-level README](../README.md#publishing) says how the site is put together.
 The page itself needs no secret.

@@ -18,12 +18,18 @@ export const RELEASE = {
 // The binary to download per target. All three carry RandomX and SHA256d,
 // so the chosen algorithm is always supported. The SHA256d-only build is a
 // "does it run" demo and is deliberately left out here.
+//
+// `idleOnly` says whether the page offers --idle-only there. The miner reads
+// /proc/stat to tell that the machine is busy, which only Linux has, and
+// what the Windows build does with the flag has not been confirmed, so the
+// page leaves it out of everything it generates for Windows.
 export const PLATFORMS = [
   {
     id: 'linux-static',
     label: 'Linux (권장 · 완전 정적)',
     os: 'linux',
     asset: 'sparemine-linux-x86_64-randomx-static',
+    idleOnly: true,
     note: 'glibc·libstdc++ 없이 어떤 x86-64 리눅스에서도 바로 실행됩니다.',
   },
   {
@@ -31,6 +37,7 @@ export const PLATFORMS = [
     label: 'Linux (glibc 폴백)',
     os: 'linux',
     asset: 'sparemine-linux-x86_64-randomx',
+    idleOnly: true,
     note: '정적 빌드가 말썽이면 glibc ≥ 2.34 · libstdc++ 환경에서 쓰세요.',
   },
   {
@@ -38,7 +45,8 @@ export const PLATFORMS = [
     label: 'Windows',
     os: 'windows',
     asset: 'sparemine-windows-x86_64-randomx.exe',
-    note: 'PowerShell에서 내려받아 실행합니다.',
+    idleOnly: false,
+    note: 'PowerShell에서 내려받아 실행합니다. 쓰고 있을 때 멈추는 --idle-only는 리눅스 전용이라 Windows에서는 뺍니다.',
   },
 ];
 
@@ -57,20 +65,31 @@ export const ALGOS = [
   },
 ];
 
+// What the page says about the address while a NiceHash pool is picked.
+// NiceHash is reported to log miners in by the mining address of a NiceHash
+// account, which is not the address of a wallet of one's own; its own
+// documentation could not be reached to confirm it, so the note says where
+// to look rather than what the address must be.
+const NICEHASH_NOTE = 'NiceHash는 개인 지갑 주소가 아니라 NiceHash 계정의 마이닝 주소로 채굴을 받는 것으로 알려져 있습니다. '
+  + 'NiceHash 대시보드에 "Mining address"로 표시된 주소를 확인해서 넣으세요.';
+
 // Pools paid out in BTC (the NiceHash model). "직접 입력" lets the visitor
-// type any host:port; its `algo` is null so it does not force a choice.
+// type any host:port; its `algo` is null so it does not force a choice. A
+// pool's `note` is shown under the form while it is picked.
 export const POOLS = [
   {
     id: 'nicehash-randomx',
     label: 'NiceHash · RandomX (BTC 지급)',
     url: 'randomxmonero.auto.nicehash.com:9200',
     algo: 'randomx',
+    note: NICEHASH_NOTE,
   },
   {
     id: 'nicehash-sha256',
     label: 'NiceHash · SHA256 (BTC 지급)',
     url: 'sha256.auto.nicehash.com:9200',
     algo: 'sha256d',
+    note: NICEHASH_NOTE,
   },
   { id: 'custom', label: '직접 입력', url: '', algo: null },
 ];
@@ -119,11 +138,13 @@ export function userField(address, worker) {
 
 // Whether `addr` looks like a BTC receive address. Lenient on purpose: it
 // catches an empty or obviously wrong entry without rejecting a valid one,
-// since the page still generates usable text for any pool username.
+// since the page still generates usable text for any pool username. A
+// bech32 address may be all in capitals, as a QR code gives it.
 export function checkAddress(addr) {
   const s = String(addr || '').trim();
   if (!s) return { ok: false, kind: null, reason: 'empty' };
-  if (/^(bc1|tb1)[0-9ac-hj-np-z]{8,87}$/.test(s)) return { ok: true, kind: 'bech32' };
+  const lower = s === s.toUpperCase() ? s.toLowerCase() : s;
+  if (/^(bc1|tb1)[0-9ac-hj-np-z]{8,87}$/.test(lower)) return { ok: true, kind: 'bech32' };
   if (/^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/.test(s)) return { ok: true, kind: 'base58' };
   return { ok: false, kind: null, reason: 'format' };
 }
@@ -140,33 +161,48 @@ export function clampThreshold(n) {
   return Math.min(0.95, Math.max(0.05, Math.round(v * 100) / 100));
 }
 
+// The thread count a field gives: a whole number of one or more, or null
+// for a field left empty or holding anything else, which leaves the CPU
+// share to decide. "0.5" is no thread count, not zero threads.
+export function threadsOf(value) {
+  if (value == null || String(value).trim() === '') return null;
+  const n = Math.floor(Number(value));
+  return Number.isFinite(n) && n >= 1 ? n : null;
+}
+
+// A line of text as the visitor meant it: without the control characters a
+// paste can carry, a line break among them, and without the space around it.
+function text(value) {
+  return String(value || '').replace(/[\u0000-\u001f\u007f]/g, '').trim();
+}
+
 // A clean, fully defaulted settings object the generators below all read, so
-// one place decides what an empty or out-of-range field becomes.
-export function normalize(raw) {
+// one place decides what an empty or out-of-range field becomes. On a
+// platform without --idle-only (`platformId`), it is off.
+export function normalize(raw, platformId) {
   const r = raw || {};
-  const threads = r.threads != null && String(r.threads) !== '' && Number(r.threads) > 0
-    ? Math.floor(Number(r.threads))
-    : null;
+  const idleOnly = r.idleOnly == null ? DEFAULTS.idleOnly : Boolean(r.idleOnly);
   return {
-    address: String(r.address || '').trim(),
+    address: text(r.address),
     worker: cleanWorker(r.worker),
     algo: ALGOS.some((a) => a.id === r.algo) ? r.algo : DEFAULTS.algo,
-    poolUrl: String(r.poolUrl || '').trim(),
-    pass: String(r.pass || '').trim() || 'x',
-    threads,
+    poolUrl: text(r.poolUrl),
+    pass: text(r.pass) || 'x',
+    threads: threadsOf(r.threads),
     maxCpuPercent: clampPercent(r.maxCpuPercent),
-    idleOnly: Boolean(r.idleOnly),
+    idleOnly: idleOnly && platformById(platformId).idleOnly,
     busyThreshold: clampThreshold(r.busyThreshold),
     lowerPriority: r.lowerPriority == null ? true : Boolean(r.lowerPriority),
   };
 }
 
-// The command-line flags, in the order sparemine documents them. `--threads`
-// overrides `--max-cpu-percent`, so only one is emitted. The default pass
-// ("x"), the default busy threshold and the default priority behaviour are
-// left off to keep the line short.
-export function argsFor(opts) {
-  const o = normalize(opts);
+// The command-line flags, in the order sparemine documents them, each a word
+// as the miner is to receive it; the commands below quote the words for the
+// shell they are written for. `--threads` overrides `--max-cpu-percent`, so
+// only one is emitted. The default pass ("x"), the default busy threshold
+// and the default priority behaviour are left off to keep the line short.
+export function argsFor(opts, platformId) {
+  const o = normalize(opts, platformId);
   const args = ['--url', o.poolUrl, '--user', userField(o.address, o.worker)];
   if (o.pass !== 'x') args.push('--pass', o.pass);
   args.push('--algo', o.algo);
@@ -182,36 +218,62 @@ export function argsFor(opts) {
   return args;
 }
 
+// A word as a POSIX shell takes it literally: as it is when it has only
+// characters no shell reads specially, in single quotes otherwise. A pool
+// address or a username typed in by hand can hold a space or a semicolon,
+// which would otherwise end the command where it stands.
+export function shWord(word) {
+  return /^[A-Za-z0-9_.,:/@%+=-]+$/.test(word) ? word : `'${word.replaceAll("'", "'\\''")}'`;
+}
+
+// The same for PowerShell, which reads more characters specially and doubles
+// a quote inside single quotes.
+export function psWord(word) {
+  return /^[A-Za-z0-9_.:/-]+$/.test(word) ? word : `'${word.replaceAll("'", "''")}'`;
+}
+
+// A TOML basic string, with the backslashes and quotes inside it escaped.
+export function tomlString(value) {
+  return `"${value.replace(/[\\"]/g, '\\$&')}"`;
+}
+
+// The flags as one line for the platform's shell.
+function flagsFor(opts, platform) {
+  return argsFor(opts, platform.id).map(platform.os === 'windows' ? psWord : shWord).join(' ');
+}
+
 // `./sparemine <flags>` on Linux, `.\sparemine.exe <flags>` on Windows: the
 // command once the binary is already in the current directory.
 export function bareCommand(opts, platformId) {
   const platform = platformById(platformId);
   const bin = platform.os === 'windows' ? '.\\sparemine.exe' : './sparemine';
-  return `${bin} ${argsFor(opts).join(' ')}`;
+  return `${bin} ${flagsFor(opts, platform)}`;
 }
 
 // One line that downloads the binary and starts it. On Linux a curl + chmod +
-// run; on Windows a PowerShell download + run.
+// run; on Windows a PowerShell download + run, which starts the miner only
+// if the download worked, so that a failed one does not run a binary left
+// from before.
 export function oneLiner(opts, platformId) {
   const platform = platformById(platformId);
   const url = assetUrl(platform.asset);
-  const flags = argsFor(opts).join(' ');
+  const flags = flagsFor(opts, platform);
   if (platform.os === 'windows') {
-    return `Invoke-WebRequest ${url} -OutFile sparemine.exe; .\\sparemine.exe ${flags}`;
+    return `Invoke-WebRequest ${url} -OutFile sparemine.exe; if ($?) { .\\sparemine.exe ${flags} }`;
   }
   return `curl -fsSL ${url} -o sparemine && chmod +x sparemine && ./sparemine ${flags}`;
 }
 
-// A config.toml that `sparemine --config config.toml` reads. Keys and sections
-// match miner-core's Config exactly.
-export function configToml(opts) {
-  const o = normalize(opts);
+// A config.toml that `sparemine --config config.toml` reads, for the
+// platform it will run on. Keys and sections follow miner-core's Config.
+export function configToml(opts, platformId) {
+  const o = normalize(opts, platformId);
   const lines = [
     '[pool]',
-    `url = "${o.poolUrl}"`,
-    `user = "${userField(o.address, o.worker)}"`,
-    `pass = "${o.pass}"`,
-    `algo = "${o.algo}"`,
+    `url = ${tomlString(o.poolUrl)}`,
+    `user = ${tomlString(userField(o.address, o.worker))}`,
+    `pass = ${tomlString(o.pass)}`,
+    `algo = ${tomlString(o.algo)}`,
     '',
     '[mining]',
   ];
@@ -229,7 +291,7 @@ export function configToml(opts) {
 export function runScript(opts, platformId) {
   const platform = platformById(platformId);
   const url = assetUrl(platform.asset);
-  const flags = argsFor(opts).join(' ');
+  const flags = flagsFor(opts, platform);
   const origin = 'https://bojun-seo.github.io/webpages/sparemine/';
   if (platform.os === 'windows') {
     return [

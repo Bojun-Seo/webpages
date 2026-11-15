@@ -135,6 +135,7 @@ input:disabled { opacity: 0.5; }
 
 .fine { font-size: 0.8125rem; color: var(--muted); }
 .fine code { color: var(--ink); }
+.fine.caution { color: var(--caution); }
 .form-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
 .reset {
   font: inherit;
@@ -200,6 +201,7 @@ h3 { font-size: 1rem; font-weight: 600; display: flex; align-items: baseline; ga
 }
 .act:hover { border-color: var(--accent); }
 .act.done { color: var(--ok); border-color: var(--ok); }
+.act.failed { color: var(--caution); border-color: var(--caution); }
 
 .code {
   margin: 0;

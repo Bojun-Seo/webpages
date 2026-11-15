@@ -54,6 +54,7 @@
         </label>
       </div>
       <p class="fine" id="algo-note"></p>
+      <p class="fine caution" id="pool-note" role="note" hidden></p>
       <p class="fine" id="platform-note"></p>
     </fieldset>
 
@@ -74,7 +75,7 @@
         </label>
       </div>
       <div class="toggles">
-        <label class="toggle"><input id="idle-only" type="checkbox"> <span>쓰고 있을 때는 멈춤 (<code>--idle-only</code>, 리눅스)</span></label>
+        <label class="toggle"><input id="idle-only" type="checkbox"> <span>쓰고 있을 때는 멈춤 (<code>--idle-only</code>, 리눅스 전용)</span></label>
         <label class="toggle"><input id="lower-priority" type="checkbox"> <span>우선순위 낮춰 앞 작업에 양보 (기본 켜짐)</span></label>
       </div>
       <p class="fine">스레드 수를 넣으면 CPU 상한 대신 그 수가 쓰입니다. 기본값은 "방해하지 말 것"에 맞춰져 있어요.</p>
@@ -131,7 +132,7 @@
   <footer class="foot">
     <p>sparemine은 <strong>브라우저가 아니라 내 컴퓨터에서 도는 네이티브 채굴기</strong>입니다. 이 페이지는 채굴을 하지 않고, 내가 실행할 명령과 설정 파일을 만들어 줄 뿐입니다. 웹페이지가 방문자 브라우저에서 몰래 채굴하는 방식(cryptojacking)이 아닙니다.</p>
     <p>남의 전기·하드웨어를 쓰는 일이 없도록, <strong>내 컴퓨터나 소유자가 동의한 컴퓨터</strong>에서만 실행하세요. PC방·사무실 PC처럼 내 것이 아닌 기기에서 돌리는 것은 그 장소의 약관을 어기는 일일 수 있고, 잠금을 우회해 설치하는 것은 더 분명한 법적 문제입니다. (법률 자문이 아닙니다.)</p>
-    <p>넣은 값은 이 브라우저에만 저장되고 어디로도 보내지 않습니다. 바이너리는 <a id="releases-link" href="https://github.com/bojun-seo/webpages/releases">GitHub Releases</a>에서 받습니다. 쓰는 법은 <a href="https://github.com/bojun-seo/applications/tree/master/sparemine">sparemine README</a>에 있습니다.</p>
+    <p>넣은 값은 이 브라우저에만 저장되고 어디로도 보내지 않습니다. 바이너리는 <a id="releases-link" href="https://github.com/bojun-seo/webpages/releases">GitHub Releases</a>에서 받고, 같은 곳의 <code>SHA256SUMS</code>로 내려받은 파일을 확인할 수 있습니다(<code>sha256sum -c SHA256SUMS --ignore-missing</code>). 쓰는 법은 <a href="https://github.com/bojun-seo/applications/tree/master/sparemine">sparemine README</a>에 있습니다.</p>
   </footer>
 </div>
 <noscript><p class="wrap">이 페이지는 자바스크립트가 있어야 명령을 만듭니다.</p></noscript>

@@ -2,8 +2,8 @@
 // visitor runs on their own machine. The generating lives in gen.js.
 
 import {
-  ALGOS, DEFAULTS, PLATFORMS, POOLS,
-  bareCommand, checkAddress, configToml, oneLiner, platformById, poolById, runScript, scriptName,
+  ALGOS, DEFAULTS, PLATFORMS, POOLS, RELEASE,
+  bareCommand, checkAddress, configToml, oneLiner, platformById, poolById, runScript, scriptName, threadsOf,
 } from './gen.js';
 
 // Where this browser keeps what the visitor entered.
@@ -12,6 +12,9 @@ const FORM_KEY = 'sparemine.form';
 // Shown in the generated text until a real address is entered, so the shape
 // is visible but obviously not runnable. No shell metacharacters.
 const ADDRESS_PLACEHOLDER = 'YOUR_BTC_ADDRESS';
+
+// The same for a pool typed in by hand, until one is.
+const POOL_PLACEHOLDER = 'POOL_HOST:PORT';
 
 // The form's starting values. The address is deliberately empty: a prefilled
 // example could be mistaken for a working one and send mining rewards to a
@@ -53,6 +56,11 @@ function option(value, label) {
 // The current generated text, by the key the copy/download buttons name.
 const output = { oneliner: '', toml: '', script: '' };
 
+// Whether the visitor wants --idle-only. The checkbox shows it, but on a
+// platform that does not offer the flag the box is off and disabled, and
+// this keeps the choice for when they pick one that does.
+let idleOnlyWanted = DEFAULTS.idleOnly;
+
 function readForm() {
   const poolId = $('pool').value;
   const pool = poolById(poolId);
@@ -65,22 +73,29 @@ function readForm() {
     platform: $('platform').value,
     maxCpuPercent: $('max-cpu-percent').value,
     threads: $('threads').value,
-    idleOnly: $('idle-only').checked,
+    idleOnly: idleOnlyWanted,
     busyThreshold: $('busy-threshold').value,
     lowerPriority: $('lower-priority').checked,
   };
 }
 
+// Picks `value` in a select, or `fallback` when the select has no such
+// option: a saved choice the page no longer offers.
+function pick(select, value, fallback) {
+  select.value = value ?? fallback;
+  if (select.selectedIndex < 0) select.value = fallback;
+}
+
 function fillForm(form) {
   $('address').value = form.address ?? '';
   $('worker').value = form.worker ?? '';
-  $('algo').value = form.algo ?? DEFAULTS.algo;
-  $('pool').value = form.pool ?? DEFAULTS.pool;
+  pick($('algo'), form.algo, DEFAULTS.algo);
+  pick($('pool'), form.pool, DEFAULTS.pool);
   $('pool-url').value = form.poolUrl ?? '';
-  $('platform').value = form.platform ?? DEFAULTS.platform;
+  pick($('platform'), form.platform, DEFAULTS.platform);
   $('max-cpu-percent').value = form.maxCpuPercent ?? DEFAULTS.maxCpuPercent;
   $('threads').value = form.threads ?? '';
-  $('idle-only').checked = form.idleOnly ?? DEFAULTS.idleOnly;
+  idleOnlyWanted = Boolean(form.idleOnly ?? DEFAULTS.idleOnly);
   $('busy-threshold').value = form.busyThreshold ?? DEFAULTS.busyThreshold;
   $('lower-priority').checked = form.lowerPriority ?? DEFAULTS.lowerPriority;
 }
@@ -103,21 +118,19 @@ function saveForm(form) {
   }
 }
 
-function setStatus(address) {
+// What the generated text still lacks, or that it is ready. The page can
+// tell that an address has the form of one, not that it is the right one.
+function setStatus(form) {
   const node = $('status');
-  if (!address) {
-    node.textContent = 'BTC 수신 주소를 넣으면 아래 명령이 완성됩니다.';
-    node.className = 'status';
-    return;
-  }
-  const check = checkAddress(address);
-  if (check.ok) {
-    node.textContent = `주소 확인됨 (${check.kind}). 아래를 복사해서 실행하세요.`;
-    node.className = 'status ok';
-  } else {
-    node.textContent = '주소가 BTC 주소 형식이 아닙니다. 명령은 만들어 두지만, 주소를 다시 확인하세요.';
-    node.className = 'status caution';
-  }
+  const say = (text, cls) => {
+    node.textContent = text;
+    node.className = cls ? `status ${cls}` : 'status';
+  };
+  if (!form.address) return say('BTC 수신 주소를 넣으면 아래 명령이 완성됩니다.');
+  if (form.pool === 'custom' && !form.poolUrl) return say('풀 주소(host:port)를 넣으면 아래 명령이 완성됩니다.', 'caution');
+  const check = checkAddress(form.address);
+  if (!check.ok) return say('주소가 BTC 주소 형식이 아닙니다. 명령은 만들어 두지만, 주소를 다시 확인하세요.', 'caution');
+  return say(`주소 형식이 맞습니다 (${check.kind}). 내 주소가 맞는지 확인하고, 아래를 복사해서 실행하세요.`, 'ok');
 }
 
 function setNotes(form) {
@@ -134,6 +147,9 @@ function setNotes(form) {
     algoNote.className = 'fine';
   }
   $('platform-note').textContent = platform.note;
+  const poolNote = $('pool-note');
+  poolNote.textContent = pool.note || '';
+  poolNote.hidden = !pool.note;
 }
 
 function render() {
@@ -145,7 +161,7 @@ function render() {
     address,
     worker: form.worker,
     algo: form.algo,
-    poolUrl: form.poolUrl,
+    poolUrl: form.poolUrl || POOL_PLACEHOLDER,
     pass: 'x',
     threads: form.threads,
     maxCpuPercent: form.maxCpuPercent,
@@ -155,7 +171,7 @@ function render() {
   };
 
   output.oneliner = oneLiner(opts, form.platform);
-  output.toml = configToml(opts);
+  output.toml = configToml(opts, form.platform);
   output.script = runScript(opts, form.platform);
 
   $('oneliner').textContent = output.oneliner;
@@ -167,15 +183,16 @@ function render() {
   $('script-name').textContent = scriptName(form.platform);
   $('devices-cmd').textContent = `${bareCommand({ ...opts }, form.platform).split(' ')[0]} --print-devices`;
 
-  setStatus(form.address);
+  setStatus(form);
   setNotes(form);
 
   const algo = ALGOS.find((a) => a.id === form.algo);
+  const threads = threadsOf(form.threads);
   $('summary').textContent = [
     algo ? algo.label.split(' ')[0] : form.algo,
     poolById(form.pool).label.split(' ')[0],
     platform.label,
-    form.threads ? `${form.threads} 스레드` : `CPU ${form.maxCpuPercent}%`,
+    threads ? `${threads} 스레드` : `CPU ${form.maxCpuPercent}%`,
   ].join(' · ');
 
   return form;
@@ -185,10 +202,16 @@ function syncEnabled() {
   const custom = $('pool').value === 'custom';
   $('pool-url-field').hidden = !custom;
   // Threads override the CPU percentage, so dim it when a thread count is set.
-  const hasThreads = Number($('threads').value) > 0;
-  $('max-cpu-percent').disabled = hasThreads;
+  $('max-cpu-percent').disabled = threadsOf($('threads').value) != null;
+  // --idle-only shows as the visitor wants it where the platform offers it, and off and disabled
+  // where it does not; a box that is enabled says what they want.
+  const idle = $('idle-only');
+  if (!idle.disabled) idleOnlyWanted = idle.checked;
+  const offered = platformById($('platform').value).idleOnly;
+  idle.disabled = !offered;
+  idle.checked = offered && idleOnlyWanted;
   // The busy threshold only matters while idle-only pauses mining.
-  $('busy-threshold').disabled = !$('idle-only').checked;
+  $('busy-threshold').disabled = !idle.checked;
 }
 
 function changed() {
@@ -204,29 +227,57 @@ function poolChanged() {
   changed();
 }
 
+// Shows the form as filled in: the checkbox as the visitor wants it, before
+// `syncEnabled` turns it off where the platform does not offer the flag.
+function showForm(form) {
+  fillForm(form);
+  $('idle-only').disabled = false;
+  $('idle-only').checked = idleOnlyWanted;
+  syncEnabled();
+}
+
 function reset() {
   saveForm(null);
-  fillForm(EXAMPLE);
+  showForm(EXAMPLE);
   $('example-note').hidden = false;
-  syncEnabled();
   render();
 }
 
-async function copyText(text, btn) {
+// Whether `text` went to the clipboard, by the clipboard API or, where a
+// browser will not give a page that, by the older copy command.
+async function copied(text) {
   try {
     await navigator.clipboard.writeText(text);
+    return true;
   } catch {
     const ta = el('textarea', { style: 'position:fixed;top:0;left:0;opacity:0' });
     ta.value = text;
     document.body.append(ta);
     ta.select();
-    try { document.execCommand('copy'); } catch { /* clipboard unavailable */ }
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { /* clipboard unavailable */ }
     ta.remove();
+    return ok;
   }
-  const label = btn.textContent;
-  btn.textContent = '복사됨';
-  btn.classList.add('done');
-  setTimeout(() => { btn.textContent = label; btn.classList.remove('done'); }, 1200);
+}
+
+// The label each copy button had before it said how the copy went, and the
+// timer that puts it back: a second press while "복사됨" still shows must not
+// take that for the button's label.
+const copyLabels = new WeakMap();
+
+async function copyText(text, btn) {
+  const ok = await copied(text);
+  const shown = copyLabels.get(btn) || { label: btn.textContent, timer: null };
+  copyLabels.set(btn, shown);
+  clearTimeout(shown.timer);
+  btn.textContent = ok ? '복사됨' : '복사 실패';
+  btn.classList.toggle('done', ok);
+  btn.classList.toggle('failed', !ok);
+  shown.timer = setTimeout(() => {
+    btn.textContent = shown.label;
+    btn.classList.remove('done', 'failed');
+  }, 1200);
 }
 
 function download(name, text) {
@@ -244,8 +295,11 @@ function main() {
   $('pool').replaceChildren(...POOLS.map((p) => option(p.id, p.label)));
   $('platform').replaceChildren(...PLATFORMS.map((p) => option(p.id, p.label)));
 
+  // The link to the binaries follows gen.js, as the commands do.
+  $('releases-link').href = RELEASE.page;
+
   const saved = loadForm();
-  fillForm({ ...EXAMPLE, ...saved });
+  showForm({ ...EXAMPLE, ...saved });
   $('example-note').hidden = Boolean(saved);
 
   for (const id of ['address', 'worker', 'pool-url', 'max-cpu-percent', 'threads', 'busy-threshold']) {
@@ -264,7 +318,6 @@ function main() {
   $('dl-toml').addEventListener('click', () => download('config.toml', output.toml));
   $('dl-script').addEventListener('click', () => download(scriptName($('platform').value), output.script));
 
-  syncEnabled();
   render();
 }
 
