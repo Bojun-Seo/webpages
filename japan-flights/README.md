@@ -114,24 +114,28 @@ documents; each run logs the fields a real ticket has, to check it against.
 ## Publish on GitHub Pages
 
 1. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
-2. Merge into the default branch. [`pages.yml`](../.github/workflows/pages.yml) runs the tests on
-   every push that touches `japan-flights/`, and on the default branch publishes `site/` to
-   <https://bojun-seo.github.io/webpages/japan-flights/>. It publishes again every day at
-   06:23 KST so the live fares stay fresh, and **Actions → pages → Run workflow** publishes on
-   demand. The [top-level README](../README.md#publishing) says how the site is put together.
+2. Merge into the default branch. [`pages.yml`](../.github/workflows/pages.yml) runs the tests and
+   opens the page in a browser on every push that touches `japan-flights/`, and on the default
+   branch publishes `site/` to <https://bojun-seo.github.io/webpages/japan-flights/>. A push keeps
+   the fares the site has; the run every day at 01:30 KST, which GitHub may start hours late,
+   fetches them again, and so does **Actions → pages → Run workflow**. The
+   [top-level README](../README.md#publishing) says how the site is put together.
 3. For live fares, sign up at [Travelpayouts](https://www.travelpayouts.com/), copy the API token
    from its developer settings, and add it as the repository secret `TRAVELPAYOUTS_TOKEN`
    (**Settings → Secrets and variables → Actions**). For the Aviasales links to credit you, add your
    partner marker, the number the Travelpayouts dashboard shows for your account, as the repository
    variable `TRAVELPAYOUTS_MARKER` on the **Variables** tab of the same page. The fetch makes about
    2,230 queries, one for each route and pair of months, 0.15 seconds apart to stay well under the
-   API's limit of 600 a minute, so it adds about eleven minutes to a deploy. Should the API answer
-   HTTP 429, too many queries, all the same, the fetcher waits as long as its Retry-After header
-   says, a minute if it says nothing, and asks again, up to twice; three queries refused in a row
-   stop the fetch. Before it fetches, the workflow downloads the fares the site has now, and the
-   fetcher keeps those of every query the API does not answer; should the API answer none, the page
-   keeps the fares it had, with the time they were fetched. A failed fetch does not stop the page
-   from publishing.
+   API's limit of 600 a minute, so it takes the daily run about seven to eleven minutes. Should the
+   API answer HTTP 429, too many queries, all the same, the fetcher waits as long as its Retry-After
+   header says, a minute if it says nothing, and asks again, up to twice; three queries refused in a
+   row stop the fetch. Before it fetches, the workflow downloads the fares the site has now. The
+   fetcher keeps those of every query the API does not answer, for three days from when they were
+   fetched: a fare kept so says when (`fetched`), and the page counts such fares in its status line.
+   Should the API answer no query, the page keeps the fares it had, with the time they were fetched.
+   A push keeps every fare the site has (`--keep-previous`), less those that have left and those of
+   airlines left out since, and fetches only when there are none. A failed fetch does not stop the
+   page from publishing.
 
 ## Update the data
 

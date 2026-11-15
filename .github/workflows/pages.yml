@@ -1,21 +1,26 @@
 # Publishes this repository's pages to GitHub Pages: each page's site/ under the page's name, and
 # index.html, which links to them, at the root. A repository has one Pages site and every
-# deployment replaces all of it, so this one workflow builds every page. It tests a page on every
-# push that touches it and publishes from the default branch; a daily run publishes again so the
-# fares japan-flights fetches into the build stay fresh. Pages must be set to deploy from GitHub
-# Actions; see README.md.
+# deployment replaces all of it, so this one workflow builds every page. A push to any branch that
+# touches a page runs every page's tests, builds the site and opens each page in a browser
+# (smoke/); the default branch then publishes it. A daily run fetches the fares japan-flights
+# shows and publishes again; a push keeps the fares the site has. Pages must be set to deploy from
+# GitHub Actions; see README.md.
 name: pages
 
 on:
   push:
+    # Branches only: a tag, such as a sparemine release's, builds nothing here.
+    branches: ['**']
     paths:
       - index.html
       - japan-flights/**
       - skypass-cards/**
       - sparemine/**
+      - smoke/**
       - .github/workflows/pages.yml
   schedule:
-    - cron: '23 21 * * *' # 06:23 in Korea
+    # 01:30 in Korea. GitHub starts a scheduled run late when it is busy, often by hours.
+    - cron: '30 16 * * *'
   workflow_dispatch:
 
 permissions:
@@ -52,27 +57,19 @@ jobs:
       - run: npm test
         working-directory: sparemine
 
-  deploy:
+  build:
     needs: [japan-flights, skypass-cards, sparemine]
-    # Pages takes deployments from the default branch only. Scheduled runs always start there.
-    if: github.event_name == 'schedule' || github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    concurrency:
-      group: pages
-      cancel-in-progress: false
+      contents: read
+      pages: read # configure-pages reads the site's address
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 22
       - id: pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
       - name: Build the site
         # Pages lets browsers keep a file for ten minutes, so a page fetched after a deploy could
         # run a script from before it. The script and style URLs carry the commit (?v=...) so a
@@ -98,26 +95,53 @@ jobs:
           grep -q "gen.js?v=$v" _site/sparemine/app.js
       - name: Download the fares the site has now
         # The fetcher keeps them for the queries the API does not answer, all of them if it answers
-        # none. Nothing to download before the first deploy.
+        # none, and a push keeps them all. Nothing to download before the first deploy.
         continue-on-error: true
         run: >-
           curl -fsSL --retry 2 -o previous-fares.json
           "${{ steps.pages.outputs.base_url }}/japan-flights/data/live-fares.json"
       - name: Fetch live fares
-        # Writes an empty file when the secret is not set. The page publishes even if this fails.
+        # The daily run and a run by hand fetch the fares, some 2,200 queries; a push, which changes
+        # the pages and not the fares, keeps those downloaded above (--keep-previous) and fetches
+        # only when there are none. Writes an empty file when the secret is not set. The page
+        # publishes even if this fails.
         continue-on-error: true
         env:
           TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
           # The partner marker the page's Aviasales links carry; a variable, not a secret, since
           # every link shows it.
           TRAVELPAYOUTS_MARKER: ${{ vars.TRAVELPAYOUTS_MARKER }}
-        run: >-
-          node japan-flights/tools/fetch-fares.js
-          --routes _site/japan-flights/data/routes.json
-          --out _site/japan-flights/data/live-fares.json
-          --previous previous-fares.json
-      - uses: actions/upload-pages-artifact@v4
+        run: |
+          args=(--routes _site/japan-flights/data/routes.json --out _site/japan-flights/data/live-fares.json
+            --previous previous-fares.json)
+          if [ "$GITHUB_EVENT_NAME" = push ]; then args+=(--keep-previous); fi
+          node japan-flights/tools/fetch-fares.js "${args[@]}"
+      - name: Install a browser for the smoke test
+        working-directory: smoke
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Open every page in the browser
+        run: node smoke/smoke.js _site
+      # Pages takes deployments from the default branch only. Scheduled runs always start there.
+      - if: github.event_name == 'schedule' || github.ref_name == github.event.repository.default_branch
+        uses: actions/upload-pages-artifact@v5
         with:
           path: _site
+
+  deploy:
+    needs: build
+    if: github.event_name == 'schedule' || github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

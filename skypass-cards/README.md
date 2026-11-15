@@ -87,8 +87,8 @@ regulate.
 
 ## Publish on GitHub Pages
 
-[`pages.yml`](../.github/workflows/pages.yml) runs the tests on every push that touches
-`skypass-cards/`, and on the default branch publishes `site/` to
+[`pages.yml`](../.github/workflows/pages.yml) runs the tests and opens the page in a browser on
+every push that touches `skypass-cards/`, and on the default branch publishes `site/` to
 <https://bojun-seo.github.io/webpages/skypass-cards/>. The [top-level README](../README.md#publishing)
 says how the site is put together. The page needs no secret.
 

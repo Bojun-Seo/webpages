@@ -1,2 +1,5 @@
 # japan-flights: fares the workflow fetches into each build
 japan-flights/site/data/live-fares.json
+# smoke/: the browser test's dependencies, and the site pages.yml builds
+node_modules/
+_site/

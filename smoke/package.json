@@ -1,0 +1,14 @@
+{
+  "name": "smoke",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "smoke": "node smoke.js ../_site"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}
