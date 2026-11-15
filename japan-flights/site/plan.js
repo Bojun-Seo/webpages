@@ -176,6 +176,14 @@ export function landsLate(fare) {
     || Boolean(fare.arrivesAbroad && fare.arrivesAbroad >= LATE);
 }
 
+// Whether a fare's flight out has left Korea by `now`, { date, time } on
+// Korea's clock: on an earlier day, or today at or before that time, where
+// the fare says when it leaves (`departs`).
+export function hasLeft(fare, now) {
+  return fare.depart < now.date
+    || (fare.depart === now.date && Boolean(fare.departs) && fare.departs <= now.time);
+}
+
 // The connections a fare makes on the way out and on the way back; a fare
 // that names none (`stops`) is nonstop both ways.
 export function stopsOf(fare) {
@@ -248,7 +256,8 @@ function byOrder(a, b) {
 // they check that it does not include, each both ways (`bag`, from
 // `bagFee`), and is held to the budget by that `total`; it ranks at that
 // less its advantage for each person (`advantageOf`). A fare whose flight
-// out lands late (`landsLate`) is not offered.
+// out lands late (`landsLate`) is not offered, nor one whose flight out has
+// left (`hasLeft`) where the page says what time it is in Korea (`now`).
 //
 // filter: { from, to, nights, maxPrice, origins, cities, alliances, airlines, party, daysOff }
 // `from` and `to` bound the departure date, and `to` is left out for no
@@ -260,7 +269,7 @@ function byOrder(a, b) {
 // none) and `airlines` (a Set of airline codes) to mean no limit, and
 // `daysOff` (a Set of dates the viewer has off besides public holidays,
 // those `dayOffProblem` takes) to mean none.
-export function recommend({ routes, fares, holidays, today, baggage }, filter) {
+export function recommend({ routes, fares, holidays, today, baggage, now }, filter) {
   const party = filter.party || DEFAULT_PARTY;
   const from = filter.from > today ? filter.from : today;
   const nights = new Set(TRIP_NIGHTS.filter((n) => !filter.nights || filter.nights.has(n)));
@@ -276,7 +285,7 @@ export function recommend({ routes, fares, holidays, today, baggage }, filter) {
     if (!route || !wanted(route) || !flown(fare.airline)) continue;
     const n = daysBetween(fare.depart, fare.return);
     const leaves = fare.depart >= from && (!filter.to || fare.depart <= filter.to);
-    if (!leaves || !nights.has(n) || !(fare.price > 0) || landsLate(fare)) continue;
+    if (!leaves || !nights.has(n) || !(fare.price > 0) || landsLate(fare) || (now && hasLeft(fare, now))) continue;
     const morningArrival = landsInTheMorning(fare);
     // A flight back that leaves late at night lands the next day.
     const lands = fare.lands || fare.return;

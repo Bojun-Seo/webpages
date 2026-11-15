@@ -213,7 +213,17 @@ h2 { font-size: 1.25rem; font-weight: 600; }
   color: var(--ink);
   white-space: nowrap;
 }
-.badge[title] { cursor: help; }
+/* A mark that says more is a button: the rest shows on hover, and in the mark when it is pressed. */
+.badge-more {
+  font-family: inherit;
+  line-height: inherit;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+}
+.badge-more[aria-expanded="true"] { white-space: normal; }
 .badge-holiday { background: var(--holiday-soft); color: var(--holiday); }
 .badge-day-off { background: var(--holiday-soft); color: var(--holiday); font-weight: 600; }
 .badge-alliance { background: var(--accent-soft); color: var(--accent); font-weight: 600; }

@@ -28,7 +28,8 @@ unless picked, and the days off the visitor adds, the page:
 1. lists the round trips of two to six nights, or of the lengths picked among them, that a fare of
    one of the airlines picked gives, nonstop or with one connection on the way out, back or both;
    it never offers a trip of one night, nor one whose flight out lands abroad at 6 p.m. local time
-   or later, or on a later day, which loses the first day;
+   or later, or on a later day, which loses the first day, nor one whose flight out has already
+   left Korea today, where the fare says when it leaves (`hasLeft`);
 2. counts the leave each takes, and offers only the trips that take none; it keeps the count to tell
    which those are, but does not show it: the workdays from departure to the day the flight back
    lands that are neither public holidays nor days off the visitor added, both ends included, except
@@ -40,8 +41,9 @@ unless picked, and the days off the visitor adds, the page:
    the page says why it turns a date down, and the browser keeps the days added in its local
    storage;
 3. marks the trips whose flight back lands in Korea before noon (오전 도착, or 다음 날 오전 도착 when it lands
-   the day after it leaves), where the fare gives the time, which the mark shows on hover, and the
-   trips that connect (갈 때 경유, 올 때 경유 or 왕복 경유), with the airports they connect at on hover;
+   the day after it leaves), where the fare gives the time, and the trips that connect (갈 때 경유,
+   올 때 경유 or 왕복 경유), with the airports they connect at; such a mark gives the time or the airports
+   on hover, and in the mark itself when it is tapped or pressed, since a touch screen has no hover;
 4. offers for each pair of dates on a route its best fare among the airlines picked, one nonstop
    both ways and one that connects, each as a trip of its own, and names its airline and the
    airline's alliance, SkyTeam, Star Alliance or oneworld (`ALLIANCES` in `site/plan.js`, as of
@@ -64,7 +66,8 @@ Aviasales, whose fares the page shows, then on Google Flights, Skyscanner and KA
 as many adults as there are people, the last three for economy too, and the KAYAK search for the
 trip's airline, nonstop unless the trip connects. The Aviasales search carries the Travelpayouts
 partner marker that the repository variable `TRAVELPAYOUTS_MARKER` gives, so that a booking it
-brings is credited to the partner.
+brings is credited to the partner; when it does, the footer says that the Aviasales links are
+affiliate links and that the order of the trips owes nothing to them.
 
 ## Where the fares come from
 

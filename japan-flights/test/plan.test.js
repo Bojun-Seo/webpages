@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  addDays, allianceOf, bagFee, dayOf, dayOffProblem, fareMonths, landsInTheMorning, landsLate, leaveFor, recommend,
-  routesOf, searchLinks,
+  addDays, allianceOf, bagFee, dayOf, dayOffProblem, fareMonths, hasLeft, landsInTheMorning, landsLate, leaveFor,
+  recommend, routesOf, searchLinks,
 } from '../site/plan.js';
 
 const data = (name) => JSON.parse(readFileSync(new URL(`../site/data/${name}`, import.meta.url)));
@@ -393,6 +393,23 @@ test('the trips that already left are not offered, and with no end every fare ah
   const ctx = { routes, fares: [fare('2026-10-09'), fare('2026-10-16'), fare('2027-03-05')], holidays, today };
   assert.deepEqual(recommend(ctx, { from: '2026-10-01', to: '2026-10-31' }).map((t) => t.depart), ['2026-10-16']);
   assert.deepEqual(recommend(ctx, { from: '2026-10-01' }).map((t) => t.depart), ['2026-10-16', '2027-03-05']);
+});
+
+test('a flight that has left Korea today is not offered, where the fare says when it leaves', () => {
+  const now = { date: '2026-10-16', time: '09:30' };
+  assert.equal(hasLeft({ depart: '2026-10-16', departs: '09:30' }, now), true);
+  assert.equal(hasLeft({ depart: '2026-10-16', departs: '09:31' }, now), false);
+  assert.equal(hasLeft({ depart: '2026-10-16' }, now), false); // a fare that does not say
+  assert.equal(hasLeft({ depart: '2026-10-15', departs: '23:00' }, now), true);
+  assert.equal(hasLeft({ depart: '2026-10-17', departs: '00:10' }, now), false);
+  // Friday 16 October: the 08:00 flight has gone by 09:30 in Korea, the 14:00 one has not.
+  const fare = (departs, price) => ({ route: 'ICN-NRT', airline: '7C', depart: '2026-10-16', return: '2026-10-18',
+    price, departs });
+  const ctx = { routes, fares: [fare('08:00', 150000), fare('14:00', 200000)], holidays, today: '2026-10-16' };
+  const prices = (context) => recommend(context, { from: '2026-10-01', to: '2026-10-31' }).map((t) => t.fare.price);
+  assert.deepEqual(prices({ ...ctx, now }), [200000]);
+  // Without the time in Korea, every fare for today stays.
+  assert.deepEqual(prices(ctx), [150000]);
 });
 
 test('months run from this one to the last a fare leaves in', () => {

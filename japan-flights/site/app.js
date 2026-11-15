@@ -98,6 +98,13 @@ function localToday() {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
+// The date and time in Korea, which keeps UTC+9 all year, whatever the
+// viewer's own clock: the fares say when their flights leave by it.
+function koreaNow() {
+  const at = new Date(Date.now() + 9 * 3600e3).toISOString();
+  return { date: at.slice(0, 10), time: at.slice(11, 16) };
+}
+
 async function load(path) {
   try {
     const res = await fetch(path, { cache: 'no-cache' });
@@ -178,19 +185,34 @@ function stopsLabel([out, back]) {
   return back ? '올 때 경유' : null;
 }
 
+// A mark on a trip. One that says more (`more`) is a button: it shows the
+// rest on hover, as its title, and in the mark itself when it is tapped,
+// clicked or pressed, since a touch screen has no hover; again puts it away.
+function badge(cls, label, more) {
+  if (!more) return el('span', { class: cls }, label);
+  const mark = el('button', {
+    type: 'button', class: `${cls} badge-more`, title: more, 'aria-expanded': 'false',
+    onclick: () => {
+      const open = mark.getAttribute('aria-expanded') !== 'true';
+      mark.setAttribute('aria-expanded', String(open));
+      mark.textContent = open ? more : label;
+    },
+  }, label);
+  return mark;
+}
+
 function tripRow(trip) {
   const { data } = state;
   const route = data.byId.get(trip.route);
   const stops = stopsLabel(trip.stops);
-  const morning = trip.lands > trip.return ? '다음 날 오전 도착' : '오전 도착';
-  // A mark that says more on hover gives it as its title.
+  const nextDay = trip.lands > trip.return;
   const badges = [
-    trip.daysOff.length > 0
-      && el('span', { class: 'badge badge-day-off' }, `내 휴일 ${trip.daysOff.map(shortDate).join('·')}`),
-    trip.alliance && el('span', { class: 'badge badge-alliance' }, ALLIANCE_NAMES[trip.alliance]),
-    stops && el('span', { class: 'badge badge-stops', title: viaLabel(trip.fare.via) }, stops),
-    ...trip.holidays.map((name) => el('span', { class: 'badge badge-holiday' }, name)),
-    trip.morningArrival && el('span', { class: 'badge', title: `${trip.fare.arrives} 도착` }, morning),
+    trip.daysOff.length > 0 && badge('badge badge-day-off', `내 휴일 ${trip.daysOff.map(shortDate).join('·')}`),
+    trip.alliance && badge('badge badge-alliance', ALLIANCE_NAMES[trip.alliance]),
+    stops && badge('badge badge-stops', stops, viaLabel(trip.fare.via)),
+    ...trip.holidays.map((name) => badge('badge badge-holiday', name)),
+    trip.morningArrival && badge('badge', nextDay ? '다음 날 오전 도착' : '오전 도착',
+      `${nextDay ? '다음 날 ' : ''}${trip.fare.arrives} 도착`),
   ];
   const price = el('div', { class: 'price' },
     el('strong', null, won(trip.total)),
@@ -233,42 +255,48 @@ function renderTrips() {
   more.textContent = `더 보기 (${(trips.length - state.shown).toLocaleString('ko-KR')}개 남음)`;
 }
 
-// A row of toggle chips for `picked`, a Set that stays empty for "all".
-function renderChips(box, allLabel, picked, options) {
-  const chip = (label, pressed, onclick) =>
-    el('button', { type: 'button', class: 'chip', 'aria-pressed': String(pressed), onclick }, label);
-  box.replaceChildren(
-    chip(allLabel, picked.size === 0, () => { picked.clear(); update(); }),
-    ...options.map(({ value, label }) => chip(label, picked.has(value), () => {
+// The rows of toggle chips, each with the Set it picks into, its chip for
+// "all" and its other chips by their values.
+const chipRows = [];
+
+// A row of toggle chips for `picked`, a Set that stays empty for "all". The
+// chips are built once and only shown as pressed or not after that
+// (`syncChips`), so that the one pressed keeps the keyboard's focus.
+function buildChips(box, allLabel, picked, options) {
+  const chip = (label, onclick) => el('button', { type: 'button', class: 'chip', onclick }, label);
+  const all = chip(allLabel, () => { picked.clear(); update(); });
+  const chips = options.map(({ value, label }) => ({
+    value,
+    button: chip(label, () => {
       if (picked.has(value)) picked.delete(value);
       else picked.add(value);
       update();
-    })));
+    }),
+  }));
+  box.replaceChildren(all, ...chips.map(({ button }) => button));
+  chipRows.push({ picked, all, chips });
 }
 
-function renderNights() {
-  renderChips($('nights'), `${TRIP_NIGHTS[0]}~${TRIP_NIGHTS.at(-1)}박 전체`, state.nights,
-    TRIP_NIGHTS.map((n) => ({ value: n, label: `${n}박` })));
-}
-
-// One chip per destination airport, whichever Korean airport its routes leave.
-function renderCities() {
-  const airports = new Map();
-  for (const route of state.data.routes) {
-    if (!airports.has(route.dest)) airports.set(route.dest, route.city);
+function syncChips() {
+  for (const { picked, all, chips } of chipRows) {
+    all.setAttribute('aria-pressed', String(picked.size === 0));
+    for (const { value, button } of chips) button.setAttribute('aria-pressed', String(picked.has(value)));
   }
-  renderChips($('cities'), '모든 도시', state.cities,
-    [...airports].map(([value, label]) => ({ value, label })));
 }
 
-function renderAlliances() {
-  renderChips($('alliances'), '모든 항공연합', state.alliances,
-    state.data.alliances.map((alliance) => ({ value: alliance, label: ALLIANCE_NAMES[alliance] })));
-}
-
-function renderAirlines() {
-  renderChips($('airlines'), '모든 항공사', state.airlines,
-    state.data.airlines.map((code) => ({ value: code, label: airlineName(code) })));
+// The chips for trip lengths, for destination airports, one each whichever
+// Korean airport its routes leave, and for the alliances and airlines that
+// have fares.
+function buildFilters() {
+  const { data } = state;
+  buildChips($('nights'), `${TRIP_NIGHTS[0]}~${TRIP_NIGHTS.at(-1)}박 전체`, state.nights,
+    TRIP_NIGHTS.map((n) => ({ value: n, label: `${n}박` })));
+  buildChips($('cities'), '모든 도시', state.cities,
+    [...data.places].map(([value, label]) => ({ value, label })));
+  buildChips($('alliances'), '모든 항공연합', state.alliances,
+    data.alliances.map((alliance) => ({ value: alliance, label: ALLIANCE_NAMES[alliance] })));
+  buildChips($('airlines'), '모든 항공사', state.airlines,
+    data.airlines.map((code) => ({ value: code, label: airlineName(code) })));
 }
 
 // The days off this browser kept, less any that has passed or has since
@@ -308,17 +336,23 @@ function addDayOff() {
   update();
 }
 
-// The days off added, each a chip that takes it out again.
+// The days off added, each a chip that takes it out again. A chip taken
+// out while it had the focus hands it to the chip that takes its place, or
+// to the button that adds a day when it was the last.
 function renderDaysOff() {
   const box = $('days-off');
   const days = [...state.daysOff].sort();
   box.hidden = days.length === 0;
-  box.replaceChildren(el('span', { class: 'chips-label' }, '내 휴일'), ...days.map((date) => el('button', {
+  box.replaceChildren(el('span', { class: 'chips-label' }, '내 휴일'), ...days.map((date, i) => el('button', {
     type: 'button', class: 'chip chip-day-off', 'aria-label': `${dayLabel(date)} 휴일 빼기`,
-    onclick: () => {
+    onclick: (event) => {
+      const focused = document.activeElement === event.currentTarget;
       state.daysOff.delete(date);
       saveDaysOff();
       update();
+      if (!focused) return;
+      const chips = box.querySelectorAll('.chip');
+      (chips[Math.min(i, chips.length - 1)] || $('add-day-off')).focus();
     },
   }, `${dayLabel(date)} ✕`)));
 }
@@ -327,24 +361,26 @@ function update() {
   state.shown = PAGE_SIZE;
   const filter = readFilter();
   state.party = filter.party;
-  state.trips = recommend(state.data, filter);
+  state.trips = recommend({ ...state.data, now: koreaNow() }, filter);
   renderDaysOff();
-  renderNights();
-  renderCities();
-  renderAlliances();
-  renderAirlines();
+  syncChips();
   renderTrips();
 }
 
 // How many fares there are and when they were fetched, in the viewer's
-// time: "실시간 운임 742건 (10.13 06:41 갱신)".
+// time: "실시간 운임 742건 (10.13 06:41 갱신)", and how many of them are
+// from an earlier fetch because the API did not answer for them this time
+// (`fetched`): "... 갱신, 그중 12건은 그 전에 받은 운임)".
 function statusLine(live) {
   if (!live) return '운임을 불러오지 못했습니다.';
   if (!live.updated) return '실시간 운임 미설정';
   const at = new Date(live.updated);
   const pad = (n) => String(n).padStart(2, '0');
   const time = `${pad(at.getHours())}:${pad(at.getMinutes())}`;
-  return `실시간 운임 ${live.fares.length.toLocaleString('ko-KR')}건 (${at.getMonth() + 1}.${at.getDate()} ${time} 갱신)`;
+  const count = (n) => n.toLocaleString('ko-KR');
+  const kept = live.fares.filter((f) => f.fetched).length;
+  return `실시간 운임 ${count(live.fares.length)}건 (${at.getMonth() + 1}.${at.getDate()} ${time} 갱신`
+    + `${kept ? `, 그중 ${count(kept)}건은 그 전에 받은 운임` : ''})`;
 }
 
 async function main() {
@@ -378,6 +414,9 @@ async function main() {
   state.data.alliances = [...Object.keys(ALLIANCES), 'none'].filter((alliance) => alliances.has(alliance));
 
   $('status').textContent = statusLine(live);
+  // With a partner marker, a booking the Aviasales links bring pays the page's owner, and the page says so.
+  $('partner-note').hidden = !state.data.marker;
+  buildFilters();
   $('month').replaceChildren(
     el('option', { value: 'all' }, '전체 기간'),
     ...state.data.months.map((m) => el('option', { value: m }, monthLabel(m))));
