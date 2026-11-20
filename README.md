@@ -10,15 +10,21 @@ A collection of web pages built for personal use, published with GitHub Pages at
 | [`sparemine/`](sparemine/) | [sparemine launcher](https://bojun-seo.github.io/webpages/sparemine/) | Turns a BTC receive address and a few options into the one-line command, `config.toml` and run script that start the [sparemine](https://github.com/bojun-seo/applications/tree/master/sparemine) miner on your own machine; the page itself never mines |
 | [`fair-pick/`](fair-pick/) | [Fair Group Vote](https://bojun-seo.github.io/webpages/fair-pick/) | Lets a group that must settle on one date or place get in with a group ID and PIN, grade every option under their own names, and picks the option by a rule from social choice theory; dates are picked on a Korean calendar with the public holidays |
 
+What more than one page uses, or a page and its API, is in [`common/`](common/): the DOM helpers
+every page's script takes, Korea's public holidays and calendar, fair-pick's voting rule and what its
+polls may hold, and the server each page's `npm run serve` runs. It is published beside the pages,
+so a page takes a shared module as `../common/<name>.js`.
+
 ## Publishing
 
 A repository has one Pages site, and every deployment replaces all of it, so one workflow,
 [`pages.yml`](.github/workflows/pages.yml), builds the whole site: each page's `site/` directory
-under the page's name, and [`index.html`](index.html), which links to the pages, at the root. A push
-to any branch that touches a page runs every page's tests, builds the site and opens each page in a
-browser at a phone's width ([`smoke/smoke.js`](smoke/smoke.js)), which fails the run when a page
-throws, logs an error, asks for a file the site lacks, is wider than the screen or stops doing what
-it has been fixed to do. The default branch then publishes the site. A tag builds nothing.
+under the page's name, `common/site/` as `common/`, and [`index.html`](index.html), which links to
+the pages, at the root. A push to any branch that touches a page or common/ runs every page's tests
+and common's, builds the site and opens each page in a browser at a phone's width
+([`smoke/smoke.js`](smoke/smoke.js)), which fails the run when a page throws, logs an error, asks
+for a file the site lacks, is wider than the screen or stops doing what it has been fixed to do. The
+default branch then publishes the site. A tag builds nothing.
 
 The fares japan-flights shows are fetched into the build by the run every day at 01:30 KST, and by
 **Actions → pages → Run workflow**; a push keeps the fares the site has. GitHub starts a scheduled
@@ -47,6 +53,8 @@ npm run smoke
 
 To add a page, give it a directory with its files under `site/`, add a job that tests it and a
 step that copies it to `pages.yml`, add what the page must keep doing to `smoke/smoke.js`, and link
-it from `index.html` and the table above. A page that calls an API of its own gets it answered in
+it from `index.html` and the table above. Take what it shares with other pages from `../common/`,
+point its `npm run serve` at `../common/tools/serve.js`, and move into `common/site/` whatever a
+second page or an API comes to need. A page that calls an API of its own gets it answered in
 `smoke/smoke.js` as fair-pick's is, by the API's own code on memory, since the browser is kept off
 every other site.

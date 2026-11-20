@@ -15,8 +15,7 @@ on:
     branches: ['**']
     paths:
       - fair-pick/api/**
-      - fair-pick/site/rank.js
-      - fair-pick/site/rules.js
+      - common/site/**
       - .github/workflows/fair-pick-api.yml
   workflow_dispatch:
 
@@ -39,6 +38,8 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+      - run: npm test
+        working-directory: common
       - run: npm test
         working-directory: fair-pick
       - run: npm ci

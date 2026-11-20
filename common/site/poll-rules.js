@@ -1,6 +1,9 @@
-// What a poll and a ballot may hold, the grades a voter gives and how a
-// group ID and PIN look. The page checks a form with these before it sends
-// it, and the API checks again what it is sent, so both say the same.
+// What a fair-pick poll and a ballot may hold, the grades a voter gives
+// and how a group ID and PIN look. The page checks a form with these before
+// it sends it, and its API checks again what it is sent, so both say the
+// same.
+
+import { addDays, isDate, koreaDate } from './calendar.js';
 
 // A poll decides a date, picked on a calendar, or one of the options its
 // maker writes down: a place, a menu, anything.
@@ -48,24 +51,6 @@ export const LIMITS = {
 };
 
 const DAY = 86400e3;
-const KOREA = 9 * 3600e3;
-
-// The date in Korea at `ms`, 'YYYY-MM-DD'. Korea keeps no summer time.
-export function koreaDate(ms = Date.now()) {
-  return new Date(ms + KOREA).toISOString().slice(0, 10);
-}
-
-// Whether `iso` is a real date written 'YYYY-MM-DD'.
-export function isDate(iso) {
-  if (typeof iso !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
-  const day = new Date(`${iso}T00:00:00Z`);
-  return !Number.isNaN(day.getTime()) && day.toISOString().slice(0, 10) === iso;
-}
-
-// The date `days` after `iso`.
-export function addDays(iso, days) {
-  return new Date(Date.parse(`${iso}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
-}
 
 // Characters that do not show or turn text around: controls, zero-width
 // spaces and direction marks.

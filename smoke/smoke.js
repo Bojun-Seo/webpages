@@ -129,7 +129,7 @@ const checks = {
     }
 
     // A day off taken out from the keyboard hands the focus on.
-    const holidays = JSON.parse(await readFile(join(site, 'japan-flights/data/holidays.json'), 'utf8')).dates;
+    const holidays = JSON.parse(await readFile(join(site, 'common/holidays.json'), 'utf8')).dates;
     await page.fill('#day-off', workdayAhead(holidays));
     await page.click('#add-day-off');
     const dayOff = page.locator('#days-off .chip-day-off');

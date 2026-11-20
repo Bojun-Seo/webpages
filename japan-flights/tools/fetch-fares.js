@@ -11,7 +11,11 @@
 //
 //   TRAVELPAYOUTS_TOKEN=... node tools/fetch-fares.js \
 //       [--routes site/data/routes.json] [--out site/data/live-fares.json] [--months 6] \
-//       [--previous live-fares.json [--keep-previous]]
+//       [--holidays ../common/site/holidays.json] [--previous live-fares.json [--keep-previous]]
+//
+// `--holidays` names the public holidays the page counts a trip's leave
+// from, which the pages share in common/; the fetcher warns when it fetches
+// trips past the last of them.
 //
 // `--previous` names the fares fetched before, which the workflow downloads
 // from the published site: the fetcher keeps those of any query the API
@@ -28,7 +32,6 @@
 // are not set up. It exits 1 only when every query failed.
 
 import { readFile, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { TRIP_NIGHTS, daysBetween, landsInTheMorning, landsLate, routesOf } from '../site/plan.js';
@@ -384,6 +387,7 @@ async function main(argv) {
       routes: { type: 'string', default: here('../site/data/routes.json') },
       out: { type: 'string', default: here('../site/data/live-fares.json') },
       months: { type: 'string', default: '6' },
+      holidays: { type: 'string', default: here('../../common/site/holidays.json') },
       previous: { type: 'string' },
       'keep-previous': { type: 'boolean', default: false },
     },
@@ -414,10 +418,10 @@ async function main(argv) {
 
   const routes = routesOf(JSON.parse(await readFile(values.routes, 'utf8')));
   const months = monthsFrom(today, Number(values.months));
-  // The page counts a trip's leave from holidays.json, beside routes.json,
-  // and takes a day it does not list for a working day.
+  // The page counts a trip's leave from the holidays in common/ and takes a
+  // day they do not list for a working day.
   const lastMonth = monthsFrom(`${months.at(-1)}-01`, 2)[1];
-  const through = await holidaysThrough(join(dirname(values.routes), 'holidays.json'));
+  const through = await holidaysThrough(values.holidays);
   if (through && lastMonth > through) {
     flag(`holidays.json lists public holidays through ${through}, but fares are fetched for trips through `
       + `${lastMonth}; add the next year's, or the page counts those holidays as working days.`);

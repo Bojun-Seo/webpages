@@ -8,6 +8,6 @@
   "scripts": {
     "test": "node --test test/*.test.js",
     "fares": "node tools/fetch-fares.js",
-    "serve": "python3 -m http.server --directory site 8000"
+    "serve": "node ../common/tools/serve.js japan-flights"
   }
 }

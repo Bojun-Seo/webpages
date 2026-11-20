@@ -5,10 +5,12 @@ dinner (회식), a menu, anything: its maker sets up a poll under a group ID and
 choosing, the others get in with both, each grades every option under their own name, and the
 page picks the option the group goes with by a rule from social choice theory, the part of
 economics that studies how a group should choose. Dates are picked on a Korean calendar, with
-Sundays and public holidays in red and Saturdays in blue.
+Sundays and public holidays in red and Saturdays in blue; the holidays are those in
+[`common/site/holidays.json`](../common/README.md#update-the-holidays).
 
 GitHub Pages serves the page. The polls live in a small API of its own, a Cloudflare Worker with a
-Durable Object for each poll ([`api/`](api/)), on Cloudflare's free plan.
+Durable Object for each poll ([`api/`](api/)), on Cloudflare's free plan. What the page and the API
+both use, the voting rule, what a poll may hold and the calendar, is in [`common/`](../common/).
 
 The page is in Korean.
 
@@ -19,7 +21,6 @@ The page is in Korean.
 - [Who can see and change what](#who-can-see-and-change-what)
 - [Set up the API](#set-up-the-api)
 - [Publish on GitHub Pages](#publish-on-github-pages)
-- [Update the holidays](#update-the-holidays)
 - [Run and test locally](#run-and-test-locally)
 - [Known limitations](#known-limitations)
 
@@ -63,7 +64,7 @@ says no rule satisfies every fairness property at once, so the page fixes its ru
 votes, says it on the page, and shows beside the result what other rules would have picked.
 
 Grades are scores: 최고 4, 좋아요 3, 보통 2, 별로 1 and 안 돼요 0; for dates ○ 2, △ 1 and ✕ 0.
-`site/rank.js` orders the options by, in turn:
+`common/site/social-choice.js` orders the options by, in turn:
 
 1. **Fewest 안 돼요.** An option someone cannot make leaves them out, so the options everyone can
    share come first: the worst off first, after Rawls.
@@ -125,8 +126,8 @@ place. [`fair-pick-api.yml`](../.github/workflows/fair-pick-api.yml) deploys it.
 5. Add that address as the repository **variable** `FAIR_PICK_API` (the **Variables** tab), then
    run **Actions → pages → Run workflow**.
 
-After that, a push to the default branch that changes `api/`, `site/rank.js` or `site/rules.js`
-deploys the Worker again; a push to another branch runs the tests and bundles it without
+After that, a push to the default branch that changes `api/` or `common/site/` deploys the Worker
+again; a push to another branch runs the tests and bundles it without
 deploying. Until the secrets are set the workflow warns and deploys nothing, and until
 `FAIR_PICK_API` is set the page says its server is not connected.
 
@@ -143,21 +144,13 @@ default branch publishes `site/` to <https://bojun-seo.github.io/webpages/fair-p
 `FAIR_PICK_API` into `config.js`. The [top-level README](../README.md#publishing) says how the
 site is put together.
 
-## Update the holidays
-
-`site/data/holidays.json` is a copy of
-[japan-flights'](../japan-flights/README.md#update-the-data), the public holidays from the
-월력요항 the Korea AeroSpace Administration publishes each June, through 2027. A test fails when
-the two differ, so copy the file here whenever a year is added there. The calendar names no
-holidays in a month past the last year listed, and says so.
-
 ## Run and test locally
 
 To try the page with an API on memory, which forgets the polls when it stops:
 
 ```
 cd fair-pick
-npm run serve        # http://localhost:8000
+npm run serve        # http://localhost:8000/fair-pick/
 ```
 
 To run the Worker in workerd, Cloudflare's runtime, instead: `cd api && npm ci && npm run dev`

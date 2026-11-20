@@ -1,20 +1,21 @@
 // Draws the page's three views and talks to the API: home, with the way
 // into a poll and to a new one; the form for a new poll, with a Korean
 // calendar for dates; and a poll, with the voter's ballot, the results and
-// the maker's menu. The API is called from api.js, what is allowed is in
-// rules.js, how the group's choice is ranked in rank.js and the calendar in
-// calendar.js.
+// the maker's menu. The API is called from api.js. What a poll may hold,
+// how the group's choice is ranked and the calendar are in ../common/,
+// which the API shares.
 
 import { API_BASE } from './config.js';
 import { createClient } from './api.js';
 import {
-  WEEKDAYS, dateLabel, dayKind, holidaysThrough, monthOf, monthWeeks, monthsBetween, shiftMonth, toggleAll,
-  weekdayDates,
-} from './calendar.js';
-import { geometricMean, otherRules, rank, tally } from './rank.js';
+  WEEKDAYS, dateLabel, dayKind, holidaysThrough, koreaDate, monthOf, monthWeeks, monthsBetween, shiftMonth,
+  toggleAll, weekdayDates,
+} from '../common/calendar.js';
+import { $, el } from '../common/dom.js';
 import {
-  LIMITS, SCALES, checkBallot, checkPoll, idProblem, koreaDate, newPinProblem, normalizeId, pinProblem, weakPin,
-} from './rules.js';
+  LIMITS, SCALES, checkBallot, checkPoll, idProblem, newPinProblem, normalizeId, pinProblem, weakPin,
+} from '../common/poll-rules.js';
+import { geometricMean, otherRules, rank, tally } from '../common/social-choice.js';
 
 // Where this browser keeps, for each poll it has been in, the token the
 // PIN unlocked, the PIN, the maker's admin key and the keys of the ballots
@@ -28,22 +29,6 @@ const KIND_NAMES = { date: '날짜 투표', choice: '장소·메뉴 투표' };
 const CHOICE_EXAMPLES = ['예: 삼겹살집', '예: 횟집', '예: 중식당'];
 
 const api = API_BASE ? createClient(API_BASE) : null;
-
-const $ = (id) => document.getElementById(id);
-
-function el(tag, props, ...children) {
-  const node = document.createElement(tag);
-  for (const [key, value] of Object.entries(props || {})) {
-    if (value == null || value === false) continue;
-    if (key === 'class') node.className = value;
-    else if (key.startsWith('on')) node.addEventListener(key.slice(2), value);
-    else node.setAttribute(key, value === true ? '' : value);
-  }
-  for (const child of children.flat(Infinity)) {
-    if (child != null && child !== false) node.append(child);
-  }
-  return node;
-}
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -1162,7 +1147,7 @@ function leave() {
 
 async function loadHolidays() {
   try {
-    const res = await fetch('data/holidays.json', { cache: 'no-cache' });
+    const res = await fetch('../common/holidays.json', { cache: 'no-cache' });
     if (!res.ok) return;
     const doc = await res.json();
     state.holidays = doc.dates || {};

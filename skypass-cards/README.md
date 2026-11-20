@@ -127,12 +127,12 @@ has and kinds of spending the page asks about, so run them after editing.
 
 ## Run and test locally
 
-The page loads its data with `fetch`, which browsers refuse for `file://` pages, so serve the
-directory:
+The page loads its data with `fetch`, which browsers refuse for `file://` pages, and takes what it
+shares from `../common/`, so serve it as Pages does, beside common/:
 
 ```
 cd skypass-cards
-npm run serve        # http://localhost:8000
+npm run serve        # http://localhost:8000/skypass-cards/
 ```
 
 Tests need Node 20 or later and nothing else:

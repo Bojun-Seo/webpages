@@ -2,12 +2,21 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  dateLabel, dayKind, daysIn, holidaysThrough, monthWeeks, monthsBetween, shiftMonth, toggleAll, weekdayDates,
-  weekdayOf,
+  addDays, dateLabel, dayKind, daysIn, holidaysThrough, isDate, koreaDate, monthWeeks, monthsBetween, shiftMonth,
+  toggleAll, weekdayDates, weekdayOf,
 } from '../site/calendar.js';
 
-const read = (path) => JSON.parse(readFileSync(new URL(path, import.meta.url)));
-const holidays = read('../site/data/holidays.json');
+const holidays = JSON.parse(readFileSync(new URL('../site/holidays.json', import.meta.url)));
+
+test('the date in Korea turns at midnight there, not in UTC', () => {
+  assert.equal(koreaDate(Date.parse('2026-11-20T14:59:00Z')), '2026-11-20');
+  assert.equal(koreaDate(Date.parse('2026-11-20T15:00:00Z')), '2026-11-21');
+  assert.equal(addDays('2026-12-31', 1), '2027-01-01');
+  assert.equal(addDays('2027-03-01', -1), '2027-02-28');
+  assert.ok(isDate('2028-02-29'));
+  assert.ok(!isDate('2027-02-29'));
+  assert.ok(!isDate('2026-1-5'));
+});
 
 test('a month runs in weeks from Sunday, padded at both ends', () => {
   // November 2026 starts on a Sunday and has 30 days.
@@ -49,10 +58,19 @@ test("a weekday's name picks its dates still ahead, and takes them out once all 
   assert.deepEqual([...toggleAll(new Set(['x']), [])], ['x']);
 });
 
-test('the holidays are those japan-flights keeps, through the end of their last year', () => {
-  // Both pages take the 월력요항; a year added to one must go to the other.
-  assert.deepEqual(holidays, read('../../japan-flights/site/data/holidays.json'),
-    'copy japan-flights/site/data/holidays.json to fair-pick/site/data/holidays.json');
+test('the holidays name every date they list, through the end of their last year', () => {
+  for (const [date, name] of Object.entries(holidays.dates)) {
+    assert.ok(isDate(date), date);
+    assert.ok(typeof name === 'string' && name.length > 0, date);
+  }
   assert.equal(holidaysThrough(holidays.dates), '2027-12-31');
   assert.equal(holidaysThrough({}), null);
+});
+
+test('the 2027 holidays leave 119 days off in a five-day week, as the official calendar says', () => {
+  let off = 0;
+  for (let d = '2027-01-01'; d <= '2027-12-31'; d = addDays(d, 1)) {
+    if (dayKind(d, holidays.dates) !== 'weekday') off++;
+  }
+  assert.equal(off, 119);
 });

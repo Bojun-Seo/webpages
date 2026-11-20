@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decide, duel, geometricMean, majorityValue, otherRules, rank, tally } from '../site/rank.js';
+import { decide, duel, geometricMean, majorityValue, otherRules, rank, tally } from '../site/social-choice.js';
 
 // Ballots from columns of grades, one array per option, each listing every
 // voter's grade in the same voter order.

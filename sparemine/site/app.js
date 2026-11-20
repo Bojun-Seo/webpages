@@ -5,6 +5,7 @@ import {
   ALGOS, DEFAULTS, PLATFORMS, POOLS, RELEASE,
   bareCommand, checkAddress, configToml, oneLiner, platformById, poolById, runScript, scriptName, threadsOf,
 } from './gen.js';
+import { $, el } from '../common/dom.js';
 
 // Where this browser keeps what the visitor entered.
 const FORM_KEY = 'sparemine.form';
@@ -32,22 +33,6 @@ const EXAMPLE = {
   busyThreshold: DEFAULTS.busyThreshold,
   lowerPriority: DEFAULTS.lowerPriority,
 };
-
-const $ = (id) => document.getElementById(id);
-
-function el(tag, props, ...children) {
-  const node = document.createElement(tag);
-  for (const [key, value] of Object.entries(props || {})) {
-    if (value == null || value === false) continue;
-    if (key === 'class') node.className = value;
-    else if (key.startsWith('on')) node.addEventListener(key.slice(2), value);
-    else node.setAttribute(key, value === true ? '' : value);
-  }
-  for (const child of children.flat(Infinity)) {
-    if (child != null && child !== false) node.append(child);
-  }
-  return node;
-}
 
 function option(value, label) {
   return el('option', { value }, label);

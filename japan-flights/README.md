@@ -139,7 +139,8 @@ documents; each run logs the fields a real ticket has, to check it against.
 
 ## Update the data
 
-Everything the page knows is in `site/data/`:
+Everything the page knows is in `site/data/`, but for the public holidays, which it shares with
+fair-pick in [`common/`](../common/):
 
 - `routes.json`: `origins` names the Korean airports, Incheon (`ICN`), Gimpo (`GMP`) and Cheongju
   (`CJJ`), and `destinations` the airports abroad, each with its `dest` code, the `city` its chip
@@ -149,12 +150,13 @@ Everything the page knows is in `site/data/`:
   flight back its local date and the flight out its local landing time. The page and the fetcher
   take a route from every origin to every destination (`routesOf` in `site/plan.js`). Move `updated`
   on with each change.
-- `holidays.json`: public holidays by date, through 2027, from the 월력요항 that the Korea
-  AeroSpace Administration publishes each June. A substitute holiday is named after the holiday it
-  stands in for. The page takes a day it does not list for a working day, so add each year before
-  the fares reach it: the fetcher fetches six months ahead and warns on the run's summary page, from
-  July 2027 for 2028, when they reach past the last holiday listed. fair-pick's calendar keeps a
-  copy in `fair-pick/site/data/holidays.json`, and its tests fail until the copy matches.
+- `common/site/holidays.json`: public holidays by date, through 2027, from the 월력요항 that the
+  Korea AeroSpace Administration publishes each June. A substitute holiday is named after the
+  holiday it stands in for. The page takes a day it does not list for a working day, so add each
+  year before the fares reach it: the fetcher fetches six months ahead and warns on the run's
+  summary page, from July 2027 for 2028, when they reach past the last holiday listed. The page
+  loads them from `../common/holidays.json`, and the fetcher from the file `--holidays` names, this
+  one unless told otherwise.
 - `baggage.json`: what a checked bag bought in advance costs one way, in won, for a bag a fare does
   not include. `airlines` gives an airline's own `fee`, one for all its routes or one for each
   destination country (`{ "JP": 40000, "TW": 50000 }`), with the `kg` it buys, its `source`,
@@ -171,17 +173,17 @@ Everything the page knows is in `site/data/`:
   Add an airline when the deploy log counts fares of its without a checked bag, the first of its
   three numbers there.
 
-The tests check that every destination has the fields the page reads and that the 2027 holidays add
-up to the 119 days off the official calendar gives, so run them after editing.
+The tests check that every destination has the fields the page reads, and common's that the 2027
+holidays add up to the 119 days off the official calendar gives, so run both after editing.
 
 ## Run and test locally
 
-The page loads its data with `fetch`, which browsers refuse for `file://` pages, so serve the
-directory:
+The page loads its data with `fetch`, which browsers refuse for `file://` pages, and takes what it
+shares from `../common/`, so serve it as Pages does, beside common/:
 
 ```
 cd japan-flights
-npm run serve        # http://localhost:8000
+npm run serve        # http://localhost:8000/japan-flights/
 ```
 
 Tests need Node 20 or later and nothing else:

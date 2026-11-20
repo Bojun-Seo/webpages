@@ -1,11 +1,32 @@
-// A month as a Korean wall calendar shows it: weeks that start on Sunday,
-// Sundays and public holidays in red, Saturdays in blue. Dates are
-// 'YYYY-MM-DD' strings and months { year, month } with month 1 to 12,
-// worked out in UTC so that the viewer's time zone cannot shift a day.
+// Dates in Korea, and a month as a Korean wall calendar shows it: weeks
+// that start on Sunday, Sundays and public holidays in red, Saturdays in
+// blue. Dates are 'YYYY-MM-DD' strings and months { year, month } with
+// month 1 to 12, worked out in UTC so that the viewer's time zone cannot
+// shift a day. The public holidays are in holidays.json beside this file.
 
 export const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
+const DAY = 86400e3;
+const KOREA = 9 * 3600e3;
+
 const pad = (n) => String(n).padStart(2, '0');
+
+// The date in Korea at `ms`, 'YYYY-MM-DD'. Korea keeps no summer time.
+export function koreaDate(ms = Date.now()) {
+  return new Date(ms + KOREA).toISOString().slice(0, 10);
+}
+
+// Whether `iso` is a real date written 'YYYY-MM-DD'.
+export function isDate(iso) {
+  if (typeof iso !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  const day = new Date(`${iso}T00:00:00Z`);
+  return !Number.isNaN(day.getTime()) && day.toISOString().slice(0, 10) === iso;
+}
+
+// The date `days` after `iso`.
+export function addDays(iso, days) {
+  return new Date(Date.parse(`${iso}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
+}
 
 export function isoOf(year, month, day) {
   return `${year}-${pad(month)}-${pad(day)}`;

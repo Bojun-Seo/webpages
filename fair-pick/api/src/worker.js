@@ -22,7 +22,7 @@
 // poll.js keeps each poll and decides who may do what; this module routes
 // a call to its poll and answers browsers on the page's site.
 
-import { idProblem, normalizeId } from '../../site/rules.js';
+import { idProblem, normalizeId } from '../../../common/site/poll-rules.js';
 import { GATE, Poll, SIGNED_OUT, WRONG, json, sha256 } from './poll.js';
 
 // workerd needs the Durable Object's class among the main module's exports.

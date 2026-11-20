@@ -141,12 +141,13 @@ The page itself needs no secret.
 
 ## Run and test locally
 
-The page is plain static files with no `fetch`, so opening `site/index.html`
-works; to serve it like Pages does:
+The page is plain static files with no `fetch`, but a browser runs its
+modules, `../common/dom.js` among them, only from a server, so serve it as
+Pages does, beside common/:
 
 ```
 cd sparemine
-npm run serve        # http://localhost:8000
+npm run serve        # http://localhost:8000/sparemine/
 ```
 
 Tests need Node 20 or later and nothing else:

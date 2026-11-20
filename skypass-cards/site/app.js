@@ -2,6 +2,7 @@
 // earns in a year. The working out lives in calc.js.
 
 import { DEFAULT_MILE_VALUE, MAX_TRIPS, compare, minPrevOf, paysAbroad, yearOf } from './calc.js';
+import { $, el } from '../common/dom.js';
 
 // Where this browser keeps what the viewer entered.
 const FORM_KEY = 'skypass-cards.form';
@@ -23,22 +24,6 @@ const AMOUNTS = {
 const SETTINGS = { trips: 'trips', mileValue: 'mile-value', maxFee: 'max-fee', sort: 'sort' };
 
 const MAN = 10000;
-
-const $ = (id) => document.getElementById(id);
-
-function el(tag, props, ...children) {
-  const node = document.createElement(tag);
-  for (const [key, value] of Object.entries(props || {})) {
-    if (value == null || value === false) continue;
-    if (key === 'class') node.className = value;
-    else if (key.startsWith('on')) node.addEventListener(key.slice(2), value);
-    else node.setAttribute(key, value === true ? '' : value);
-  }
-  for (const child of children.flat(Infinity)) {
-    if (child != null && child !== false) node.append(child);
-  }
-  return node;
-}
 
 async function load(path) {
   try {

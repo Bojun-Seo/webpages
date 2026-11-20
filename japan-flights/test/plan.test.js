@@ -8,7 +8,7 @@ import {
 
 const data = (name) => JSON.parse(readFileSync(new URL(`../site/data/${name}`, import.meta.url)));
 const routes = routesOf(data('routes.json'));
-const holidays = data('holidays.json').dates;
+const holidays = JSON.parse(readFileSync(new URL('../../common/site/holidays.json', import.meta.url))).dates;
 const route = (id) => routes.find((r) => r.id === id);
 const today = '2026-10-11';
 const december = { from: '2026-12-01', to: '2026-12-31', nights: new Set([2, 3]) };
@@ -141,14 +141,6 @@ test('a flight back that lands after midnight frees the day it lands, not the da
   assert.equal(trip('2026-11-22').lands, '2026-11-23'); // back Monday morning, so it takes no leave
   assert.equal(trip('2026-11-23'), undefined); // away all Monday
   assert.equal(leaveFor('2026-11-20', '2026-11-24', holidays, { morningArrival: true }).leave, 1);
-});
-
-test('the 2027 holidays leave 119 days off in a five-day week, as the official calendar says', () => {
-  let off = 0;
-  for (let d = '2027-01-01'; d <= '2027-12-31'; d = addDays(d, 1)) {
-    if (holidays[d] || dayOf(d) === 'sat' || dayOf(d) === 'sun') off++;
-  }
-  assert.equal(off, 119);
 });
 
 test('a morning arrival lands in Korea before noon', () => {

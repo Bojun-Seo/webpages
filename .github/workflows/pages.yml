@@ -1,5 +1,5 @@
-# Publishes this repository's pages to GitHub Pages: each page's site/ under the page's name, and
-# index.html, which links to them, at the root. A repository has one Pages site and every
+# Publishes this repository's pages to GitHub Pages: each page's site/ under the page's name,
+# common/site/, which they share, as common/, and index.html, which links to them, at the root. A repository has one Pages site and every
 # deployment replaces all of it, so this one workflow builds every page. A push to any branch that
 # touches a page runs every page's tests, builds the site and opens each page in a browser
 # (smoke/); the default branch then publishes it. A daily run fetches the fares japan-flights
@@ -14,6 +14,7 @@ on:
     branches: ['**']
     paths:
       - index.html
+      - common/**
       - japan-flights/**
       - skypass-cards/**
       - sparemine/**
@@ -29,6 +30,16 @@ permissions:
   contents: read
 
 jobs:
+  common:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm test
+        working-directory: common
+
   japan-flights:
     runs-on: ubuntu-latest
     steps:
@@ -70,7 +81,7 @@ jobs:
         working-directory: fair-pick
 
   build:
-    needs: [japan-flights, skypass-cards, sparemine, fair-pick]
+    needs: [common, japan-flights, skypass-cards, sparemine, fair-pick]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -93,6 +104,7 @@ jobs:
         run: |
           mkdir _site
           cp index.html _site/
+          cp -R common/site _site/common
           cp -R japan-flights/site _site/japan-flights
           cp -R skypass-cards/site _site/skypass-cards
           cp -R sparemine/site _site/sparemine
@@ -103,15 +115,20 @@ jobs:
               _site/$page/index.html
             grep -q "style.css?v=$v" _site/$page/index.html
             grep -q "app.js?v=$v" _site/$page/index.html
+            # What each page takes from common/, and the shared modules from each other.
+            sed -i -E "s#from '\.\./common/([a-z-]+)\.js'#from '../common/\1.js?v=$v'#" _site/$page/app.js
+            grep -q "common/dom.js?v=$v" _site/$page/app.js
           done
+          sed -i -E "s#from '\./([a-z-]+)\.js'#from './\1.js?v=$v'#" _site/common/*.js
+          grep -q "calendar.js?v=$v" _site/common/poll-rules.js
           sed -i "s|from './plan.js'|from './plan.js?v=$v'|" _site/japan-flights/app.js
           grep -q "plan.js?v=$v" _site/japan-flights/app.js
           sed -i "s|from './calc.js'|from './calc.js?v=$v'|" _site/skypass-cards/app.js
           grep -q "calc.js?v=$v" _site/skypass-cards/app.js
           sed -i "s|from './gen.js'|from './gen.js?v=$v'|" _site/sparemine/app.js
           grep -q "gen.js?v=$v" _site/sparemine/app.js
-          sed -i -E "s#from '\./(api|calendar|config|rank|rules)\.js'#from './\1.js?v=$v'#" _site/fair-pick/app.js
-          test "$(grep -c "\.js?v=$v'" _site/fair-pick/app.js)" -eq 5
+          sed -i -E "s#from '\./(api|config)\.js'#from './\1.js?v=$v'#" _site/fair-pick/app.js
+          test "$(grep -c "\.js?v=$v'" _site/fair-pick/app.js)" -eq 6
           if [ -z "$FAIR_PICK_API" ]; then
             echo "::notice::FAIR_PICK_API is not set, so fair-pick says its server is not connected. See fair-pick/README.md."
           elif [[ "$FAIR_PICK_API" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$ ]]; then

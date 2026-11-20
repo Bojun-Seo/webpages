@@ -5,6 +5,7 @@ import {
   ALLIANCES, DAY_NAMES, DEFAULT_PARTY, TRIP_NIGHTS, allianceOf, dayOf, dayOffProblem, fareMonths, lastDayOfMonth,
   recommend, routesOf, searchLinks,
 } from './plan.js';
+import { $, el } from '../common/dom.js';
 
 const PAGE_SIZE = 30;
 
@@ -74,22 +75,6 @@ function viaLabel(via) {
   if (out && out === back) return `왕복 ${out} 경유`;
   const ways = [out && `갈 때 ${out}`, back && `올 때 ${back}`].filter(Boolean);
   return ways.length ? `${ways.join(', ')} 경유` : null;
-}
-
-const $ = (id) => document.getElementById(id);
-
-function el(tag, props, ...children) {
-  const node = document.createElement(tag);
-  for (const [key, value] of Object.entries(props || {})) {
-    if (value == null || value === false) continue;
-    if (key === 'class') node.className = value;
-    else if (key.startsWith('on')) node.addEventListener(key.slice(2), value);
-    else node.setAttribute(key, value === true ? '' : value);
-  }
-  for (const child of children.flat(Infinity)) {
-    if (child != null && child !== false) node.append(child);
-  }
-  return node;
 }
 
 function localToday() {
@@ -385,7 +370,7 @@ function statusLine(live) {
 
 async function main() {
   const [routesDoc, live, holidaysDoc, baggage] = await Promise.all([
-    load('data/routes.json'), load('data/live-fares.json'), load('data/holidays.json'), load('data/baggage.json'),
+    load('data/routes.json'), load('data/live-fares.json'), load('../common/holidays.json'), load('data/baggage.json'),
   ]);
   if (!routesDoc) {
     $('status').textContent = 'data/routes.json을 읽지 못했습니다. 파일을 직접 열었다면 README의 로컬 실행 방법을 따라 주세요.';

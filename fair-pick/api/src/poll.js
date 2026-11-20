@@ -11,8 +11,8 @@
 // workerd takes every name the Worker's main module exports for an entry
 // point, so the constants the tests read live here, not there.
 
-import { decide } from '../../site/rank.js';
-import { LIMITS, SCALES, checkBallot, checkPoll, nameKey, newPinProblem, pinProblem } from '../../site/rules.js';
+import { LIMITS, SCALES, checkBallot, checkPoll, nameKey, newPinProblem, pinProblem } from '../../../common/site/poll-rules.js';
+import { decide } from '../../../common/site/social-choice.js';
 
 const MINUTE = 60e3;
 const HOUR = 60 * MINUTE;

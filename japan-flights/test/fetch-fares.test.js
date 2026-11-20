@@ -369,7 +369,7 @@ test('when the API answers some queries, the fares fetched before stand in for t
   assert.deepEqual(fetchWith(narita, old).doc.fares.map((f) => `${f.route} ${f.airline}`), ['ICN-NRT 7C']);
 });
 
-test('the script warns when it fetches trips past the last holiday holidays.json lists', () => {
+test('the script warns when it fetches trips past the last holiday it is given', () => {
   const dir = mkdtempSync(join(tmpdir(), 'fares-'));
   const path = (name) => join(dir, name);
   writeFileSync(path('stub.mjs'), 'globalThis.fetch = async () => '
@@ -380,7 +380,7 @@ test('the script warns when it fetches trips past the last holiday holidays.json
   const warned = (dates) => {
     writeFileSync(path('holidays.json'), JSON.stringify({ dates }));
     const run = spawnSync(process.execPath, ['--import', path('stub.mjs'), script, '--routes', path('routes.json'),
-      '--out', path('out.json'), '--months', '1'],
+      '--out', path('out.json'), '--months', '1', '--holidays', path('holidays.json')],
     { env: { ...process.env, TRAVELPAYOUTS_TOKEN: 'token' }, encoding: 'utf8' });
     assert.equal(run.status, 0, run.stderr);
     return /holidays\.json lists public holidays through/.test(run.stderr);

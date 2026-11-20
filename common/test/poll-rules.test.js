@@ -1,24 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { addDays } from '../site/calendar.js';
 import {
-  LIMITS, SCALES, addDays, checkBallot, checkPoll, cleanText, idProblem, isDate, koreaDate, nameKey,
-  newPinProblem, normalizeId, pinProblem, weakPin,
-} from '../site/rules.js';
+  LIMITS, SCALES, checkBallot, checkPoll, cleanText, idProblem, nameKey, newPinProblem, normalizeId, pinProblem,
+  weakPin,
+} from '../site/poll-rules.js';
 
 // 20 November 2026, 10:00 in Korea.
 const NOW = Date.parse('2026-11-20T01:00:00Z');
 
 const datePoll = (props) => ({
   kind: 'date', title: '12월 팀 회식', note: '', options: ['2026-12-04', '2026-12-03'], ...props,
-});
-
-test('the date in Korea turns at midnight there, not in UTC', () => {
-  assert.equal(koreaDate(Date.parse('2026-11-20T14:59:00Z')), '2026-11-20');
-  assert.equal(koreaDate(Date.parse('2026-11-20T15:00:00Z')), '2026-11-21');
-  assert.equal(addDays('2026-12-31', 1), '2027-01-01');
-  assert.ok(isDate('2028-02-29'));
-  assert.ok(!isDate('2027-02-29'));
-  assert.ok(!isDate('2026-1-5'));
 });
 
 test('a group ID is lower case with hyphens for spaces, and Hangul is welcome', () => {
