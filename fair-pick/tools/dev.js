@@ -1,8 +1,10 @@
 // Serves the site as common/tools/serve.js does, with fair-pick's API on
 // memory, so that the page can be tried without Cloudflare:
 //
-//   npm run serve          # http://localhost:8000/fair-pick/
-//   PORT=9000 npm run serve
+//   npm run serve:api          # http://localhost:8000/fair-pick/
+//   PORT=9000 npm run serve:api
+//
+// npm run serve serves the page as it is published, polls in links.
 //
 // The page asks config.js where its API is; this answers that it is here,
 // under /api. Polls last until the server stops. `cd api && npm run dev`

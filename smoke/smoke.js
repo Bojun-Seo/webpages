@@ -10,8 +10,9 @@
 // It serves the directory itself and keeps the browser off every other
 // site, so a font that does not load is no failure, and it uses whatever
 // fares the build fetched: a japan-flights with no fares passes, since the
-// page publishes without them. fair-pick gets its API from here too: its
-// Worker, run on memory, answers in place of the one config.js names.
+// page publishes without them. fair-pick is opened both as it publishes
+// without an API, keeping its polls in links, and with one, its Worker run
+// on memory here answering in place of the one config.js would name.
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -32,7 +33,7 @@ const TYPES = {
 // A file the site may lack: the fares, which the build does not stop for.
 const OPTIONAL = ['/japan-flights/data/live-fares.json'];
 
-// Where fair-pick is told its API is while it is checked.
+// Where fair-pick is told its API is while it is checked with one.
 const FAIR_PICK_API = 'https://fair-pick-api.test';
 
 // Serves `root` on a free port of this machine, a directory by its
@@ -66,10 +67,10 @@ function workdayAhead(holidays) {
 
 // What a page needs before it opens, by path.
 const setups = {
-  // fair-pick calls the API config.js names, which the build takes from a
-  // repository variable a branch may not have; the check names one of its
-  // own and answers it with the Worker on memory.
-  async '/fair-pick/'(context) {
+  // fair-pick with an API, which config.js names when the build has the
+  // repository variable for it: the check names one of its own and answers
+  // it with the Worker on memory.
+  async '/fair-pick/?server'(context) {
     const env = memoryEnv();
     await context.route((url) => url.pathname.endsWith('/fair-pick/config.js'), (route) => route.fulfill({
       contentType: 'text/javascript; charset=utf-8',
@@ -165,9 +166,71 @@ const checks = {
     return problems;
   },
 
-  async '/fair-pick/'(page) {
+  // fair-pick with no API, as it is published until one is set up: a poll
+  // goes from one phone to another in links, and their votes add up.
+  async '/fair-pick/'(page, { base }) {
     const problems = [];
-    if (await page.isVisible('#server-note')) return ['fair-pick says its server is not connected'];
+    if (await page.evaluate(() => document.body.dataset.mode) !== 'links') return ['fair-pick does not keep its polls in links'];
+    await page.click('#new-link');
+    await page.check('input[name="kind"][value="choice"]', { force: true });
+    await page.fill('#title-input', '점검 링크');
+    await page.locator('#choice-list input').nth(0).fill('가');
+    await page.locator('#choice-list input').nth(1).fill('나');
+    await page.fill('#id-input', 'smoke-links');
+    await page.fill('#pin-input', '48291573');
+    await page.click('#create-submit');
+    await page.waitForSelector('#poll-body:not([hidden])');
+    const linkOf = async (on) => {
+      await on.waitForFunction(() => document.getElementById('share-link').href.includes('#1.'));
+      return on.getAttribute('#share-link', 'href');
+    };
+    const vote = async (on, name, grades) => {
+      await on.fill('#voter-name', name);
+      for (const [i, grade] of grades.entries()) {
+        await on.locator('#ballot > li').nth(i).locator(`input[value="${grade}"]`).check({ force: true });
+      }
+      await on.click('#vote-submit');
+      await on.waitForFunction(() => /투표했어요/.test(document.getElementById('vote-message').textContent));
+    };
+    await vote(page, '갑', [4, 1]);
+    if (!(await page.isVisible('#send'))) problems.push('fair-pick: no link to send after a vote');
+    const first = await linkOf(page);
+
+    // Another phone opens the link with the group ID and PIN, and votes.
+    const other = await page.context().browser().newContext({ viewport: { width: 375, height: 800 }, hasTouch: true });
+    await other.route('**', (route) => (route.request().url().startsWith(base) ? route.continue() : route.abort()));
+    const second = await other.newPage();
+    second.on('pageerror', (error) => problems.push(`fair-pick, second phone: ${error.message}`));
+    await second.goto(first);
+    await second.waitForSelector('#gate-id-field:not([hidden])');
+    await second.fill('#gate-id', 'smoke-links');
+    await second.fill('#gate-pin', '11112222');
+    await second.click('#gate-submit');
+    await second.waitForFunction(() => document.getElementById('gate-message').textContent !== '');
+    if (!/맞지 않아요/.test(await second.textContent('#gate-message'))) problems.push('fair-pick takes a wrong PIN for a link');
+    await second.fill('#gate-pin', '48291573');
+    await second.click('#gate-submit');
+    await second.waitForSelector('#poll-body:not([hidden])');
+    await vote(second, '을', [2, 4]);
+    const back = await linkOf(second);
+
+    // Its link brings that vote to the first phone, and the close goes back.
+    await page.goto(back);
+    await page.waitForSelector('#poll-body:not([hidden])');
+    const voters = await page.locator('#voters li').count();
+    if (voters !== 2) problems.push(`fair-pick: the maker sees ${voters} voters after opening the other's link`);
+    await page.locator('#admin').evaluate((details) => { details.open = true; });
+    await page.click('#admin-close');
+    await page.waitForSelector('#decision:not([hidden])');
+    await second.goto(await linkOf(page));
+    await second.waitForSelector('#decision:not([hidden])');
+    if (!(await second.isHidden('#vote-form'))) problems.push('fair-pick: the closing link leaves the other phone voting');
+    await other.close();
+    return problems;
+  },
+
+  async '/fair-pick/?server'(page) {
+    const problems = [];
 
     // A poll of dates picked on the calendar: every Friday of next month at
     // once, from the weekday's name, which keeps the focus when pressed from

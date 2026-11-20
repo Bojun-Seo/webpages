@@ -1,26 +1,34 @@
-// Draws the page's three views and talks to the API: home, with the way
+// Draws the page's three views and keeps its polls: home, with the way
 // into a poll and to a new one; the form for a new poll, with a Korean
 // calendar for dates; and a poll, with the voter's ballot, the results and
-// the maker's menu. The API is called from api.js. What a poll may hold,
-// how the group's choice is ranked and the calendar are in ../common/,
-// which the API shares.
+// the maker's menu. With an API address in config.js the polls live on the
+// API, which api.js calls; without one they live in links, which link.js
+// seals and merges. What a poll may hold, how the group's choice is ranked
+// and the calendar are in ../common/, which the API shares.
 
 import { API_BASE } from './config.js';
 import { createClient } from './api.js';
+import { createLinkClient, payloadsIn } from './link.js';
 import {
-  WEEKDAYS, dateLabel, dayKind, holidaysThrough, koreaDate, monthOf, monthWeeks, monthsBetween, shiftMonth,
+  WEEKDAYS, dateLabel, dayKind, holidaysThrough, isDate, koreaDate, monthOf, monthWeeks, monthsBetween, shiftMonth,
   toggleAll, weekdayDates,
 } from '../common/calendar.js';
 import { $, el } from '../common/dom.js';
-import {
+import * as pollRules from '../common/poll-rules.js';
+import { decide, otherRules, pairwise, rank } from '../common/social-choice.js';
+
+const {
   LIMITS, SCALES, checkBallot, checkPoll, idProblem, newPinProblem, normalizeId, pinProblem, weakPin,
-} from '../common/poll-rules.js';
-import { otherRules, pairwise, rank } from '../common/social-choice.js';
+} = pollRules;
 
 // Where this browser keeps, for each poll it has been in, the token the
 // PIN unlocked, the PIN, the maker's admin key and the keys of the ballots
 // cast from it: { [id]: { token, pin, adminKey, keys, current, title, kind, seen } }.
 const STORE_KEY = 'fair-pick.polls';
+
+// Where this browser keeps, when polls live in links, each poll it has by
+// group ID: { uid, key, state }.
+const LINKS_KEY = 'fair-pick.links';
 
 // How many months past this one the calendar goes.
 const MONTHS_AHEAD = 12;
@@ -28,7 +36,32 @@ const MONTHS_AHEAD = 12;
 const KIND_NAMES = { date: '날짜 투표', choice: '장소·메뉴 투표' };
 const CHOICE_EXAMPLES = ['예: 삼겹살집', '예: 횟집', '예: 중식당'];
 
-const api = API_BASE ? createClient(API_BASE) : null;
+// Polls live on the API when config.js names one, and in links otherwise.
+const LINKS = !API_BASE;
+
+let linkMemory = null;
+const linkStorage = {
+  read() {
+    try {
+      const raw = localStorage.getItem(LINKS_KEY);
+      return raw === null ? linkMemory : JSON.parse(raw);
+    } catch {
+      return linkMemory;
+    }
+  },
+  write(polls) {
+    linkMemory = polls;
+    try {
+      localStorage.setItem(LINKS_KEY, JSON.stringify(polls));
+    } catch {
+      // `linkMemory` keeps them as long as the page.
+    }
+  },
+};
+
+const api = LINKS
+  ? createLinkClient({ rules: { ...pollRules, isDate }, decide, storage: linkStorage })
+  : createClient(API_BASE);
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -52,6 +85,13 @@ const state = {
   draft: null,
   justMade: false,
   flash: '',
+  // In link mode: a link's payload waiting for its group ID and PIN, the
+  // link that carries this device's poll, the names cast from more than one
+  // phone, and what to say once the poll shows.
+  pending: null,
+  link: '',
+  sameNames: [],
+  notice: '',
 };
 
 // What this browser keeps. Without storage it lasts as long as the page.
@@ -190,12 +230,13 @@ function optionNode(poll, index, tag = 'span') {
 function readRoute() {
   const params = new URLSearchParams(location.search);
   if (params.has('new')) return { view: 'create' };
+  if (params.has('join')) return { view: 'poll', join: true };
   if (params.has('g')) return { view: 'poll', id: normalizeId(params.get('g')) };
   return { view: 'home' };
 }
 
-function navigate(search) {
-  history.pushState(null, '', search || location.pathname);
+function navigate(search, { replace = false } = {}) {
+  history[replace ? 'replaceState' : 'pushState'](null, '', search || location.pathname);
   show();
 }
 
@@ -228,7 +269,6 @@ function showHome() {
 
 async function onEnter(event) {
   event.preventDefault();
-  if (!api) return;
   const id = normalizeId($('enter-id').value);
   const pin = $('enter-pin').value.trim();
   const problem = idProblem(id) || pinProblem(pin);
@@ -425,7 +465,6 @@ function resetCreate() {
 
 async function onCreate(event) {
   event.preventDefault();
-  if (!api) return;
   const deadline = $('deadline-input').value;
   const input = {
     kind: state.kind,
@@ -449,6 +488,7 @@ async function onCreate(event) {
         token: data.token, adminKey: data.adminKey, pin, title: data.poll.title, kind: data.poll.kind,
       });
       take(data);
+      markUnsent(data.poll.id, 'made');
       state.justMade = true;
       resetCreate();
       navigate(`?g=${encodeURIComponent(data.poll.id)}`);
@@ -465,16 +505,29 @@ async function onCreate(event) {
 function take(data) {
   state.poll = data.poll;
   state.ballots = data.ballots;
+  state.sameNames = data.sameNames || [];
   state.loadedAt = Date.now();
+  state.link = '';
+}
+
+// After a change kept in links, what the send box asks for until it is
+// sent: 'made' for the invitation, 'changed' for the link.
+function markUnsent(id, why) {
+  if (LINKS) updateEntry(id, { unsent: why });
 }
 
 function showPoll(id) {
   say('poll-message');
   say('vote-message');
-  $('poll-id').textContent = id;
+  $('poll-id').textContent = id || '';
+  $('poll-id-wrap').hidden = !id;
   $('poll-kind').textContent = '';
   $('poll-note').hidden = true;
   $('poll-status').textContent = '';
+  if (state.route.join) {
+    showJoin();
+    return;
+  }
   const problem = idProblem(id);
   if (problem) {
     $('poll-title').textContent = '없는 투표 주소예요';
@@ -487,7 +540,8 @@ function showPoll(id) {
   $('poll-title').textContent = entry?.title || id;
   document.title = `${entry?.title || id} · 모임 공정 투표`;
   if (!entry?.token && !entry?.adminKey) {
-    showGate();
+    if (LINKS) missing();
+    else showGate();
     return;
   }
   if (state.poll?.id === id && Date.now() - state.loadedAt < 5000) {
@@ -503,11 +557,28 @@ function showPoll(id) {
   refresh();
 }
 
-function showGate(message = '') {
+function showGate(message = '', { askId = false } = {}) {
   $('gate-form').hidden = false;
   $('poll-body').hidden = true;
+  $('gate-id-field').hidden = !askId;
+  $('gate-title').textContent = askId ? '그룹 ID와 PIN을 넣고 열기' : 'PIN을 넣고 들어가기';
   $('gate-pin').value = '';
   say('gate-message', message);
+}
+
+// In link mode, a poll this device does not keep: only a link brings it.
+function missing(message = '이 기기에 없는 투표예요. 단톡방에서 받은 투표 링크를 열어 주세요.') {
+  $('gate-form').hidden = true;
+  $('poll-body').hidden = true;
+  say('poll-message', message);
+}
+
+// A link's poll new to this device, which its group ID and PIN open.
+function showJoin() {
+  document.title = '받은 투표 열기 · 모임 공정 투표';
+  $('poll-title').textContent = '받은 투표 열기';
+  if (state.pending) showGate('', { askId: true });
+  else missing('받은 투표 링크를 다시 열어 주세요.');
 }
 
 // After an answer that the poll is gone or the token no longer opens it.
@@ -515,26 +586,36 @@ function signedOut(error) {
   forgetEntry(state.route.id);
   state.poll = null;
   state.draft = null;
-  showGate(error.message);
+  if (LINKS) missing(error.message);
+  else showGate(error.message);
 }
 
 async function onGate(event) {
   event.preventDefault();
-  if (!api) return;
-  const { id } = state.route;
+  const joining = LINKS && state.route.join;
+  const id = joining ? normalizeId($('gate-id').value) : state.route.id;
   const pin = $('gate-pin').value.trim();
-  const problem = pinProblem(pin);
+  const problem = (joining && idProblem(id)) || pinProblem(pin);
   if (problem) {
     say('gate-message', problem);
     return;
   }
+  say('gate-message');
   await withBusy($('gate-submit'), async () => {
     try {
-      const data = await api.enter(id, pin);
-      updateEntry(id, { token: data.token, pin, title: data.poll.title, kind: data.poll.kind });
+      const data = joining ? await api.open(state.pending, id, pin) : await api.enter(id, pin);
+      const pollId = data.poll.id;
+      updateEntry(pollId, { token: data.token, pin, title: data.poll.title, kind: data.poll.kind });
       $('gate-pin').value = '';
+      $('gate-id').value = '';
       take(data);
-      renderPoll();
+      if (!joining) {
+        renderPoll();
+        return;
+      }
+      state.pending = null;
+      state.notice = '투표를 열었어요. 이름을 걸고 투표한 뒤, 나오는 링크를 단톡방에 올려 주세요.';
+      navigate(`?g=${encodeURIComponent(pollId)}`, { replace: true });
     } catch (error) {
       say('gate-message', error.message);
     }
@@ -543,15 +624,13 @@ async function onGate(event) {
 
 async function refresh() {
   const { id } = state.route;
-  if (!api) {
-    say('poll-message', '투표 서버가 아직 연결되지 않았어요.');
-    return;
-  }
   if (!state.poll) $('poll-status').textContent = '불러오는 중…';
   try {
     const data = await api.load(id, authOf(entryOf(id)));
     if (state.route.view !== 'poll' || state.route.id !== id) return;
     take(data);
+    // The maker's phone showed the seed once the deadline passed.
+    if (data.changed) markUnsent(id, 'changed');
     renderPoll();
   } catch (error) {
     if (state.route.view !== 'poll' || state.route.id !== id) return;
@@ -564,25 +643,35 @@ async function refresh() {
   }
 }
 
-function renderPoll() {
+// Draws the poll; `quiet` keeps what the page last said, as when the
+// holidays arrive after the poll did.
+function renderPoll({ quiet = false } = {}) {
   $('gate-form').hidden = true;
   $('poll-body').hidden = false;
-  say('poll-message');
-  say('vote-message');
+  if (!quiet) {
+    say('poll-message');
+    say('vote-message');
+  }
+  if (state.notice) {
+    say('poll-message', state.notice, true);
+    state.notice = '';
+  }
   updateEntry(state.poll.id, { title: state.poll.title, kind: state.poll.kind });
   renderHeader();
   renderDecision();
+  renderSend();
   renderShare();
   renderBallot();
   renderResults();
   renderVoters();
   renderAdmin();
+  if (LINKS) updateLink();
 }
 
 function renderHeader() {
   const { poll, ballots } = state;
   document.title = `${poll.title} · 모임 공정 투표`;
-  $('poll-kind').textContent = `${KIND_NAMES[poll.kind]} · `;
+  $('poll-kind').textContent = ` · ${KIND_NAMES[poll.kind]}`;
   $('poll-id').textContent = poll.id;
   $('poll-title').textContent = poll.title;
   $('poll-note').textContent = poll.note;
@@ -605,7 +694,16 @@ function renderDecision() {
       el('p', null, '아무도 투표하지 않은 채 마감되어 정하지 못했어요.'));
     return;
   }
-  const { index, tied, drawn } = poll.decision;
+  const { index, tied, drawn, pending } = poll.decision;
+  if (pending) {
+    // In link mode, level at the top and the maker's seed not shown yet.
+    box.className = 'decision none';
+    box.replaceChildren(
+      el('span', { class: 'label' }, `${timeText(poll.closedAt)} 마감 · ${ballots.length}명 투표`),
+      el('strong', null, `공동 1위: ${tied.map((i) => optionOf(poll, i).text).join(', ')}`),
+      el('p', null, '투표를 만든 사람의 기기가 마감 링크를 올리면, 만들 때 봉인해 둔 순서로 하나가 정해져요.'));
+    return;
+  }
   const { text, holiday } = optionOf(poll, index);
   // How the rule put it first, from the ballots it was decided by.
   const ranked = rank(ballots, poll.options.length, SCALES[poll.kind].grades.length - 1);
@@ -619,31 +717,93 @@ function renderDecision() {
       : placed && reason(placed, ranked)));
 }
 
+// The link to the poll: on the API, its address; in link mode, the link
+// that carries everything this device has of it, once it is sealed.
 function shareLink(id) {
-  return `${location.origin}${location.pathname}?g=${encodeURIComponent(id)}`;
+  return LINKS ? state.link : `${location.origin}${location.pathname}?g=${encodeURIComponent(id)}`;
+}
+
+// The link in link mode, sealed now if it is not yet.
+async function linkNow() {
+  if (!state.link) state.link = `${location.origin}${location.pathname}#${await api.linkOf(state.poll.id)}`;
+  return state.link;
+}
+
+// Seals the link for the poll shown, and shows it once it is ready.
+let linkRun = 0;
+async function updateLink() {
+  const run = ++linkRun;
+  const { id } = state.poll;
+  try {
+    const link = `${location.origin}${location.pathname}#${await api.linkOf(id)}`;
+    if (run !== linkRun || state.poll?.id !== id) return;
+    state.link = link;
+    renderShareLink();
+  } catch {
+    // The poll is gone from this device; the next load says so.
+  }
 }
 
 function inviteText(poll, pin) {
-  return [
-    `[모임 공정 투표] ${poll.title}`,
-    '링크를 열고 PIN을 넣은 뒤, 이름을 걸고 투표해 주세요.',
-    shareLink(poll.id),
-    `그룹 ID: ${poll.id}`,
-    pin && `PIN: ${pin}`,
-  ].filter(Boolean).join('\n');
+  const how = LINKS
+    ? '링크를 열고 그룹 ID와 PIN을 넣은 뒤 이름을 걸고 투표해 주세요. 투표하면 나오는 새 링크를 이 방에 올려 주시면 서로의 투표가 합쳐져요.'
+    : '링크를 열고 PIN을 넣은 뒤, 이름을 걸고 투표해 주세요.';
+  return [`[모임 공정 투표] ${poll.title}`, how, shareLink(poll.id), `그룹 ID: ${poll.id}`, pin && `PIN: ${pin}`]
+    .filter(Boolean).join('\n');
+}
+
+// What the send box hands on: the invitation after the poll is made, and
+// the link after a change.
+function sendText() {
+  const { poll, ballots } = state;
+  const entry = entryOf(poll.id) || {};
+  if (entry.unsent === 'made') return inviteText(poll, entry.pin);
+  return [`[모임 공정 투표] ${poll.title} · ${ballots.length}명 투표${poll.closedAt ? ' · 마감' : ''}`, state.link].join('\n');
+}
+
+function renderSend() {
+  const why = LINKS ? entryOf(state.poll.id)?.unsent : null;
+  $('send').hidden = !why;
+  if (!why) return;
+  const made = why === 'made';
+  $('send-title').textContent = made ? '단톡방에 초대해 주세요' : '단톡방에 올려 주세요';
+  $('send-text').textContent = made
+    ? '투표를 만들었어요. 링크와 그룹 ID, PIN이 든 초대 메시지를 단톡방에 올려 주세요.'
+    : '방금 바뀐 내용은 아직 이 기기에만 있어요. 이 링크를 단톡방에 올려야 다른 사람에게도 반영돼요.';
+  delete $('send-copy').dataset.label;
+  $('send-copy').textContent = made ? '초대 메시지 복사' : '링크 복사';
+  $('send-native').hidden = typeof navigator.share !== 'function';
+}
+
+// Hides the send box a moment after its text went out.
+function sent(id) {
+  setTimeout(() => {
+    updateEntry(id, { unsent: null });
+    if (state.poll?.id === id) renderSend();
+  }, 1600);
+}
+
+function renderShareLink() {
+  const link = shareLink(state.poll.id);
+  let shown = link;
+  if (LINKS) {
+    shown = link ? `${link.slice(0, link.indexOf('#') + 12)}… (${link.length.toLocaleString('ko-KR')}자)` : '링크를 만드는 중…';
+  } else {
+    // The link as a person reads it; what is copied keeps a Hangul ID encoded.
+    try {
+      shown = decodeURI(link);
+    } catch {
+      // Shown encoded.
+    }
+  }
+  $('share-link').textContent = shown;
+  $('share-link').href = link || './';
 }
 
 function renderShare() {
   const { poll } = state;
   const entry = entryOf(poll.id) || {};
-  // The link as a person reads it; what is copied keeps a Hangul ID encoded.
-  let link = shareLink(poll.id);
-  try {
-    link = decodeURI(link);
-  } catch {
-    // Shown encoded.
-  }
-  $('share-link').textContent = link;
+  renderShareLink();
   $('share-id').textContent = poll.id;
   $('share-pin').textContent = entry.pin || '이 기기에 없어요';
   $('share-native').hidden = typeof navigator.share !== 'function';
@@ -756,7 +916,7 @@ function renderBallot() {
   ]));
   renderBallotRows();
   $('vote-submit').textContent = mine ? '고치기' : '투표하기';
-  $('vote-submit').disabled = closed || !api;
+  $('vote-submit').disabled = closed;
   $('vote-other').hidden = !mine || closed;
   $('vote-remove').hidden = !mine || closed;
   updateLeft();
@@ -765,7 +925,7 @@ function renderBallot() {
 async function onVote(event) {
   event.preventDefault();
   const { poll, draft } = state;
-  if (!api || !poll || poll.closedAt) return;
+  if (!poll || poll.closedAt) return;
   draft.name = $('voter-name').value;
   const missing = draft.grades.findIndex((grade) => grade == null);
   if (missing >= 0) {
@@ -794,6 +954,7 @@ async function onVote(event) {
       );
       if (data.ballotKey) keys[data.ballotId] = data.ballotKey;
       updateEntry(poll.id, { keys, current: data.ballotId });
+      markUnsent(poll.id, 'changed');
       state.draft = {
         pollId: poll.id, ballotId: data.ballotId, name: checked.ballot.name, grades: [...checked.ballot.grades],
         showMissing: false,
@@ -854,6 +1015,7 @@ async function onRemoveMine() {
       const keys = { ...(entry.keys || {}) };
       delete keys[mine.id];
       updateEntry(poll.id, { keys, current: null });
+      markUnsent(poll.id, 'changed');
       state.draft = null;
       take(data);
       renderPoll();
@@ -1107,7 +1269,7 @@ function renderResults() {
   const count = poll.options.length;
   const ranked = rank(ballots, count, SCALES[poll.kind].grades.length - 1);
   const wins = pairwise(ballots, count);
-  $('results-summary').textContent = `${ballots.length}명 · ${poll.closedAt ? '마감 결과' : '지금까지'}`;
+  $('results-summary').textContent = `${ballots.length}명 · ${poll.closedAt ? '마감 결과' : '지금까지'}${LINKS ? ' · 이 기기가 받은 투표' : ''}`;
   renderParadox(ranked, wins);
   $('results').replaceChildren(...ranked.map((t) => resultRow(t, ranked, wins)));
   if (poll.kind === 'date') renderResultCalendar(ranked);
@@ -1126,6 +1288,8 @@ function renderVoters() {
         onclick: () => editBallot(ballot.id),
       }, '고치기'));
   }));
+  $('voters-note').hidden = state.sameNames.length === 0;
+  $('voters-note').textContent = `이름이 같은 투표가 여러 기기에서 들어왔어요: ${state.sameNames.join(', ')}. 가장 나중 것만 셉니다.`;
 }
 
 async function adminCall(button, call, done) {
@@ -1149,18 +1313,20 @@ async function adminCall(button, call, done) {
 
 function reload(data) {
   take(data);
+  markUnsent(data.poll.id, 'changed');
   renderPoll();
 }
 
 async function onAdminKey(event) {
   event.preventDefault();
   const key = $('admin-key-input').value.trim();
-  if (!key || !api) return;
+  if (!key) return;
   const { poll } = state;
   try {
     const data = await api.load(poll.id, { adminKey: key });
     updateEntry(poll.id, { adminKey: key });
-    reload(data);
+    take(data);
+    renderPoll();
     $('admin').open = true;
   } catch (error) {
     say('admin-message', error.status === 401 ? '관리 코드가 맞지 않아요.' : error.message);
@@ -1173,7 +1339,7 @@ function renderAdmin() {
   const body = $('admin-body');
   if (!entry.adminKey) {
     body.replaceChildren(el('form', { class: 'admin-block', novalidate: true, onsubmit: onAdminKey },
-      el('p', { class: 'fine' }, '투표를 만든 기기에서는 이 메뉴가 바로 열려요. 다른 기기에서 만들었다면 그때 받은 관리 코드를 넣어 주세요.'),
+      el('p', { class: 'fine' }, '투표를 만든 기기에서는 이 메뉴가 바로 열려요. 다른 기기에서 쓰려면 투표를 만들 때 받은 관리 코드를 넣어 주세요.'),
       el('label', { class: 'field' }, el('span', null, '관리 코드'),
         el('input', { id: 'admin-key-input', type: 'text', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' })),
       el('p', { class: 'message', id: 'admin-message', role: 'alert' }),
@@ -1187,6 +1353,9 @@ function renderAdmin() {
       el('p', { class: 'fine' }, closed
         ? '다시 열면 투표를 더 받고, 결정은 지워집니다. 지난 마감 시각도 지워집니다. 다시 마감해도 공동 1위를 고르는 무작위 순서는 그대로예요.'
         : '마감하면 투표를 더 받지 않고, 지금까지의 투표로 하나를 정합니다. 공동 1위면 투표를 만들 때 미리 뽑아 둔 무작위 순서로 고릅니다.'),
+      LINKS && el('p', { class: 'fine' }, closed
+        ? '다시 연 링크를 단톡방에 올려야 다른 사람에게도 열려요.'
+        : '마감하기 전에 단톡방에 올라온 링크를 모두 열어 투표를 합쳐 주세요. 마감한 뒤에는 마감 링크를 올려야 다른 사람에게도 마감돼요.'),
       el('div', { class: 'actions' }, el('button', {
         type: 'button', class: closed ? 'ghost' : 'primary', id: 'admin-close',
         onclick: (event) => adminCall(event.currentTarget, closed ? api.reopen : api.close, reload),
@@ -1205,11 +1374,13 @@ function renderAdmin() {
       }, '지우기'))))),
     el('div', { class: 'admin-block' },
       el('h3', null, '관리 코드'),
-      el('p', { class: 'fine' }, '다른 기기에서 이 메뉴를 쓰려면 이 코드가 필요해요. 다른 사람에게는 알려 주지 마세요.'),
+      el('p', { class: 'fine' }, LINKS
+        ? '다른 기기에서 이 메뉴를 쓰려면 이 코드가 필요해요. 공동 1위를 가를 순서도 이 코드로 봉인되어 있으니, 마감 전에는 아무에게도 알려 주지 마세요.'
+        : '다른 기기에서 이 메뉴를 쓰려면 이 코드가 필요해요. 다른 사람에게는 알려 주지 마세요.'),
       el('div', { class: 'key-row' }, el('code', null, entry.adminKey), el('button', {
         type: 'button', class: 'act', onclick: (event) => copyText(entry.adminKey, event.currentTarget),
       }, '복사'))),
-    el('div', { class: 'admin-block' },
+    !LINKS && el('div', { class: 'admin-block' },
       el('h3', null, '투표 삭제'),
       el('p', { class: 'fine' }, '투표와 모든 기록을 지금 서버에서 지웁니다. 되돌릴 수 없어요.'),
       el('div', { class: 'actions' }, el('button', {
@@ -1230,11 +1401,56 @@ function renderAdmin() {
 
 function leave() {
   const { id } = state.route;
-  if (!window.confirm('이 기기에서 이 투표의 열쇠와 PIN을 지울까요? 다시 들어오려면 PIN이 필요하고, 만든 사람이라면 관리 코드도 필요해요.')) return;
+  const ask = LINKS
+    ? '이 기기에서 이 투표를 지울까요? 이 기기가 받은 투표와 열쇠, PIN이 사라져요. 단톡방의 링크로 다시 열 수 있고, 만든 사람이라면 관리 코드도 필요해요.'
+    : '이 기기에서 이 투표의 열쇠와 PIN을 지울까요? 다시 들어오려면 PIN이 필요하고, 만든 사람이라면 관리 코드도 필요해요.';
+  if (!window.confirm(ask)) return;
+  if (LINKS) api.remove(id);
   forgetEntry(id);
   state.poll = null;
   state.draft = null;
   navigate('');
+}
+
+// --- Links -----------------------------------------------------------------
+
+// A link opened on this page: its ballots added to the poll this device
+// keeps, or, for a poll new to it, its group ID and PIN asked for. Says
+// whether there was a link.
+async function receive(text) {
+  const [found] = payloadsIn(text);
+  if (!LINKS || !found) return false;
+  history.replaceState(null, '', location.pathname + location.search);
+  const [result] = await api.absorb(found.payload);
+  if (result) {
+    if (!entryOf(result.id)?.token) updateEntry(result.id, { token: 'link' });
+    state.loadedAt = 0;
+    state.notice = result.added
+      ? `링크에서 새 투표 ${result.added}개를 합쳤어요.`
+      : '링크의 투표는 이미 이 기기에 다 있어요.';
+    navigate(`?g=${encodeURIComponent(result.id)}`, { replace: true });
+    return true;
+  }
+  state.pending = found.payload;
+  navigate('?join', { replace: true });
+  return true;
+}
+
+async function onMerge() {
+  const text = $('merge-input').value;
+  if (payloadsIn(text).length === 0) {
+    say('merge-message', '붙여 넣은 글에서 투표 링크를 찾지 못했어요.');
+    return;
+  }
+  const results = (await api.absorb(text)).filter((result) => result.id === state.poll.id);
+  if (results.length === 0) {
+    say('merge-message', '이 투표의 링크가 아니에요.');
+    return;
+  }
+  const added = results.reduce((sum, result) => sum + result.added, 0);
+  $('merge-input').value = '';
+  await refresh();
+  say('merge-message', added ? `새 투표 ${added}개를 합쳤어요.` : '이미 이 기기에 다 있는 투표예요.', true);
 }
 
 // --- Start -----------------------------------------------------------------
@@ -1259,6 +1475,7 @@ function wire() {
     navigate(new URL(link.href).search);
   });
   window.addEventListener('popstate', show);
+  window.addEventListener('hashchange', () => receive(location.hash));
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible' || state.route.view !== 'poll' || !state.poll) return;
     if (Date.now() - state.loadedAt > 15000) refresh();
@@ -1284,32 +1501,53 @@ function wire() {
   $('vote-remove').addEventListener('click', onRemoveMine);
   $('refresh').addEventListener('click', (event) => withBusy(event.currentTarget, refresh));
   $('leave').addEventListener('click', leave);
-  $('copy-invite').addEventListener('click', (event) => {
-    copyText(inviteText(state.poll, entryOf(state.poll.id)?.pin), event.currentTarget);
+  $('copy-invite').addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    if (LINKS) await linkNow();
+    copyText(inviteText(state.poll, entryOf(state.poll.id)?.pin), button);
   });
-  $('copy-link').addEventListener('click', (event) => copyText(shareLink(state.poll.id), event.currentTarget));
+  $('copy-link').addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    copyText(LINKS ? await linkNow() : shareLink(state.poll.id), button);
+  });
   $('share-native').addEventListener('click', async () => {
     try {
+      if (LINKS) await linkNow();
       await navigator.share({ title: state.poll.title, text: inviteText(state.poll, entryOf(state.poll.id)?.pin) });
     } catch {
       // Cancelled, or the browser would not share.
     }
   });
+  $('send-copy').addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    const { id } = state.poll;
+    await linkNow();
+    await copyText(sendText(), button);
+    sent(id);
+  });
+  $('send-native').addEventListener('click', async () => {
+    const { id } = state.poll;
+    try {
+      await linkNow();
+      await navigator.share({ title: state.poll.title, text: sendText() });
+      sent(id);
+    } catch {
+      // Cancelled, or the browser would not share.
+    }
+  });
+  $('merge-submit').addEventListener('click', (event) => withBusy(event.currentTarget, onMerge));
 }
 
 async function main() {
-  if (!api) {
-    $('server-note').hidden = false;
-    for (const id of ['enter-submit', 'create-submit', 'gate-submit']) $(id).disabled = true;
-  }
+  document.body.dataset.mode = LINKS ? 'links' : 'server';
   wire();
-  show();
+  if (!await receive(location.hash)) show();
   await loadHolidays();
   if (state.route.view === 'create') {
     renderPicker();
     renderPicked();
   } else if (state.route.view === 'poll' && state.poll && !$('poll-body').hidden) {
-    renderPoll();
+    renderPoll({ quiet: true });
   }
 }
 

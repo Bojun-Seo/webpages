@@ -11,7 +11,6 @@
 </head>
 <body>
 <div class="wrap">
-  <p class="notice caution" id="server-note" role="note" hidden>투표 서버가 아직 연결되지 않아서 투표를 만들거나 들어갈 수 없어요. 서버를 연결하는 방법은 README에 있습니다.</p>
 
   <main id="view-home" hidden>
     <header class="masthead">
@@ -21,6 +20,8 @@
     </header>
 
     <p class="message ok" id="home-message" role="status"></p>
+
+    <p class="notice mode-note" data-only="links">서버 없이 이 페이지만으로 움직여요. 투표는 그룹 ID와 PIN으로 잠겨 <strong>링크</strong>에 담기고, 단톡방에서 링크를 주고받으면 서로의 투표가 합쳐집니다.</p>
 
     <div class="home-grid">
       <form class="panel" id="enter-form" novalidate aria-labelledby="enter-title">
@@ -118,7 +119,9 @@
           <span>그룹 ID</span>
           <input id="id-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="30" placeholder="team-dinner">
         </label>
-        <p class="fine">영문 소문자·숫자·한글과 -, _로 4~30자. 다른 투표가 쓰는 ID는 쓸 수 없어요.</p>
+        <p class="fine">영문 소문자·숫자·한글과 -, _로 4~30자.
+          <span data-only="server">다른 투표가 쓰는 ID는 쓸 수 없어요.</span>
+          <span data-only="links">링크를 연 사람은 이 ID와 PIN을 함께 넣어야 들어올 수 있어요. 남이 짐작하기 어려운 ID일수록 안전해요.</span></p>
         <label class="field">
           <span>PIN (숫자 4~8자리)</span>
           <span class="pin-row">
@@ -126,7 +129,9 @@
             <button type="button" class="ghost" id="random-pin">무작위</button>
           </span>
         </label>
-        <p class="fine">ID와 PIN을 아는 사람만 들어올 수 있어요. 6자리 이상을 권하고, 1234나 0000처럼 쉬운 번호는 쓸 수 없어요. PIN을 다섯 번 틀린 기기는 10분 동안 들어올 수 없어요.</p>
+        <p class="fine">ID와 PIN을 아는 사람만 들어올 수 있어요. 6자리 이상을 권하고, 1234나 0000처럼 쉬운 번호는 쓸 수 없어요.
+          <span data-only="server">PIN을 다섯 번 틀린 기기는 10분 동안 들어올 수 없어요.</span>
+          <span data-only="links">틀린 횟수를 막아 줄 서버가 없으니 8자리를 권해요.</span></p>
       </fieldset>
 
       <p class="message" id="create-message" role="alert"></p>
@@ -136,7 +141,7 @@
 
   <main id="view-poll" hidden>
     <header class="masthead">
-      <p class="eyebrow"><a href="./" data-nav>모임 공정 투표</a> · <span id="poll-kind"></span>그룹 ID <span class="id-text" id="poll-id"></span></p>
+      <p class="eyebrow"><a href="./" data-nav>모임 공정 투표</a><span id="poll-kind"></span><span id="poll-id-wrap"> · 그룹 ID <span class="id-text" id="poll-id"></span></span></p>
       <h1 id="poll-title"></h1>
       <p class="lede note" id="poll-note" hidden></p>
       <p class="status" id="poll-status" aria-live="polite"></p>
@@ -145,6 +150,10 @@
     <form class="panel gate" id="gate-form" novalidate hidden aria-labelledby="gate-title">
       <h2 id="gate-title">PIN을 넣고 들어가기</h2>
       <p class="fine">이 투표는 그룹 ID와 PIN을 아는 사람만 볼 수 있어요.</p>
+      <label class="field" id="gate-id-field" hidden>
+        <span>그룹 ID</span>
+        <input id="gate-id" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="next" maxlength="30">
+      </label>
       <label class="field">
         <span>PIN</span>
         <input id="gate-pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" enterkeyhint="go">
@@ -158,11 +167,21 @@
     <div class="poll-body" id="poll-body" hidden>
       <section class="decision" id="decision" aria-live="polite" hidden></section>
 
+      <section class="notice send" id="send" aria-live="polite" hidden>
+        <strong id="send-title">단톡방에 올려 주세요</strong>
+        <p id="send-text"></p>
+        <div class="actions">
+          <button type="button" class="primary" id="send-native" hidden>공유하기</button>
+          <button type="button" class="act" id="send-copy">복사</button>
+        </div>
+      </section>
+
       <details class="panel share" id="share">
         <summary>함께할 사람 부르기</summary>
-        <p class="fine">이 링크와 그룹 ID, PIN을 알려 주세요. 링크를 열면 그룹 ID가 채워져 있어요.</p>
+        <p class="fine" data-only="server">이 링크와 그룹 ID, PIN을 알려 주세요. 링크를 열면 그룹 ID가 채워져 있어요.</p>
+        <p class="fine" data-only="links">이 링크와 그룹 ID, PIN을 단톡방에 올려 주세요. 링크에는 이 기기가 가진 투표가 모두, 그룹 ID와 PIN으로 잠겨 들어 있어요.</p>
         <dl class="facts">
-          <dt>링크</dt><dd><span class="id-text" id="share-link"></span></dd>
+          <dt>링크</dt><dd><a class="id-text" id="share-link" href="./"></a></dd>
           <dt>그룹 ID</dt><dd><span class="id-text" id="share-id"></span></dd>
           <dt>PIN</dt><dd><span class="id-text" id="share-pin"></span></dd>
         </dl>
@@ -198,11 +217,18 @@
         <div class="section-head">
           <h2 id="results-title">결과</h2>
           <p class="summary" id="results-summary"></p>
-          <button type="button" class="act" id="refresh">새로고침</button>
+          <button type="button" class="act" id="refresh" data-only="server">새로고침</button>
         </div>
         <div class="notice paradox" id="paradox" role="note" hidden></div>
         <div class="result-cal" id="result-cal" hidden></div>
         <ol class="board" id="results"></ol>
+        <details class="panel merge" id="merge-panel" data-only="links">
+          <summary>받은 링크 합치기</summary>
+          <p class="fine">다른 사람이 단톡방에 올린 링크를 열면 그 투표가 이 기기에 저절로 합쳐져요. 링크를 복사했다면 여기에 붙여 넣어도 되고, 여러 개를 한꺼번에 붙여 넣어도 돼요.</p>
+          <textarea id="merge-input" rows="3" aria-label="받은 링크"></textarea>
+          <p class="message" id="merge-message" role="alert"></p>
+          <div class="actions"><button type="button" class="ghost" id="merge-submit">합치기</button></div>
+        </details>
         <details class="panel others" id="others-panel" hidden>
           <summary>다른 규칙으로 고르면</summary>
           <p class="fine">같은 투표를 다른 이름난 규칙으로 셌을 때 고르는 후보입니다. 어느 규칙을 쓸지는 투표 전에 정해 두어야 공정하므로, 이 투표는 위의 순서로 정합니다.</p>
@@ -217,6 +243,7 @@
       <section class="panel voters" aria-labelledby="voters-title" id="voters-section" hidden>
         <h2 id="voters-title">투표한 사람</h2>
         <ul class="voter-list" id="voters"></ul>
+        <p class="fine" id="voters-note" hidden></p>
       </section>
 
       <details class="panel admin" id="admin">
@@ -229,8 +256,10 @@
   </main>
 
   <footer class="foot">
-    <p>투표는 Cloudflare에 있는 이 페이지의 서버에 저장되고, 마지막으로 바뀐 뒤 60일이 지나면 저절로 지워집니다. 만든 사람은 언제든 바로 지울 수 있습니다.</p>
-    <p>기명 투표라서 이름과 고른 것이 그룹 ID와 PIN을 아는 사람 모두에게 보입니다. PIN은 서버에 그대로 남기지 않고, 이 기기에는 들어간 투표의 열쇠와 PIN을 저장해 다시 들어올 때 씁니다.</p>
+    <p data-only="server">투표는 Cloudflare에 있는 이 페이지의 서버에 저장되고, 마지막으로 바뀐 뒤 60일이 지나면 저절로 지워집니다. 만든 사람은 언제든 바로 지울 수 있습니다.</p>
+    <p data-only="server">기명 투표라서 이름과 고른 것이 그룹 ID와 PIN을 아는 사람 모두에게 보입니다. PIN은 서버에 그대로 남기지 않고, 이 기기에는 들어간 투표의 열쇠와 PIN을 저장해 다시 들어올 때 씁니다.</p>
+    <p data-only="links">투표는 어느 서버에도 저장되지 않습니다. 그룹 ID와 PIN으로 암호화되어 링크의 # 뒤에 담기는데, 이 부분은 브라우저가 사이트에 보내지 않습니다. 이 기기에는 받은 투표와 열쇠, PIN이 저장됩니다.</p>
+    <p data-only="links">기명 투표라서 이름과 고른 것이 그룹 ID와 PIN을 아는 사람 모두에게 보입니다. PIN을 틀리는 횟수를 막아 줄 서버가 없으니, 링크를 아무 데나 올리지 말고 남이 짐작하기 어려운 그룹 ID와 8자리 PIN을 쓰세요. 그룹 ID와 PIN을 아는 사람이 마음먹으면 링크 속 투표를 고쳐 쓸 수도 있으니, 서로 믿는 모임에서 쓰세요.</p>
     <p>날짜의 공휴일은 우주항공청 월력요항을 따릅니다.</p>
   </footer>
 </div>

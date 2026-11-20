@@ -164,6 +164,17 @@ h1 { font-weight: 700; font-size: clamp(1.75rem, 6vw, 2.5rem); line-height: 1.2;
 }
 .caution { background: var(--caution-soft); color: var(--caution); }
 
+/* What belongs to one way of keeping polls only: on a server, or in links. */
+body[data-mode="links"] [data-only="server"],
+body[data-mode="server"] [data-only="links"] { display: none !important; }
+.mode-note { background: var(--accent-soft); color: var(--ink); }
+
+/* After a change kept in links: the link to send on */
+.send { display: grid; gap: 0.5rem; background: var(--caution-soft); color: var(--ink); border: 1px solid var(--caution); }
+.send strong { color: var(--caution); }
+#share-link { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
+.merge textarea { font-family: var(--font-data); font-size: 0.8125rem; }
+
 /* Panels and fields */
 .panel {
   display: grid;

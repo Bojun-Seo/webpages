@@ -98,7 +98,7 @@ jobs:
         # run a script from before it. The script and style URLs carry the commit (?v=...) so a
         # deploy always loads its own; the grep fails the build if a file stops matching.
         # fair-pick calls the API at the repository variable FAIR_PICK_API, its Worker's https://
-        # address; without it the page says its server is not connected.
+        # address; without it the page keeps its polls in links.
         env:
           FAIR_PICK_API: ${{ vars.FAIR_PICK_API }}
         run: |
@@ -127,10 +127,10 @@ jobs:
           grep -q "calc.js?v=$v" _site/skypass-cards/app.js
           sed -i "s|from './gen.js'|from './gen.js?v=$v'|" _site/sparemine/app.js
           grep -q "gen.js?v=$v" _site/sparemine/app.js
-          sed -i -E "s#from '\./(api|config)\.js'#from './\1.js?v=$v'#" _site/fair-pick/app.js
-          test "$(grep -c "\.js?v=$v'" _site/fair-pick/app.js)" -eq 6
+          sed -i -E "s#from '\./(api|config|link)\.js'#from './\1.js?v=$v'#" _site/fair-pick/app.js
+          test "$(grep -c "\.js?v=$v'" _site/fair-pick/app.js)" -eq 7
           if [ -z "$FAIR_PICK_API" ]; then
-            echo "::notice::FAIR_PICK_API is not set, so fair-pick says its server is not connected. See fair-pick/README.md."
+            echo "::notice::FAIR_PICK_API is not set, so fair-pick keeps its polls in links. See fair-pick/README.md."
           elif [[ "$FAIR_PICK_API" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$ ]]; then
             printf "export const API_BASE = '%s';\n" "${FAIR_PICK_API%/}" > _site/fair-pick/config.js
           else
