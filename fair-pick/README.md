@@ -48,8 +48,9 @@ The page has three views, one address each: home (`fair-pick/`), a new poll (`?n
    the poll closes; a second ballot under a name already taken is turned down. One phone can vote
    for several people with 다른 사람으로 새로 투표.
 4. **Results**, live for everyone who is in: the options in the order of the rule below, each
-   with how many gave each grade, who they were, and why the first is first; for dates the same
-   on a calendar; and what five other well-known rules would pick from the same ballots.
+   with how many gave each grade, who they were, its head-to-head record and why it is where it
+   is; the circle, when majorities go round in one; for dates the same on a calendar; and what
+   seven other well-known rules would pick from the same ballots.
 5. **Closing.** The poll closes at its deadline, or when its maker closes it, and the decision
    shows at the top. The maker's menu also reopens the poll, takes out any ballot, and deletes
    the poll. It opens on the device that made the poll; another needs the admin code it shows.
@@ -63,29 +64,44 @@ matching (Gale, Shapley and Roth), which pairs people with different things. Arr
 says no rule satisfies every fairness property at once, so the page fixes its rule before anyone
 votes, says it on the page, and shows beside the result what other rules would have picked.
 
-Grades are scores: 최고 4, 좋아요 3, 보통 2, 별로 1 and 안 돼요 0; for dates ○ 2, △ 1 and ✕ 0.
-`common/site/social-choice.js` orders the options by, in turn:
+A voter prefers one option to another when they grade it higher: 최고 over 좋아요 over 보통 over
+별로 over 안 돼요, and for dates ○ over △ over ✕. `common/site/social-choice.js` places the options
+one place at a time, first place first, each time among the options not yet placed:
 
-1. **Fewest 안 돼요.** An option someone cannot make leaves them out, so the options everyone can
-   share come first: the worst off first, after Rawls.
-2. **The largest product of the scores of those who can make it**, the Nash social welfare (Nash
-   1950; Kaneko and Nakamura 1979). A sum lets many small gains outweigh one person's large loss;
-   a product falls sharply when anyone is unhappy, so it weighs both. For dates it comes to the
-   most ○ among the dates fewest cannot make. The page shows the geometric mean, which orders
-   options with as many 안 돼요 the same way and reads like an average.
-3. **The happier its least happy voter**, then the next (leximin).
-4. **More head-to-head wins** against the options still level, each voter siding with the option
-   they grade higher (Copeland, after Condorcet).
+1. **Fewest 안 돼요.** Only the options the fewest cannot make stay in the running. An option
+   someone cannot make leaves them out, so the options everyone can share come first: the worst
+   off first, after Rawls.
+2. **The Condorcet winner.** Of those, the option that beats every other head to head, more voters
+   grading it higher, is placed: what a majority prefers to anything else.
+3. **The Condorcet paradox, settled by Borda.** Majorities can go round in a circle, as in
+   rock-paper-scissors: A beats B, B beats C and C beats A, and no option beats every other. The
+   rule then takes the options caught in the circle, the top cycle (Smith set), and of them the one
+   with the most Borda points, a point from each voter for every other option in the running they
+   grade lower and half a point for every one they grade the same. Borda adds every head-to-head
+   contest up at once, so what goes round in the circle cancels out (Saari), and a Condorcet winner
+   else Borda's is Black's method (1958). Options that draw head to head are settled the same way.
+4. **Then the product of the grades.** Still level, the largest product of the scores of those who
+   can come (최고 4, 좋아요 3, 보통 2, 별로 1; ○ 2, △ 1), the Nash social welfare (Nash 1950; Kaneko
+   and Nakamura 1979), which falls sharply when anyone is unhappy; for dates, the most ○. Then the
+   happier least happy voter (leximin).
 
-Options level after all four share a rank. When a poll closes with several first, it goes with
+Options level after all four share the place. When a poll closes with several first, it goes with
 the one that comes first in an order the API drew at random when the poll was made. Nobody sees
-the order, and since it was drawn once, closing again cannot draw again.
+the order, and since it was drawn once, closing again cannot draw again. In a perfectly even circle,
+three voters each preferring a different option, that order decides.
 
-The rule is Pareto efficient: an option that someone grades higher and nobody lower always ranks
-above, which the tests check on random ballots. Beside the result the page shows approval voting
-(the most 되긴 해요 or 보통 and above, the usual way of finding a date), the largest sum
-(utilitarian), leximin alone (Rawls), majority judgment (the best median, Balinski and Laraki
-2007) and the Condorcet winner, where there is one.
+The results show the circle when there is one, with the majorities that make it, each option's
+head-to-head wins, draws and losses and its score against every other option, and why each place
+went as it did. The tests check, on random ballots, that the rule is Pareto efficient, an option
+that someone grades higher and nobody lower always ranking above, and Condorcet consistent, an
+option that beats every other in the running always placed first. Beside the result the page shows
+approval voting (the most 되긴 해요 or 보통 and above, the usual way of finding a date), the largest
+sum (utilitarian), Borda alone, Nash's product, leximin alone (Rawls), majority judgment (the best
+median, Balinski and Laraki 2007) and the Condorcet winner, or the circle when there is none.
+
+The rule sides with a majority once nobody is left out. Where three love one restaurant and two
+find it 별로 while everyone finds another 좋아요, it takes the first, though Nash's product would
+take the second; a voter who cannot go somewhere says 안 돼요, which step 1 puts first.
 
 ## Who can see and change what
 
@@ -173,5 +189,9 @@ npm test
   and the maker takes out a ballot that should not be there.
 - The rule counts every voter the same. A dinner that cannot go ahead without someone is better
   settled by that person's 안 돼요, which the rule already puts first.
+- Borda points, which settle a circle or a draw, can shift when options much alike are added, as a
+  run of similar dates; a Condorcet winner, where there is one, does not.
+- 안 돼요 is a veto, and a voter could cast it on every option but their favourite; the ballots are
+  named, so everyone in the poll sees who did.
 - Dates are whole days; a time of day goes in the note.
 - The results refresh when the page comes back into view and with 새로고침, not by themselves.

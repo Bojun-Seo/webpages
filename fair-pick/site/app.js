@@ -15,7 +15,7 @@ import { $, el } from '../common/dom.js';
 import {
   LIMITS, SCALES, checkBallot, checkPoll, idProblem, newPinProblem, normalizeId, pinProblem, weakPin,
 } from '../common/poll-rules.js';
-import { geometricMean, otherRules, rank, tally } from '../common/social-choice.js';
+import { otherRules, pairwise, rank } from '../common/social-choice.js';
 
 // Where this browser keeps, for each poll it has been in, the token the
 // PIN unlocked, the PIN, the maker's admin key and the keys of the ballots
@@ -607,13 +607,16 @@ function renderDecision() {
   }
   const { index, tied, drawn } = poll.decision;
   const { text, holiday } = optionOf(poll, index);
+  // How the rule put it first, from the ballots it was decided by.
+  const ranked = rank(ballots, poll.options.length, SCALES[poll.kind].grades.length - 1);
+  const placed = ranked.find((t) => t.index === index);
   box.className = 'decision';
   box.replaceChildren(
-    el('span', { class: 'label' }, `${timeText(poll.closedAt)} 마감 · 결정`),
+    el('span', { class: 'label' }, `${timeText(poll.closedAt)} 마감 · ${ballots.length}명 투표 · 결정`),
     el('strong', null, holiday ? `${text} · ${holiday}` : text),
     el('p', null, drawn
       ? `공동 1위 ${tied.length}개 가운데, 투표를 만들 때 미리 뽑아 둔 무작위 순서로 골랐어요.`
-      : `${ballots.length}명의 투표를 아래 규칙으로 센 1위예요.`));
+      : placed && reason(placed, ranked)));
 }
 
 function shareLink(id) {
@@ -866,43 +869,88 @@ function namesWith(index, score) {
   return state.ballots.filter((ballot) => ballot.grades[index] === score).map((ballot) => ballot.name);
 }
 
-// Why the option ranked first is first, against the one ranked after it.
+// `word` with the particle that follows it, the first of `pair` after a
+// final consonant and the second after a vowel: 날이, 후보가. Only ㄹ takes
+// 로 rather than 으로.
+function josa(word, pair) {
+  const [consonant, vowel] = pair.split('/');
+  const code = word.charCodeAt(word.length - 1) - 0xac00;
+  const last = code >= 0 && code < 11172 ? code % 28 : 0;
+  return word + (last === 0 || (vowel === '로' && last === 8) ? vowel : consonant);
+}
+
+// What an option is called in a sentence: its label, for a date with its
+// holiday.
+function nameOf(index) {
+  const { text, holiday } = optionOf(state.poll, index);
+  return holiday ? `${text} ${holiday}` : text;
+}
+
+// Borda points as they read: 6, or 6.5.
+function points(n) {
+  return `${Number.isInteger(n) ? n : n.toFixed(1)}점`;
+}
+
+// Why option `t` is where it is, from how the rule settled its place.
 function reason(t, ranked) {
   const { poll } = state;
   const date = poll.kind === 'date';
   const word = date ? '날' : '후보';
-  const firsts = ranked.filter((u) => u.rank === 1);
-  if (firsts.length > 1) {
-    if (poll.decision?.drawn && poll.decision.index === t.index) {
-      return '공동 1위 가운데 투표를 만들 때 미리 뽑아 둔 무작위 순서로 뽑혔어요.';
+  // Below first place, the rule chose among the options not yet placed;
+  // of those, only the ones the fewest cannot make were in the running.
+  const after = t.rank > 1 ? '위 순위를 빼면, ' : '';
+  const left = ranked.filter((u) => u.rank >= t.rank).length;
+  const among = t.pool.length === left ? ''
+    : `${t.vetoes === 0 ? "'안 돼요'가 없는" : `'안 돼요'가 가장 적은(${t.vetoes}명)`} ${word} ${t.pool.length}개 가운데 `;
+  const split = t.cycle ? '맞대결이 서로 물고 물려(콩도르세의 역설)' : '맞대결에서 비겨';
+  switch (t.by) {
+    case 'veto':
+      return t.vetoes === 0
+        ? `${after}'안 돼요'가 아무도 없는 ${josa(word, '은/는')} 이것뿐이에요.`
+        : `${after}'안 돼요'가 ${t.vetoes}명으로 가장 적어요.`;
+    case 'condorcet':
+      return among
+        ? `${after}${among}맞대결에서 모두 이겨요 (콩도르세 승자).`
+        : `${after}맞대결에서 다른 모든 ${josa(word, '을/를')} 이겨요 (콩도르세 승자).`;
+    case 'borda':
+      return `${after}${among}${split} 모두를 이기는 ${josa(word, '이/가')} 없어, 보르다 점수로 정했어요. `
+        + `${points(t.borda[t.index])}으로 가장 높아요.`;
+    case 'nash':
+      return `${after}${split} 보르다 점수까지 같아, ${date ? '○가 더 많은' : '만족도를 곱한 값이 더 큰'} 쪽이에요.`;
+    case 'leximin':
+      return `${after}${split} 보르다 점수와 만족도 곱까지 같아, 가장 불만인 사람이 덜 불만인 쪽이에요.`;
+    case 'tie': {
+      if (t.rank !== 1) return '앞뒤를 가릴 수 없어 같은 순위예요.';
+      if (poll.decision?.drawn && poll.decision.index === t.index) {
+        return '끝까지 같아 공동 1위였고, 투표를 만들 때 미리 뽑아 둔 무작위 순서로 뽑혔어요.';
+      }
+      return poll.closedAt
+        ? '끝까지 같아 공동 1위였어요.'
+        : `${split} 보르다 점수와 만족도까지 같아 공동 1위예요. 마감하면 투표를 만들 때 미리 뽑아 둔 무작위 순서로 하나를 고릅니다.`;
     }
-    return poll.closedAt
-      ? '공동 1위였어요.'
-      : '공동 1위예요. 마감하면 투표를 만들 때 미리 뽑아 둔 무작위 순서로 하나를 고릅니다.';
+    default:
+      return ranked.length > 1 ? '남은 후보가 이것뿐이에요.' : '';
   }
-  const next = ranked.find((u) => u.rank > 1);
-  if (!next) return '';
-  if (t.vetoes < next.vetoes) {
-    return t.vetoes === 0 ? `'안 돼요'가 아무도 없는 ${word}는 이것뿐이에요.` : `'안 돼요'가 ${t.vetoes}명으로 가장 적어요.`;
-  }
-  const among = t.vetoes === 0 ? `'안 돼요'가 없는 ${word}` : `'안 돼요'가 똑같이 ${t.vetoes}명인 ${word}`;
-  if (t.product !== next.product) {
-    return date ? `${among} 가운데 ○가 가장 많아요.` : `${among} 가운데 만족도를 곱한 값이 가장 커요.`;
-  }
-  if (t.level.includes(next.index)) return `만족도가 똑같은 ${word} 가운데 일대일 맞대결에서 더 많이 이겨요.`;
-  return `만족도를 곱한 값이 같은 ${word} 가운데 가장 불만인 사람이 덜 불만이에요.`;
 }
 
-function resultRow(t, ranked) {
+// "2승 1무 1패" for a head-to-head record.
+function recordText({ won, drew, lost }) {
+  return [`${won}승`, drew > 0 && `${drew}무`, `${lost}패`].filter(Boolean).join(' ');
+}
+
+function resultRow(t, ranked, wins) {
   const { poll } = state;
   const scale = SCALES[poll.kind];
   const counts = bestFirst(poll).map((score) => ({ score, n: t.counts[score] }));
   const sharing = ranked.filter((u) => u.rank === t.rank).length > 1;
   const first = t.rank === 1;
-  const geo = geometricMean(t);
-  const stats = poll.kind === 'date'
-    ? counts.map(({ score, n }) => `${scale.grades[score].short} ${n}`).join(' · ')
-    : [`안 돼요 ${t.vetoes}명`, geo != null && `기하평균 ${geo.toFixed(2)}점`, `합계 ${t.sum}점`].filter(Boolean).join(' · ');
+  const stats = [
+    poll.kind === 'date'
+      ? counts.map(({ score, n }) => `${scale.grades[score].short} ${n}`).join(' · ')
+      : `안 돼요 ${t.vetoes}명`,
+    ranked.length > 1 && `맞대결 ${recordText(t.record)}`,
+    t.borda && `보르다 ${points(t.borda[t.index])}`,
+  ].filter(Boolean).join(' · ');
   const bar = el('div', {
     class: 'bar', role: 'img',
     'aria-label': counts.map(({ score, n }) => `${scale.grades[score].label} ${n}명`).join(', '),
@@ -911,6 +959,14 @@ function resultRow(t, ranked) {
     part.style.flexGrow = String(n);
     return part;
   }));
+  const duels = ranked.filter((u) => u.index !== t.index).map((u) => {
+    const [mine, theirs] = [wins[t.index][u.index], wins[u.index][t.index]];
+    const outcome = mine > theirs ? '승' : mine < theirs ? '패' : '무';
+    // An opponent more cannot make was out of the running, whatever the score.
+    const out = u.vetoes > t.vetoes ? ` (상대는 안 돼요 ${u.vetoes}명)` : '';
+    return el('li', { class: `duel duel-${outcome === '승' ? 'won' : outcome === '패' ? 'lost' : 'drew'}` },
+      el('span', null, nameOf(u.index)), ` ${mine} 대 ${theirs} ${outcome}${out}`);
+  });
   return el('li', { class: `result${first ? ' first' : ''}` },
     el('div', { class: 'rank-badge', 'aria-label': `${sharing ? '공동 ' : ''}${t.rank}위` },
       sharing && el('small', null, '공동'), String(t.rank)),
@@ -921,10 +977,39 @@ function resultRow(t, ranked) {
       el('p', { class: 'stats' }, stats),
       first && el('p', { class: 'why' }, reason(t, ranked)),
       el('details', { class: 'who' }, el('summary', null, '누가 어떻게 골랐나요'),
+        !first && el('p', { class: 'why' }, reason(t, ranked)),
         el('dl', null, counts.filter(({ n }) => n > 0).map(({ score }) => [
           el('dt', { class: `tone-${scale.grades[score].tone}` }, scale.grades[score].label),
           el('dd', null, namesWith(t.index, score).join(', ')),
-        ])))));
+        ])),
+        duels.length > 0 && [el('p', { class: 'duels-title' }, '맞대결 (이 후보를 더 높게 고른 사람 대 상대를 더 높게 고른 사람)'),
+          el('ul', { class: 'duels' }, duels)])));
+}
+
+// What the page says when majorities give no Condorcet winner at the top:
+// the circle they go round, or the draw, and how the rule settles it.
+function renderParadox(ranked, wins) {
+  const box = $('paradox');
+  const [first] = ranked;
+  box.hidden = !first || first.smith.length < 2;
+  if (box.hidden) return;
+  const word = state.poll.kind === 'date' ? '날' : '후보';
+  if (first.cycle) {
+    const circle = [...first.cycle, first.cycle[0]];
+    box.replaceChildren(
+      el('strong', null, '콩도르세의 역설'),
+      el('p', null, `다수결로 둘씩 견주면 ${word}들이 서로 물고 물려서, 모두를 이기는 ${josa(word, '이/가')} 없어요. 화살표는 이긴 쪽에서 진 쪽으로, 숫자는 더 높게 고른 사람 수예요.`),
+      el('ol', { class: 'circle' }, circle.slice(0, -1).map((a, i) => {
+        const b = circle[i + 1];
+        return el('li', null, el('span', null, nameOf(a)), el('span', { class: 'arrow' }, ` ${wins[a][b]}:${wins[b][a]} → `),
+          el('span', null, nameOf(b)));
+      })),
+      el('p', null, `그래서 물고 물린 ${word}들(${first.smith.length}개) 가운데 보르다 점수가 가장 높은 ${josa(word, '을/를')} 골라요. 보르다 점수는 모든 맞대결을 한꺼번에 더하므로, 돌고 도는 부분은 서로 지워집니다.`));
+    return;
+  }
+  box.replaceChildren(
+    el('strong', null, '맞대결에서 비김'),
+    el('p', null, `맞대결에서 비긴 ${josa(word, '이/가')} 있어 모두를 이기는 ${josa(word, '이/가')} 없어요. 그래서 맨 위에서 비긴 ${word}들(${first.smith.length}개) 가운데 보르다 점수가 가장 높은 ${josa(word, '을/를')} 골라요.`));
 }
 
 function renderResultCalendar(ranked) {
@@ -964,19 +1049,26 @@ const OTHER_RULES = [
     choice: "'보통' 이상이 가장 많은 후보.",
   }],
   ['sum', '점수 합계 (공리주의)', '모두의 점수를 더한 값이 가장 큰 것. 여럿의 작은 만족이 한 사람의 큰 불만을 덮을 수 있어요.'],
+  ['borda', '보르다 점수', '한 사람마다 다른 후보보다 높게 매긴 만큼 1점, 같게 매긴 만큼 0.5점을 더한 것. 콩도르세의 역설이 없지만, 비슷한 후보가 늘면 결과가 흔들릴 수 있어요.'],
+  ['nash', '내쉬 사회후생 (만족도 곱)', "'안 돼요'가 가장 적은 것 가운데 점수를 곱한 값이 가장 큰 것. 다수의 만족과 소수의 불만을 함께 따져요."],
   ['rawls', '최소 수혜자 우선 (롤스)', '가장 낮은 점수가 가장 높은 것. 여럿이 크게 좋아하는 것을 놓칠 수 있어요.'],
   ['median', '다수 판단 (중앙값)', '절반 이상이 그 점수 이상을 준 점수, 곧 중앙값이 가장 높은 것 (발린스키·라라키).'],
-  ['condorcet', '콩도르세 승자', '다른 모든 후보와 일대일로 붙어 모두 이기는 것. 서로 물고 물리면 없어요.'],
+  ['condorcet', '콩도르세 승자', "'안 돼요'를 따로 보지 않고, 다른 모든 후보와 일대일로 붙어 모두 이기는 것."],
 ];
 
-function renderOthers(tallies, ranked) {
-  const { poll } = state;
-  const picks = otherRules(tallies, SCALES[poll.kind].approveAt);
+function renderOthers(ranked) {
+  const { poll, ballots } = state;
+  const picks = otherRules(ballots, poll.options.length, SCALES[poll.kind].grades.length - 1, SCALES[poll.kind].approveAt);
   const fair = ranked.filter((t) => t.rank === 1).map((t) => t.index);
   const same = (list) => list.length === fair.length && list.every((index) => fair.includes(index));
   $('others').replaceChildren(...OTHER_RULES.map(([key, name, what]) => {
     const list = picks[key];
-    const text = list.length ? list.map((index) => optionOf(poll, index).text).join(', ') : '없음 (서로 물고 물려요)';
+    let text = list.map((index) => nameOf(index)).join(', ');
+    if (list.length === 0) {
+      text = picks.cycle
+        ? `없음. 콩도르세의 역설: ${[...picks.cycle, picks.cycle[0]].map((index) => nameOf(index)).join(' → ')}`
+        : '없음. 맞대결에서 비긴 후보가 있어요';
+    }
     return el('li', null,
       el('span', { class: 'rule-name' }, name),
       el('span', { class: 'fine' }, typeof what === 'string' ? what : what[poll.kind]),
@@ -986,16 +1078,15 @@ function renderOthers(tallies, ranked) {
 
 function renderHow() {
   const date = state.poll.kind === 'date';
-  const steps = date ? [
-    "'안 돼요(✕)'가 가장 적은 날. 그날로 정하면 빠져야 하는 사람이 가장 적어요.",
-    "그중 '좋아요(○)'가 가장 많은 날. ○를 2점, △를 1점으로 놓고 올 수 있는 사람들의 점수를 곱한 값(내쉬 사회후생)이 가장 큰 날과 같아요.",
-    '그래도 같으면 일대일 맞대결에서 더 많이 이기는 날. 두 날 가운데 한쪽을 더 높게 고른 사람이 많으면 그쪽이 이겨요.',
-    '끝까지 같으면 공동 순위로 두고, 마감할 때 투표를 만들 때 미리 뽑아 둔 무작위 순서로 하나를 골라요.',
-  ] : [
-    "'안 돼요'가 가장 적은 후보. 그 후보로 정하면 빠져야 하는 사람이 가장 적어요.",
-    '그중 함께할 사람들의 점수(최고 4 · 좋아요 3 · 보통 2 · 별로 1)를 곱한 값이 가장 큰 후보(내쉬 사회후생). 기하평균이 높은 순서와 같아요.',
-    '그래도 같으면 가장 낮은 점수가 더 높은 후보, 그다음 일대일 맞대결에서 더 많이 이기는 후보.',
-    '끝까지 같으면 공동 순위로 두고, 마감할 때 투표를 만들 때 미리 뽑아 둔 무작위 순서로 하나를 골라요.',
+  const word = date ? '날' : '후보';
+  const steps = [
+    `'안 돼요'가 가장 적은 ${word}만 남겨요. 그 ${josa(word, '으로/로')} 정하면 빠져야 하는 사람이 가장 적어요.`,
+    `그중 맞대결에서 다른 모든 ${josa(word, '을/를')} 이기는 ${josa(word, '이/가')} 있으면(콩도르세 승자) 그 ${josa(word, '이에요/예요')}. 두 ${word} 가운데 한쪽을 더 높게 고른 사람이 많으면 그쪽이 이겨요.`,
+    `서로 물고 물리거나 비겨서 그런 ${josa(word, '이/가')} 없으면(콩도르세의 역설), 물고 물린 ${word}들 가운데 보르다 점수가 가장 높은 ${josa(word, '이에요/예요')}. 한 사람마다 다른 ${word}보다 높게 고른 만큼 1점, 같게 고른 만큼 0.5점을 줘요.`,
+    date
+      ? '그래도 같으면 ○가 더 많은 날(만족도 곱), 끝까지 같으면 공동 순위로 두고 마감할 때 투표를 만들 때 미리 뽑아 둔 무작위 순서로 골라요.'
+      : '그래도 같으면 점수(최고 4 · 좋아요 3 · 보통 2 · 별로 1)를 곱한 값이 큰 후보, 그다음 가장 낮은 점수가 높은 후보예요. 끝까지 같으면 공동 순위로 두고 마감할 때 투표를 만들 때 미리 뽑아 둔 무작위 순서로 골라요.',
+    `1위를 뺀 나머지로 같은 과정을 되풀이해 2위, 3위를 정해요.`,
   ];
   $('how-steps').replaceChildren(...steps.map((step) => el('li', null, step)));
 }
@@ -1006,18 +1097,21 @@ function renderResults() {
   renderHow();
   $('others-panel').hidden = !has;
   $('result-cal').hidden = !has || poll.kind !== 'date';
+  $('paradox').hidden = true;
   if (!has) {
     $('results-summary').textContent = '';
     $('results').replaceChildren(el('li', { class: 'empty' },
       poll.closedAt ? '아무도 투표하지 않았어요.' : '아직 아무도 투표하지 않았어요. 첫 투표를 해 주세요.'));
     return;
   }
-  const tallies = tally(ballots, poll.options.length, SCALES[poll.kind].grades.length - 1);
-  const ranked = rank(tallies);
+  const count = poll.options.length;
+  const ranked = rank(ballots, count, SCALES[poll.kind].grades.length - 1);
+  const wins = pairwise(ballots, count);
   $('results-summary').textContent = `${ballots.length}명 · ${poll.closedAt ? '마감 결과' : '지금까지'}`;
-  $('results').replaceChildren(...ranked.map((t) => resultRow(t, ranked)));
+  renderParadox(ranked, wins);
+  $('results').replaceChildren(...ranked.map((t) => resultRow(t, ranked, wins)));
   if (poll.kind === 'date') renderResultCalendar(ranked);
-  renderOthers(tallies, ranked);
+  renderOthers(ranked);
 }
 
 function renderVoters() {

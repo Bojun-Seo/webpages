@@ -209,6 +209,35 @@ const checks = {
     await page.waitForFunction(() => document.getElementById('enter-message').textContent !== '');
     const wrong = await page.textContent('#enter-message');
     if (!/번 더 틀리면/.test(wrong)) problems.push(`fair-pick: a wrong PIN says "${wrong}"`);
+
+    // Majorities that go round in a circle, 가 over 나 3-2, 나 over 다 4-1 and
+    // 다 over 가 3-2, show as the Condorcet paradox, and 나 wins on Borda points.
+    await page.click('#new-link');
+    await page.check('input[name="kind"][value="choice"]', { force: true });
+    await page.fill('#title-input', '점검 장소');
+    await page.locator('#choice-list input').nth(0).fill('가');
+    await page.locator('#choice-list input').nth(1).fill('나');
+    await page.click('#add-choice');
+    await page.locator('#choice-list input').nth(2).fill('다');
+    await page.fill('#id-input', 'smoke-circle');
+    await page.fill('#pin-input', '482915');
+    await page.click('#create-submit');
+    await page.waitForSelector('#poll-body:not([hidden])');
+    const circle = [['갑', [4, 3, 2]], ['을', [4, 3, 2]], ['병', [2, 4, 3]], ['정', [2, 4, 3]], ['무', [3, 2, 4]]];
+    for (const [name, grades] of circle) {
+      if (await page.isVisible('#vote-other')) await page.click('#vote-other');
+      await page.fill('#voter-name', name);
+      for (const [i, grade] of grades.entries()) {
+        await page.locator('#ballot > li').nth(i).locator(`input[value="${grade}"]`).check({ force: true });
+      }
+      await page.click('#vote-submit');
+      await page.waitForFunction(() => /투표했어요/.test(document.getElementById('vote-message').textContent));
+    }
+    if (!(await page.isVisible('#paradox'))) problems.push('fair-pick: a circle of majorities shows no paradox');
+    const first = await page.locator('#results .result').first().textContent();
+    if (!/^1나/.test(first) || !/보르다/.test(first)) {
+      problems.push(`fair-pick: the circle's first place is "${first.slice(0, 60)}"`);
+    }
     return problems;
   },
 
