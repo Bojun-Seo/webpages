@@ -1,0 +1,20 @@
+# The fair-pick API: a Worker in front of a Durable Object for each poll,
+# on the Workers Free plan, which takes Durable Objects that keep their
+# data in SQLite. fair-pick-api.yml deploys it; see ../README.md.
+name = "fair-pick"
+main = "src/worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[vars]
+# The sites whose pages may call the API from a browser, separated by
+# commas. A page on this machine (localhost or 127.0.0.1) always may.
+ALLOWED_ORIGINS = "https://bojun-seo.github.io"
+
+[[durable_objects.bindings]]
+name = "POLLS"
+class_name = "Poll"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Poll"]

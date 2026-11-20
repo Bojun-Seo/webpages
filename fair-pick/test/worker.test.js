@@ -1,0 +1,273 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import worker from '../api/src/worker.js';
+import { CREATES, IP_LOCK, IP_TRIES, KEEP, POLL_TRIES } from '../api/src/poll.js';
+import { memoryEnv } from '../api/memory.js';
+
+const ORIGIN = 'https://bojun-seo.github.io';
+const START = Date.parse('2026-11-20T01:00:00Z');
+
+// A Worker on memory whose clock the test moves, and a way to call it as
+// the page would.
+function setup() {
+  const clock = { now: START };
+  const env = memoryEnv({ ALLOWED_ORIGINS: ORIGIN, clock: () => clock.now });
+  async function call(method, path, { body, token, admin, ballotKey, ip = '203.0.113.7', origin = ORIGIN } = {}) {
+    const headers = { origin, 'cf-connecting-ip': ip };
+    if (body !== undefined) headers['content-type'] = 'application/json';
+    if (token) headers.authorization = `Bearer ${token}`;
+    if (admin) headers['x-admin-key'] = admin;
+    if (ballotKey) headers['x-ballot-key'] = ballotKey;
+    const res = await worker.fetch(new Request(`https://api.test${path}`, {
+      method, headers, body: body === undefined ? undefined : JSON.stringify(body),
+    }), env);
+    return { status: res.status, headers: res.headers, body: res.status === 204 ? null : await res.json() };
+  }
+  return { clock, env, call };
+}
+
+const DINNER = {
+  id: 'Team Dinner',
+  pin: '482915',
+  kind: 'date',
+  title: '12월 팀 회식',
+  note: '저녁 7시',
+  options: ['2026-12-03', '2026-12-04', '2026-12-10'],
+};
+
+async function made(props = {}) {
+  const t = setup();
+  const res = await t.call('POST', '/polls', { body: { ...DINNER, ...props } });
+  assert.equal(res.status, 201, JSON.stringify(res.body));
+  return { ...t, ...res.body };
+}
+
+test('a poll is made under its group ID, which no second poll can take', async () => {
+  const { call, token, adminKey, poll, ballots } = await made();
+  assert.equal(poll.id, 'team-dinner');
+  assert.deepEqual(poll.options.map((option) => option.date), DINNER.options);
+  assert.deepEqual(ballots, []);
+  assert.ok(token.length >= 20 && adminKey.length >= 20);
+  // Nothing secret goes to the page.
+  for (const secret of ['pinHash', 'pinSalt', 'memberToken', 'adminHash', 'tieOrder']) assert.ok(!(secret in poll), secret);
+
+  const again = await call('POST', '/polls', { body: { ...DINNER, id: 'team-dinner' } });
+  assert.equal(again.status, 409);
+  assert.equal(again.body.error, 'taken');
+});
+
+test('a poll is turned down with what is wrong with it', async () => {
+  const { call } = setup();
+  const bad = async (props) => (await call('POST', '/polls', { body: { ...DINNER, ...props } })).body;
+  assert.match((await bad({ id: 'ab' })).message, /4~30자/);
+  assert.equal((await bad({ id: 'ab' })).field, 'id');
+  assert.match((await bad({ pin: '1234' })).message, /쉽게 맞힐/);
+  assert.match((await bad({ options: ['2026-11-01', '2026-12-01'] })).message, /지난 날짜/);
+  assert.match((await bad({ title: ' ' })).message, /제목/);
+  const notJson = await worker.fetch(new Request('https://api.test/polls', {
+    method: 'POST', body: '{', headers: { origin: ORIGIN },
+  }), setup().env);
+  assert.equal(notJson.status, 400);
+  const huge = await call('POST', '/polls', { body: { ...DINNER, note: 'x'.repeat(20000) } });
+  assert.equal(huge.status, 413);
+});
+
+test('the PIN lets a member in, and a wrong one is counted', async () => {
+  const { call } = await made();
+  const ok = await call('POST', '/polls/team-dinner/enter', { body: { pin: '482915' } });
+  assert.equal(ok.status, 200);
+  assert.ok(ok.body.token);
+  assert.equal(ok.body.poll.title, '12월 팀 회식');
+
+  // The ID may be typed as it was made.
+  assert.equal((await call('POST', `/polls/${encodeURIComponent('Team Dinner')}/enter`, { body: { pin: '482915' } })).status, 200);
+
+  const wrong = await call('POST', '/polls/team-dinner/enter', { body: { pin: '000000' } });
+  assert.equal(wrong.status, 401);
+  assert.equal(wrong.body.error, 'wrong');
+  assert.equal(wrong.body.left, IP_TRIES - 1);
+});
+
+test('a poll that does not exist answers like a wrong PIN, and keeps nothing', async () => {
+  const { call, env } = setup();
+  const res = await call('POST', '/polls/no-such-poll/enter', { body: { pin: '482915' } });
+  assert.equal(res.status, 401);
+  assert.equal(res.body.error, 'wrong');
+  assert.equal(res.body.left, undefined);
+  assert.equal(env.POLLS.objects.get('no-such-poll').storage.data.size, 0);
+  assert.equal((await call('POST', '/polls/x/enter', { body: { pin: '482915' } })).body.error, 'wrong');
+});
+
+test('an address that keeps getting the PIN wrong waits, and others do not', async () => {
+  const { call, clock } = await made();
+  const enter = (pin, ip) => call('POST', '/polls/team-dinner/enter', { body: { pin }, ip });
+  for (let i = 1; i < IP_TRIES; i++) assert.equal((await enter('111222', '198.51.100.1')).status, 401);
+  const locked = await enter('111222', '198.51.100.1');
+  assert.equal(locked.status, 429);
+  assert.equal(locked.body.retryAfter, IP_LOCK / 1000);
+  // Even the right PIN waits, or guessing would go on.
+  assert.equal((await enter('482915', '198.51.100.1')).status, 429);
+  // Another address gets in.
+  assert.equal((await enter('482915', '198.51.100.2')).status, 200);
+  clock.now += IP_LOCK;
+  assert.equal((await enter('482915', '198.51.100.1')).status, 200);
+});
+
+test('a poll stops taking PINs for the hour once it has seen too many wrong ones', async () => {
+  const { call, clock } = await made();
+  let last;
+  for (let i = 0; i < POLL_TRIES; i++) {
+    last = await call('POST', '/polls/team-dinner/enter', { body: { pin: '111222' }, ip: `10.0.${i}.1` });
+  }
+  assert.equal(last.status, 429);
+  assert.equal((await call('POST', '/polls/team-dinner/enter', { body: { pin: '482915' }, ip: '10.9.9.9' })).status, 429);
+  clock.now += 3600e3;
+  assert.equal((await call('POST', '/polls/team-dinner/enter', { body: { pin: '482915' }, ip: '10.9.9.9' })).status, 200);
+});
+
+test('only the token or the admin key reads a poll', async () => {
+  const { call, token, adminKey } = await made();
+  assert.equal((await call('GET', '/polls/team-dinner')).status, 401);
+  assert.equal((await call('GET', '/polls/team-dinner', { token: 'x'.repeat(24) })).status, 401);
+  assert.equal((await call('GET', '/polls/team-dinner', { token })).status, 200);
+  assert.equal((await call('GET', '/polls/team-dinner', { admin: adminKey })).status, 200);
+  assert.equal((await call('GET', '/polls/ab', { token })).status, 401);
+});
+
+test('a voter votes by name, changes it with the key their device keeps, and no one else can', async () => {
+  const { call, token } = await made();
+  const first = await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '김민수', grades: [2, 1, 0] } });
+  assert.equal(first.status, 200);
+  const { ballotId, ballotKey } = first.body;
+  assert.ok(ballotId && ballotKey);
+  assert.deepEqual(first.body.ballots, [{ id: ballotId, name: '김민수', grades: [2, 1, 0], at: first.body.ballots[0].at }]);
+
+  // Someone else under the same name is turned away.
+  const clash = await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: ' 김민수 ', grades: [0, 0, 0] } });
+  assert.equal(clash.status, 409);
+  assert.equal(clash.body.error, 'name');
+  // So is a change without the key.
+  const stolen = await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '김민수', grades: [0, 0, 0], ballotId } });
+  assert.equal(stolen.status, 403);
+
+  const changed = await call('PUT', '/polls/team-dinner/ballot', {
+    token, ballotKey, body: { name: '김민수', grades: [2, 2, 2], ballotId },
+  });
+  assert.equal(changed.status, 200);
+  assert.equal(changed.body.ballotKey, undefined);
+  assert.deepEqual(changed.body.ballots.map((ballot) => ballot.grades), [[2, 2, 2]]);
+
+  const invalid = await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '이영희', grades: [2, 2] } });
+  assert.equal(invalid.status, 400);
+  assert.match(invalid.body.message, /모든 후보/);
+});
+
+test('a voter takes back their own ballot, and the maker anyone’s', async () => {
+  const { call, token, adminKey } = await made();
+  const vote = async (name) => (await call('PUT', '/polls/team-dinner/ballot', { token, body: { name, grades: [2, 2, 2] } })).body;
+  const mine = await vote('김민수');
+  const theirs = await vote('이영희');
+  assert.equal((await call('DELETE', `/polls/team-dinner/ballots/${theirs.ballotId}`, { token, ballotKey: mine.ballotKey })).status, 403);
+  const own = await call('DELETE', `/polls/team-dinner/ballots/${mine.ballotId}`, { token, ballotKey: mine.ballotKey });
+  assert.deepEqual(own.body.ballots.map((ballot) => ballot.name), ['이영희']);
+  const byMaker = await call('DELETE', `/polls/team-dinner/ballots/${theirs.ballotId}`, { token, admin: adminKey });
+  assert.deepEqual(byMaker.body.ballots, []);
+  assert.equal((await call('DELETE', `/polls/team-dinner/ballots/${theirs.ballotId}`, { token, admin: adminKey })).status, 404);
+});
+
+test('the maker closes the poll and it decides; a member cannot, and nobody votes after', async () => {
+  const { call, token, adminKey } = await made();
+  await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '김민수', grades: [2, 1, 0] } });
+  await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '이영희', grades: [1, 2, 2] } });
+  assert.equal((await call('POST', '/polls/team-dinner/close', { token })).status, 403);
+  const closed = await call('POST', '/polls/team-dinner/close', { token, admin: adminKey });
+  assert.equal(closed.status, 200);
+  assert.ok(closed.body.poll.closedAt);
+  // Dates 0 and 1 are level on everything; the draw fixed at the start picks one.
+  assert.deepEqual(closed.body.poll.decision.tied, [0, 1]);
+  assert.equal(closed.body.poll.decision.drawn, true);
+  const late = await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '박지훈', grades: [2, 2, 2] } });
+  assert.equal(late.status, 423);
+
+  // Reopening and closing again cannot draw again.
+  const picked = closed.body.poll.decision.index;
+  for (let i = 0; i < 5; i++) {
+    await call('POST', '/polls/team-dinner/reopen', { token, admin: adminKey });
+    const again = await call('POST', '/polls/team-dinner/close', { token, admin: adminKey });
+    assert.equal(again.body.poll.decision.index, picked);
+  }
+});
+
+test('a poll whose deadline passes closes by itself and decides', async () => {
+  const { call, clock, token, adminKey } = await made({ deadline: '2026-11-25T18:00:00+09:00' });
+  await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '김민수', grades: [0, 2, 1] } });
+  clock.now = Date.parse('2026-11-25T09:00:01Z');
+  const after = await call('GET', '/polls/team-dinner', { token });
+  assert.equal(after.body.poll.closedAt, '2026-11-25T09:00:00.000Z');
+  assert.deepEqual(after.body.poll.decision, { index: 1, tied: [1], drawn: false });
+  assert.equal((await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '이영희', grades: [2, 2, 2] } })).status, 423);
+  // Reopening drops the deadline that has passed.
+  const reopened = await call('POST', '/polls/team-dinner/reopen', { token, admin: adminKey });
+  assert.equal(reopened.body.poll.deadline, null);
+  assert.equal(reopened.body.poll.closedAt, null);
+});
+
+test('the maker deletes the poll, which frees its ID', async () => {
+  const { call, token, adminKey, env } = await made();
+  assert.equal((await call('DELETE', '/polls/team-dinner', { token })).status, 403);
+  assert.equal((await call('DELETE', '/polls/team-dinner', { token, admin: adminKey })).status, 200);
+  assert.equal(env.POLLS.objects.get('team-dinner').storage.data.size, 0);
+  assert.equal((await call('GET', '/polls/team-dinner', { token })).status, 401);
+  assert.equal((await call('POST', '/polls', { body: DINNER })).status, 201);
+});
+
+test('a poll goes 60 days after it last changed', async () => {
+  const { call, clock, token, env } = await made();
+  const object = env.POLLS.objects.get('team-dinner');
+  assert.equal(await object.storage.getAlarm(), START + KEEP);
+  clock.now += 10 * 86400e3;
+  await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '김민수', grades: [2, 2, 2] } });
+  assert.equal(await object.storage.getAlarm(), clock.now + KEEP);
+  // An alarm that goes off early, as one left from before may, keeps it.
+  await object.poll.alarm();
+  assert.ok(object.storage.data.has('poll'));
+  clock.now += KEEP;
+  await object.poll.alarm();
+  assert.equal(object.storage.data.size, 0);
+});
+
+test('one address can make only so many polls an hour', async () => {
+  const { call, clock } = setup();
+  for (let i = 0; i < CREATES; i++) {
+    const res = await call('POST', '/polls', { body: { ...DINNER, id: `poll-${i}` }, ip: '192.0.2.5' });
+    assert.equal(res.status, 201);
+  }
+  const busy = await call('POST', '/polls', { body: { ...DINNER, id: 'one-more' }, ip: '192.0.2.5' });
+  assert.equal(busy.status, 429);
+  assert.equal(busy.body.error, 'busy');
+  assert.equal((await call('POST', '/polls', { body: { ...DINNER, id: 'one-more' }, ip: '192.0.2.6' })).status, 201);
+  clock.now += 3600e3;
+  assert.equal((await call('POST', '/polls', { body: { ...DINNER, id: 'later' }, ip: '192.0.2.5' })).status, 201);
+});
+
+test('the page’s own site and this machine get CORS headers, and other sites none', async () => {
+  const { call } = setup();
+  const preflight = await call('OPTIONS', '/polls', {});
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get('access-control-allow-origin'), ORIGIN);
+  assert.match(preflight.headers.get('access-control-allow-headers'), /x-ballot-key/);
+  const local = await call('OPTIONS', '/polls', { origin: 'http://127.0.0.1:8000' });
+  assert.equal(local.headers.get('access-control-allow-origin'), 'http://127.0.0.1:8000');
+  const other = await call('OPTIONS', '/polls', { origin: 'https://evil.example' });
+  assert.equal(other.headers.get('access-control-allow-origin'), null);
+  const answer = await call('GET', '/polls/team-dinner', { origin: ORIGIN });
+  assert.equal(answer.headers.get('access-control-allow-origin'), ORIGIN);
+  assert.equal(answer.headers.get('cache-control'), 'no-store');
+});
+
+test('a path that is no route says so', async () => {
+  const { call } = setup();
+  assert.equal((await call('GET', '/')).status, 404);
+  assert.equal((await call('PATCH', '/polls/team-dinner')).status, 405);
+  assert.equal((await call('GET', '/polls/%E0%A4%A')).status, 401);
+});
