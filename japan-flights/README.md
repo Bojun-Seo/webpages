@@ -153,7 +153,8 @@ Everything the page knows is in `site/data/`:
   AeroSpace Administration publishes each June. A substitute holiday is named after the holiday it
   stands in for. The page takes a day it does not list for a working day, so add each year before
   the fares reach it: the fetcher fetches six months ahead and warns on the run's summary page, from
-  July 2027 for 2028, when they reach past the last holiday listed.
+  July 2027 for 2028, when they reach past the last holiday listed. fair-pick's calendar keeps a
+  copy in `fair-pick/site/data/holidays.json`, and its tests fail until the copy matches.
 - `baggage.json`: what a checked bag bought in advance costs one way, in won, for a bag a fare does
   not include. `airlines` gives an airline's own `fee`, one for all its routes or one for each
   destination country (`{ "JP": 40000, "TW": 50000 }`), with the `kg` it buys, its `source`,

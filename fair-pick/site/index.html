@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>모임 공정 투표</title>
+<meta name="description" content="회식 장소나 날짜처럼 여럿이 하나를 정할 때, 그룹 ID와 PIN으로 들어가 이름을 걸고 투표하면 경제학의 사회선택이론으로 모두가 함께할 수 있는 하나를 고르는 개인 페이지">
+<meta name="referrer" content="no-referrer">
+<link rel="stylesheet" href="style.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <p class="notice caution" id="server-note" role="note" hidden>투표 서버가 아직 연결되지 않아서 투표를 만들거나 들어갈 수 없어요. 서버를 연결하는 방법은 README에 있습니다.</p>
+
+  <main id="view-home" hidden>
+    <header class="masthead">
+      <p class="eyebrow">회식 장소·날짜처럼 여럿이 하나를 정할 때</p>
+      <h1>모임 공정 투표</h1>
+      <p class="lede">그룹 ID와 PIN으로 들어가 <strong>이름을 걸고</strong> 투표하면, 경제학의 사회선택이론으로 모두가 함께할 수 있는 하나를 고릅니다.</p>
+    </header>
+
+    <p class="message ok" id="home-message" role="status"></p>
+
+    <div class="home-grid">
+      <form class="panel" id="enter-form" novalidate aria-labelledby="enter-title">
+        <h2 id="enter-title">투표에 들어가기</h2>
+        <label class="field">
+          <span>그룹 ID</span>
+          <input id="enter-id" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="next" maxlength="30">
+        </label>
+        <label class="field">
+          <span>PIN</span>
+          <input id="enter-pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" enterkeyhint="go">
+        </label>
+        <p class="message" id="enter-message" role="alert"></p>
+        <button type="submit" class="primary" id="enter-submit">들어가기</button>
+      </form>
+
+      <div class="panel new-panel">
+        <h2>새 투표 만들기</h2>
+        <p>날짜나 장소·메뉴 후보를 넣고 그룹 ID와 PIN을 정한 뒤, 함께할 사람들에게 알려 주세요.</p>
+        <a class="button primary" href="?new" data-nav id="new-link">새 투표 만들기</a>
+      </div>
+    </div>
+
+    <section id="recent-section" aria-labelledby="recent-title" hidden>
+      <h2 id="recent-title">이 기기에서 들어간 투표</h2>
+      <ul class="recent" id="recent"></ul>
+    </section>
+
+    <section class="method" aria-labelledby="method-title">
+      <h2 id="method-title">어떻게 하나를 고르나요?</h2>
+      <p>투표하는 사람은 후보마다 얼마나 좋은지 고릅니다. 날짜는 <b>좋아요 ○ · 되긴 해요 △ · 안 돼요 ✕</b>, 장소·메뉴는 <b>최고 · 좋아요 · 보통 · 별로 · 안 돼요</b> 가운데 하나입니다. 그다음 투표 전에 정해 둔 이 순서로 줄을 세웁니다.</p>
+      <ol class="steps">
+        <li><strong>함께할 수 없는 사람이 가장 적은 것.</strong> '안 돼요'는 그 후보로 정하면 빠져야 하는 사람입니다. 가장 불리한 사람을 먼저 살피는 롤스의 생각대로, 모두가 함께할 수 있는 후보를 먼저 봅니다.</li>
+        <li><strong>만족도를 곱한 값이 가장 큰 것.</strong> 함께할 사람들의 점수(최고 4 · 좋아요 3 · 보통 2 · 별로 1, 날짜는 ○ 2 · △ 1)를 모두 곱한 내쉬 사회후생입니다. 합계는 여러 사람의 작은 만족이 한 사람의 큰 불만을 덮을 수 있지만, 곱은 누구 하나라도 많이 불만이면 크게 줄어 다수의 만족과 소수의 불만을 함께 따집니다. 날짜라면 ○가 가장 많은 날입니다.</li>
+        <li><strong>그래도 같으면,</strong> 가장 불만인 사람이 덜 불만인 것(최소극대화), 그다음 일대일 맞대결에서 더 많이 이기는 것(콩도르세).</li>
+        <li><strong>끝까지 같으면</strong> 공동 순위로 두고, 마감할 때 투표를 만들 때 서버가 미리 뽑아 둔 무작위 순서로 하나를 고릅니다. 그 순서는 아무도 미리 볼 수 없고, 다시 마감해도 바뀌지 않습니다.</li>
+      </ol>
+      <p class="fine">여럿이 하나를 고르는 문제는 경제학에서 사회선택이론이 다룹니다. 애로의 불가능성 정리가 보여 주듯 모든 면에서 완벽한 투표 규칙은 없어서, 이 페이지는 규칙을 투표 전에 정해 두고 결과 아래에 다른 이름난 규칙들이 고르는 것도 함께 보여 줍니다.</p>
+    </section>
+  </main>
+
+  <main id="view-create" hidden>
+    <header class="masthead">
+      <p class="eyebrow"><a href="./" data-nav>모임 공정 투표</a></p>
+      <h1>새 투표 만들기</h1>
+    </header>
+
+    <form class="panel create" id="create-form" novalidate aria-label="새 투표">
+      <fieldset>
+        <legend>무엇을 정하나요?</legend>
+        <div class="seg">
+          <label><input type="radio" name="kind" value="date" checked><span>날짜</span></label>
+          <label><input type="radio" name="kind" value="choice"><span>장소·메뉴 등</span></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>제목과 설명</legend>
+        <label class="field">
+          <span>제목</span>
+          <input id="title-input" type="text" maxlength="60" placeholder="12월 팀 회식" autocomplete="off">
+        </label>
+        <label class="field">
+          <span>설명 (적지 않아도 돼요)</span>
+          <textarea id="note-input" rows="2" maxlength="300" placeholder="저녁 7시, 강남역 근처"></textarea>
+        </label>
+      </fieldset>
+
+      <fieldset id="dates-fieldset">
+        <legend>후보 날짜</legend>
+        <p class="fine">날짜를 누르면 고르고, 다시 누르면 뺍니다. 요일 이름을 누르면 그 달의 그 요일을 한꺼번에 고릅니다. 빨간 날은 일요일과 공휴일, 파란 날은 토요일입니다.</p>
+        <div class="cal" id="picker"></div>
+        <p class="fine" id="picked-count" aria-live="polite"></p>
+        <ul class="chips" id="picked-list"></ul>
+      </fieldset>
+
+      <fieldset id="choices-fieldset" hidden>
+        <legend>후보</legend>
+        <ol class="choice-list" id="choice-list"></ol>
+        <button type="button" class="ghost" id="add-choice">+ 후보 추가</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>마감 (정하지 않아도 돼요)</legend>
+        <label class="field">
+          <span>이때까지 투표 받기 (한국 시각)</span>
+          <input id="deadline-input" type="datetime-local">
+        </label>
+        <p class="fine">마감 시각이 지나면 투표를 더 받지 않고 결과가 정해집니다. 비워 두면 만든 사람이 직접 마감합니다.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>그룹 ID와 PIN</legend>
+        <label class="field">
+          <span>그룹 ID</span>
+          <input id="id-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="30" placeholder="team-dinner">
+        </label>
+        <p class="fine">영문 소문자·숫자·한글과 -, _로 4~30자. 다른 투표가 쓰는 ID는 쓸 수 없어요.</p>
+        <label class="field">
+          <span>PIN (숫자 4~8자리)</span>
+          <span class="pin-row">
+            <input id="pin-input" type="text" inputmode="numeric" autocomplete="off" maxlength="8">
+            <button type="button" class="ghost" id="random-pin">무작위</button>
+          </span>
+        </label>
+        <p class="fine">ID와 PIN을 아는 사람만 들어올 수 있어요. 6자리 이상을 권하고, 1234나 0000처럼 쉬운 번호는 쓸 수 없어요. PIN을 다섯 번 틀린 기기는 10분 동안 들어올 수 없어요.</p>
+      </fieldset>
+
+      <p class="message" id="create-message" role="alert"></p>
+      <button type="submit" class="primary" id="create-submit">투표 만들기</button>
+    </form>
+  </main>
+
+  <main id="view-poll" hidden>
+    <header class="masthead">
+      <p class="eyebrow"><a href="./" data-nav>모임 공정 투표</a> · <span id="poll-kind"></span>그룹 ID <span class="id-text" id="poll-id"></span></p>
+      <h1 id="poll-title"></h1>
+      <p class="lede note" id="poll-note" hidden></p>
+      <p class="status" id="poll-status" aria-live="polite"></p>
+    </header>
+
+    <form class="panel gate" id="gate-form" novalidate hidden aria-labelledby="gate-title">
+      <h2 id="gate-title">PIN을 넣고 들어가기</h2>
+      <p class="fine">이 투표는 그룹 ID와 PIN을 아는 사람만 볼 수 있어요.</p>
+      <label class="field">
+        <span>PIN</span>
+        <input id="gate-pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" enterkeyhint="go">
+      </label>
+      <p class="message" id="gate-message" role="alert"></p>
+      <button type="submit" class="primary" id="gate-submit">들어가기</button>
+    </form>
+
+    <p class="message" id="poll-message" role="alert"></p>
+
+    <div class="poll-body" id="poll-body" hidden>
+      <section class="decision" id="decision" aria-live="polite" hidden></section>
+
+      <details class="panel share" id="share">
+        <summary>함께할 사람 부르기</summary>
+        <p class="fine">이 링크와 그룹 ID, PIN을 알려 주세요. 링크를 열면 그룹 ID가 채워져 있어요.</p>
+        <dl class="facts">
+          <dt>링크</dt><dd><span class="id-text" id="share-link"></span></dd>
+          <dt>그룹 ID</dt><dd><span class="id-text" id="share-id"></span></dd>
+          <dt>PIN</dt><dd><span class="id-text" id="share-pin"></span></dd>
+        </dl>
+        <div class="actions">
+          <button type="button" class="act" id="share-native" hidden>공유하기</button>
+          <button type="button" class="act" id="copy-invite">초대 메시지 복사</button>
+          <button type="button" class="act" id="copy-link">링크만 복사</button>
+        </div>
+      </details>
+
+      <section class="panel vote" aria-labelledby="vote-title">
+        <div class="section-head">
+          <h2 id="vote-title">내 투표</h2>
+          <p class="summary" id="vote-state"></p>
+        </div>
+        <form id="vote-form" novalidate>
+          <label class="field name-field">
+            <span>이름 (기명 투표라 모두에게 보여요)</span>
+            <input id="voter-name" type="text" maxlength="20" autocomplete="name" enterkeyhint="done">
+          </label>
+          <div class="quick" id="quick-fill"></div>
+          <ol class="ballot" id="ballot"></ol>
+          <p class="message" id="vote-message" role="alert"></p>
+          <div class="actions">
+            <button type="submit" class="primary" id="vote-submit">투표하기</button>
+            <button type="button" class="ghost" id="vote-other" hidden>다른 사람으로 새로 투표</button>
+            <button type="button" class="ghost danger" id="vote-remove" hidden>내 투표 지우기</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="results" aria-labelledby="results-title">
+        <div class="section-head">
+          <h2 id="results-title">결과</h2>
+          <p class="summary" id="results-summary"></p>
+          <button type="button" class="act" id="refresh">새로고침</button>
+        </div>
+        <div class="result-cal" id="result-cal" hidden></div>
+        <ol class="board" id="results"></ol>
+        <details class="panel others" id="others-panel" hidden>
+          <summary>다른 규칙으로 고르면</summary>
+          <p class="fine">같은 투표를 다른 이름난 규칙으로 셌을 때 고르는 후보입니다. 어느 규칙을 쓸지는 투표 전에 정해 두어야 공정하므로, 이 투표는 위의 순서로 정합니다.</p>
+          <ul class="rules" id="others"></ul>
+        </details>
+        <details class="panel how" id="how-panel">
+          <summary>어떻게 줄을 세웠나요?</summary>
+          <ol class="steps" id="how-steps"></ol>
+        </details>
+      </section>
+
+      <section class="panel voters" aria-labelledby="voters-title" id="voters-section" hidden>
+        <h2 id="voters-title">투표한 사람</h2>
+        <ul class="voter-list" id="voters"></ul>
+      </section>
+
+      <details class="panel admin" id="admin">
+        <summary>만든 사람 메뉴</summary>
+        <div class="admin-body" id="admin-body"></div>
+      </details>
+
+      <p class="leave-row"><button type="button" class="ghost" id="leave">이 기기에서 이 투표 잊기</button></p>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <p>투표는 Cloudflare에 있는 이 페이지의 서버에 저장되고, 마지막으로 바뀐 뒤 60일이 지나면 저절로 지워집니다. 만든 사람은 언제든 바로 지울 수 있습니다.</p>
+    <p>기명 투표라서 이름과 고른 것이 그룹 ID와 PIN을 아는 사람 모두에게 보입니다. PIN은 서버에 그대로 남기지 않고, 이 기기에는 들어간 투표의 열쇠와 PIN을 저장해 다시 들어올 때 씁니다.</p>
+    <p>날짜의 공휴일은 우주항공청 월력요항을 따릅니다.</p>
+  </footer>
+</div>
+<noscript><p class="wrap">이 페이지는 자바스크립트가 있어야 투표할 수 있습니다.</p></noscript>
+</body>
+</html>

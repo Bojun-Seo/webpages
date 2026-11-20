@@ -8,6 +8,7 @@ A collection of web pages built for personal use, published with GitHub Pages at
 | [`japan-flights/`](japan-flights/) | [Short-Haul Flights](https://bojun-seo.github.io/webpages/japan-flights/) | Recommends round trips that take no leave, nonstop or with one connection, from Seoul and Cheongju to Japan, Taiwan, Hong Kong, Macau, Vietnam, Thailand, Guam and Saipan |
 | [`skypass-cards/`](skypass-cards/) | [SKYPASS Card Calculator](https://bojun-seo.github.io/webpages/skypass-cards/) | Works out the Korean Air miles each SKYPASS credit card earns in a year for what the visitor spends, and what is left after the annual fee |
 | [`sparemine/`](sparemine/) | [sparemine launcher](https://bojun-seo.github.io/webpages/sparemine/) | Turns a BTC receive address and a few options into the one-line command, `config.toml` and run script that start the [sparemine](https://github.com/bojun-seo/applications/tree/master/sparemine) miner on your own machine; the page itself never mines |
+| [`fair-pick/`](fair-pick/) | [Fair Group Vote](https://bojun-seo.github.io/webpages/fair-pick/) | Lets a group that must settle on one date or place get in with a group ID and PIN, grade every option under their own names, and picks the option by a rule from social choice theory; dates are picked on a Korean calendar with the public holidays |
 
 ## Publishing
 
@@ -26,6 +27,12 @@ run late when it is busy, often by hours.
 Pages has to be set to deploy from GitHub Actions: **Settings → Pages → Build and deployment →
 Source: GitHub Actions**. Until it is, the deploy job fails.
 
+fair-pick keeps its polls in an API of its own, a Cloudflare Worker that
+[`fair-pick-api.yml`](.github/workflows/fair-pick-api.yml) deploys when a push to the default
+branch changes it. That needs the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, and
+the page finds the Worker at the repository variable `FAIR_PICK_API`, which the build writes into
+it; [its README](fair-pick/README.md#set-up-the-api) says how to set them up.
+
 GitHub turns off the scheduled workflows of a public repository that has seen no activity for 60
 days. If that happens, **Actions → pages → Enable workflow** turns the daily run back on.
 
@@ -40,4 +47,6 @@ npm run smoke
 
 To add a page, give it a directory with its files under `site/`, add a job that tests it and a
 step that copies it to `pages.yml`, add what the page must keep doing to `smoke/smoke.js`, and link
-it from `index.html` and the table above.
+it from `index.html` and the table above. A page that calls an API of its own gets it answered in
+`smoke/smoke.js` as fair-pick's is, by the API's own code on memory, since the browser is kept off
+every other site.

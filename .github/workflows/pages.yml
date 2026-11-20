@@ -4,7 +4,8 @@
 # touches a page runs every page's tests, builds the site and opens each page in a browser
 # (smoke/); the default branch then publishes it. A daily run fetches the fares japan-flights
 # shows and publishes again; a push keeps the fares the site has. Pages must be set to deploy from
-# GitHub Actions; see README.md.
+# GitHub Actions; see README.md. fair-pick's API is a Cloudflare Worker that fair-pick-api.yml
+# deploys; this workflow only tells the page where it is.
 name: pages
 
 on:
@@ -16,6 +17,7 @@ on:
       - japan-flights/**
       - skypass-cards/**
       - sparemine/**
+      - fair-pick/**
       - smoke/**
       - .github/workflows/pages.yml
   schedule:
@@ -57,8 +59,18 @@ jobs:
       - run: npm test
         working-directory: sparemine
 
+  fair-pick:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm test
+        working-directory: fair-pick
+
   build:
-    needs: [japan-flights, skypass-cards, sparemine]
+    needs: [japan-flights, skypass-cards, sparemine, fair-pick]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -74,14 +86,19 @@ jobs:
         # Pages lets browsers keep a file for ten minutes, so a page fetched after a deploy could
         # run a script from before it. The script and style URLs carry the commit (?v=...) so a
         # deploy always loads its own; the grep fails the build if a file stops matching.
+        # fair-pick calls the API at the repository variable FAIR_PICK_API, its Worker's https://
+        # address; without it the page says its server is not connected.
+        env:
+          FAIR_PICK_API: ${{ vars.FAIR_PICK_API }}
         run: |
           mkdir _site
           cp index.html _site/
           cp -R japan-flights/site _site/japan-flights
           cp -R skypass-cards/site _site/skypass-cards
           cp -R sparemine/site _site/sparemine
+          cp -R fair-pick/site _site/fair-pick
           v=${GITHUB_SHA::7}
-          for page in japan-flights skypass-cards sparemine; do
+          for page in japan-flights skypass-cards sparemine fair-pick; do
             sed -i "s|href=\"style.css\"|href=\"style.css?v=$v\"|; s|src=\"app.js\"|src=\"app.js?v=$v\"|" \
               _site/$page/index.html
             grep -q "style.css?v=$v" _site/$page/index.html
@@ -93,6 +110,16 @@ jobs:
           grep -q "calc.js?v=$v" _site/skypass-cards/app.js
           sed -i "s|from './gen.js'|from './gen.js?v=$v'|" _site/sparemine/app.js
           grep -q "gen.js?v=$v" _site/sparemine/app.js
+          sed -i -E "s#from '\./(api|calendar|config|rank|rules)\.js'#from './\1.js?v=$v'#" _site/fair-pick/app.js
+          test "$(grep -c "\.js?v=$v'" _site/fair-pick/app.js)" -eq 5
+          if [ -z "$FAIR_PICK_API" ]; then
+            echo "::notice::FAIR_PICK_API is not set, so fair-pick says its server is not connected. See fair-pick/README.md."
+          elif [[ "$FAIR_PICK_API" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$ ]]; then
+            printf "export const API_BASE = '%s';\n" "${FAIR_PICK_API%/}" > _site/fair-pick/config.js
+          else
+            echo "::error::FAIR_PICK_API must be an https:// address, such as https://fair-pick.example.workers.dev"
+            exit 1
+          fi
       - name: Download the fares the site has now
         # The fetcher keeps them for the queries the API does not answer, all of them if it answers
         # none, and a push keeps them all. Nothing to download before the first deploy.
