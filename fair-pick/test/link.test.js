@@ -4,7 +4,8 @@ import { addDays, isDate } from '../../common/site/calendar.js';
 import * as pollRules from '../../common/site/poll-rules.js';
 import { decide } from '../../common/site/social-choice.js';
 import {
-  checked, closedAt, counted, createLinkClient, importKey, merge, payloadsIn, sameNames, seal, sha256Hex, tieOrderOf,
+  STATE_VERSION, checked, closedAt, counted, createLinkClient, importKey, merge, payloadsIn, sameNames, seal, sha256Hex,
+  tieOrderOf,
 } from '../site/link.js';
 
 const rules = { ...pollRules, isDate };
@@ -29,6 +30,10 @@ function phone(clock = { now: NOW }) {
 }
 
 const names = (data) => data.ballots.map((ballot) => ballot.name).sort();
+
+// The grades of the ballots that count on a phone, as its links carry them,
+// for the page is not told them before the poll closes.
+const stored = (on, id = 'team-dinner') => counted(on.storage.read()[id].state, pollRules.nameKey).map((ballot) => ballot.g);
 
 async function maker(props = {}) {
   const a = phone();
@@ -90,7 +95,7 @@ test('the later change to a ballot wins, whichever link brings it first', async 
   const b = phone();
   await b.client.open(after, 'team-dinner', '482915');
   await b.client.absorb(before);
-  assert.deepEqual((await b.client.load('team-dinner')).ballots[0].grades, [0, 0, 2]);
+  assert.deepEqual(stored(b), ['002']);
 });
 
 test('a ballot taken out stays out, and only its voter or the maker takes it out', async () => {
@@ -120,7 +125,8 @@ test('a name cast from two phones before either saw the other counts once, the l
   await c.client.vote('team-dinner', {}, { name: ' 김민수', grades: [0, 0, 0] });
   await a.client.absorb(`${await b.client.linkOf('team-dinner')} ${await c.client.linkOf('team-dinner')}`);
   const data = await a.client.load('team-dinner');
-  assert.deepEqual(data.ballots.map((ballot) => ballot.grades), [[0, 0, 0]]);
+  assert.deepEqual(names(data), ['김민수']);
+  assert.deepEqual(stored(a), ['000']);
   assert.deepEqual(data.sameNames, ['김민수']);
   // A phone that knows the name turns a second ballot under it down.
   await assert.rejects(a.client.vote('team-dinner', {}, { name: '김민수', grades: [1, 1, 1] }), { status: 409, code: 'name' });
@@ -131,7 +137,7 @@ test('only the maker closes, and closing shows the seed that settles a tie the s
   const b = phone();
   await b.client.open(await a.client.linkOf('team-dinner'), 'team-dinner', '482915');
   await b.client.vote('team-dinner', {}, { name: '김민수', grades: [2, 1, 0] });
-  await b.client.vote('team-dinner', {}, { name: '이영희', grades: [1, 2, 2] });
+  await b.client.vote('team-dinner', {}, { name: '이영희', grades: [1, 2, 0] });
   await assert.rejects(b.client.close('team-dinner', {}), { status: 403, code: 'admin' });
   await a.client.absorb(await b.client.linkOf('team-dinner'));
   const closed = await a.client.close('team-dinner', admin);
@@ -146,12 +152,65 @@ test('only the maker closes, and closing shows the seed that settles a tie the s
   await assert.rejects(b.client.vote('team-dinner', {}, { name: '박지훈', grades: [2, 2, 2] }), { status: 423 });
 });
 
+test('until the poll closes a phone is told who voted but not how, and then everything', async () => {
+  const { a, admin } = await maker();
+  await a.client.vote('team-dinner', {}, { name: '김민수', grades: [2, 1, 0] });
+  const open = await a.client.load('team-dinner', admin);
+  assert.deepEqual(open.ballots.map((ballot) => Object.keys(ballot).sort()), [['at', 'id', 'name']]);
+  const closed = await a.client.close('team-dinner', admin);
+  assert.deepEqual(closed.ballots.map((ballot) => ballot.grades), [[2, 1, 0]]);
+  assert.deepEqual(closed.poll.decision, { index: 0, tied: [0], drawn: false });
+});
+
+test('a choice poll goes round in links as orders, and goes with the one that beats every other', async () => {
+  const { a, admin } = await maker({ id: 'dinner-place', kind: 'choice', options: ['고깃집', '횟집', '중식당', '분식'] });
+  // Points, 3 for the first and 0 for the last; base 36 in the link.
+  await a.client.vote('dinner-place', {}, { name: '김민수', grades: [2, 3, 1, 0] });
+  await a.client.vote('dinner-place', {}, { name: '이영희', grades: [0, 3, 2, 1] });
+  await assert.rejects(a.client.vote('dinner-place', {}, { name: '박지훈', grades: [3, 3, 1, 0] }), { status: 400 });
+  const b = phone();
+  await b.client.open(await a.client.linkOf('dinner-place'), 'dinner-place', '482915');
+  await b.client.vote('dinner-place', {}, { name: '박지훈', grades: [3, 2, 1, 0] });
+  await a.client.absorb(await b.client.linkOf('dinner-place'));
+  assert.deepEqual(stored(a, 'dinner-place').sort(), ['0321', '2310', '3210']);
+  const closed = await a.client.close('dinner-place', admin);
+  assert.deepEqual(closed.poll.decision, { index: 1, tied: [1], drawn: false });
+});
+
+test('a link from before polls of places were ranked opens with its grades turned into orders', async () => {
+  const { a } = await maker({ id: 'dinner-place', kind: 'choice', options: ['고깃집', '횟집', '중식당', '분식'] });
+  const record = a.storage.read()['dinner-place'];
+  // Grades from 안 돼요 (0) to 최고 (4), as a version 1 link carried them.
+  const old = {
+    ...record.state, v: 1,
+    ballots: [{ i: 'aa', n: '갑', g: '4130', t: 1 }, { i: 'bb', n: '을', g: '2240', t: 2 }, { i: 'cc', n: '병', g: '41', t: 3 }],
+  };
+  const link = await seal(old, await importKey(record.key));
+  const b = phone();
+  const c = phone();
+  await b.client.open(link, 'dinner-place', '482915');
+  await c.client.open(link, 'dinner-place', '482915');
+  const [kept, level] = stored(b, 'dinner-place');
+  assert.equal(b.storage.read()['dinner-place'].state.v, STATE_VERSION);
+  // Graded 4, 3, 1, 0: the order stands. Graded 2, 2, 4, 0: 중식당 first,
+  // 분식 last, and the two graded alike in an order every phone draws alike.
+  assert.equal(kept, '3120');
+  assert.ok(['2130', '1230'].includes(level), level);
+  assert.deepEqual(stored(c, 'dinner-place'), stored(b, 'dinner-place'));
+  // A phone that kept the poll from before brings it up to date on reading it.
+  const d = phone();
+  d.storage.write({ 'dinner-place': { ...record, state: old } });
+  assert.equal(d.storage.read()['dinner-place'].state.v, 1);
+  assert.equal((await d.client.load('dinner-place')).ballots.length, 2);
+  assert.deepEqual(stored(d, 'dinner-place'), stored(b, 'dinner-place'));
+});
+
 test('the deadline closes the poll everywhere; the maker’s phone shows the seed, and may open it again', async () => {
   const { a, admin } = await maker({ deadline: '2026-11-25T18:00:00+09:00' });
   const b = phone();
   await b.client.open(await a.client.linkOf('team-dinner'), 'team-dinner', '482915');
   await b.client.vote('team-dinner', {}, { name: '김민수', grades: [2, 1, 0] });
-  await b.client.vote('team-dinner', {}, { name: '이영희', grades: [1, 2, 2] });
+  await b.client.vote('team-dinner', {}, { name: '이영희', grades: [1, 2, 0] });
   b.clock.now = Date.parse('2026-11-25T09:00:01Z');
   const late = await b.client.load('team-dinner');
   assert.equal(late.poll.closedAt, '2026-11-25T09:00:00.000Z');
@@ -176,7 +235,7 @@ test('a seed that does not match the poll’s hash is not trusted', async () => 
   const b = phone();
   await b.client.open(await a.client.linkOf('team-dinner'), 'team-dinner', '482915');
   await b.client.vote('team-dinner', {}, { name: '김민수', grades: [2, 1, 0] });
-  await b.client.vote('team-dinner', {}, { name: '이영희', grades: [1, 2, 2] });
+  await b.client.vote('team-dinner', {}, { name: '이영희', grades: [1, 2, 0] });
   // Someone with the PIN seals the poll again with a seed of their own.
   const record = b.storage.read()['team-dinner'];
   const forged = await seal({ ...record.state, seed: 'chosen-to-win' }, await importKey(record.key));
@@ -233,6 +292,12 @@ test('a link’s ballots that do not fit its poll are dropped, and a broken poll
     { i: 'noname', n: '', g: '210', t: 4 }, { i: 'gone', t: 5, x: 1 },
   ] }, rules);
   assert.deepEqual(fixed.ballots.map((b) => b.i), ['ok', 'gone']);
+  const choice = { ...state, kind: 'choice', options: [{ label: '가' }, { label: '나' }, { label: '다' }] };
+  const places = checked({ ...choice, ballots: [
+    { i: 'ok', n: '갑', g: '021', t: 1 }, { i: 'twice', n: '을', g: '112', t: 2 }, { i: 'upper', n: '병', g: '0A1', t: 3 },
+  ] }, rules);
+  assert.deepEqual(places.ballots.map((b) => b.i), ['ok']);
+  assert.throws(() => checked({ ...state, v: 3 }, rules));
   assert.throws(() => checked({ ...state, kind: 'vote' }, rules));
   assert.throws(() => checked({ ...state, options: [{ date: '2026-02-30' }, { date: '2026-12-01' }] }, rules));
 });

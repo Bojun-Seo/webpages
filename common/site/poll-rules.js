@@ -1,7 +1,7 @@
-// What a fair-pick poll and a ballot may hold, the grades a voter gives
-// and how a group ID and PIN look. The page checks a form with these before
-// it sends it, and its API checks again what it is sent, so both say the
-// same.
+// What a fair-pick poll and a ballot may hold, how a voter answers each
+// kind of poll and how a group ID and PIN look. The page checks a form with
+// these before it sends it, and its API checks again what it is sent, so
+// both say the same.
 
 import { addDays, isDate, koreaDate } from './calendar.js';
 
@@ -9,29 +9,44 @@ import { addDays, isDate, koreaDate } from './calendar.js';
 // maker writes down: a place, a menu, anything.
 export const KINDS = ['date', 'choice'];
 
-// The grades a voter gives each option, worst first: a grade's index is its
-// score. Grade 0 says the voter cannot come, or cannot have it at all.
-// `approveAt` is the lowest grade that counts as yes for approval voting.
-export const SCALES = {
-  date: {
-    grades: [
-      { label: '안 돼요', short: '✕', tone: 'no' },
-      { label: '되긴 해요', short: '△', tone: 'meh' },
-      { label: '좋아요', short: '○', tone: 'best' },
-    ],
-    approveAt: 1,
-  },
-  choice: {
-    grades: [
-      { label: '안 돼요', short: '✕', tone: 'no' },
-      { label: '별로', short: '별로', tone: 'meh' },
-      { label: '보통', short: '보통', tone: 'mid' },
-      { label: '좋아요', short: '좋아요', tone: 'good' },
-      { label: '최고', short: '최고', tone: 'best' },
-    ],
-    approveAt: 2,
-  },
-};
+// How a voter answers a date poll: each date ✕, △ or ○, a grade's index
+// its value. ○ says they would like that day, △ that they can come but
+// would rather not, ✕ that they cannot come.
+export const DATE_GRADES = [
+  { label: '못 가요', short: '✕', tone: 'no' },
+  { label: '되긴 해요', short: '△', tone: 'meh' },
+  { label: '좋아요', short: '○', tone: 'best' },
+];
+
+export const NO = 0;
+export const MEH = 1;
+export const YES = 2;
+
+// A choice poll is answered by putting every option in order, best first.
+// A ballot carries the order as points, one for each option in the poll's
+// order: n - 1 for the first of n options, n - 2 for the next and 0 for
+// the last, so that more is better there as for dates.
+export function pointsOf(order) {
+  const points = Array(order.length);
+  order.forEach((index, place) => {
+    points[index] = order.length - 1 - place;
+  });
+  return points;
+}
+
+// The options in the order a choice ballot's points put them, best first.
+export function orderOf(points) {
+  return points.map((value, index) => [value, index]).sort((a, b) => b[0] - a[0]).map(([, index]) => index);
+}
+
+// Whether `grades` answer each of `count` options of a `kind` poll: a grade
+// of DATE_GRADES for every date, or every option's place for a choice.
+export function gradesFit(kind, count, grades) {
+  if (!Array.isArray(grades) || grades.length !== count) return false;
+  if (!grades.every((grade) => Number.isInteger(grade) && grade >= 0)) return false;
+  if (kind === 'date') return grades.every((grade) => grade < DATE_GRADES.length);
+  return grades.every((grade) => grade < count) && new Set(grades).size === count;
+}
 
 export const LIMITS = {
   title: 60,
@@ -173,16 +188,14 @@ export function checkPoll(input, now = Date.now()) {
 }
 
 // A ballot for `poll` from what the voter entered, { name, grades }, as
-// { ballot } or { problem }: a grade for every option, in its order.
+// { ballot } or { problem }: for every option in its order, its grade or,
+// for a choice, its points.
 export function checkBallot(input, poll) {
   const name = cleanText(input?.name);
   if (!name) return { problem: '이름을 넣어 주세요. 이 투표는 기명 투표예요.' };
   if (lengthOf(name) > LIMITS.name) return { problem: `이름은 ${LIMITS.name}자까지 쓸 수 있어요.` };
-  const top = SCALES[poll.kind].grades.length - 1;
-  const { grades } = input;
-  if (!Array.isArray(grades) || grades.length !== poll.options.length) return { problem: '모든 후보에 답해 주세요.' };
-  if (!grades.every((grade) => Number.isInteger(grade) && grade >= 0 && grade <= top)) {
-    return { problem: '모든 후보에 답해 주세요.' };
+  if (!gradesFit(poll.kind, poll.options.length, input.grades)) {
+    return { problem: poll.kind === 'date' ? '모든 후보에 답해 주세요.' : '모든 후보에 순위를 매겨 주세요.' };
   }
-  return { ballot: { name, grades: [...grades] } };
+  return { ballot: { name, grades: [...input.grades] } };
 }

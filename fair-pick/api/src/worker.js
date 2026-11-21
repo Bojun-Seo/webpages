@@ -16,8 +16,10 @@
 // unlocks, as `Authorization: Bearer`; closing, reopening and deleting the
 // poll, or another voter's ballot, also need the admin key its maker got
 // (`X-Admin-Key`), and changing a ballot the key its voter got
-// (`X-Ballot-Key`). An error answers { error, message }, the message in
-// Korean for the page to show.
+// (`X-Ballot-Key`). A ballot's grades are each date's ✕ △ ○ (0 to 2), or
+// each option's points from its place, n - 1 for the first of n; until the
+// poll closes, the ballots answered carry no grades. An error answers
+// { error, message }, the message in Korean for the page to show.
 //
 // poll.js keeps each poll and decides who may do what; this module routes
 // a call to its poll and answers browsers on the page's site.

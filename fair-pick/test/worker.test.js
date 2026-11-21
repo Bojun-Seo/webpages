@@ -140,7 +140,8 @@ test('a voter votes by name, changes it with the key their device keeps, and no 
   assert.equal(first.status, 200);
   const { ballotId, ballotKey } = first.body;
   assert.ok(ballotId && ballotKey);
-  assert.deepEqual(first.body.ballots, [{ id: ballotId, name: '김민수', grades: [2, 1, 0], at: first.body.ballots[0].at }]);
+  // Until the poll closes, who voted shows but not how.
+  assert.deepEqual(first.body.ballots, [{ id: ballotId, name: '김민수', at: first.body.ballots[0].at }]);
 
   // Someone else under the same name is turned away.
   const clash = await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: ' 김민수 ', grades: [0, 0, 0] } });
@@ -155,7 +156,7 @@ test('a voter votes by name, changes it with the key their device keeps, and no 
   });
   assert.equal(changed.status, 200);
   assert.equal(changed.body.ballotKey, undefined);
-  assert.deepEqual(changed.body.ballots.map((ballot) => ballot.grades), [[2, 2, 2]]);
+  assert.deepEqual(changed.body.ballots.map((ballot) => ballot.name), ['김민수']);
 
   const invalid = await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '이영희', grades: [2, 2] } });
   assert.equal(invalid.status, 400);
@@ -178,11 +179,15 @@ test('a voter takes back their own ballot, and the maker anyone’s', async () =
 test('the maker closes the poll and it decides; a member cannot, and nobody votes after', async () => {
   const { call, token, adminKey } = await made();
   await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '김민수', grades: [2, 1, 0] } });
-  await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '이영희', grades: [1, 2, 2] } });
+  await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '이영희', grades: [1, 2, 0] } });
   assert.equal((await call('POST', '/polls/team-dinner/close', { token })).status, 403);
+  // Neither the maker nor anyone else sees how anyone voted before the close.
+  const before = await call('GET', '/polls/team-dinner', { token, admin: adminKey });
+  assert.ok(before.body.ballots.every((ballot) => ballot.grades === undefined));
   const closed = await call('POST', '/polls/team-dinner/close', { token, admin: adminKey });
   assert.equal(closed.status, 200);
   assert.ok(closed.body.poll.closedAt);
+  assert.deepEqual(closed.body.ballots.map((ballot) => ballot.grades), [[2, 1, 0], [1, 2, 0]]);
   // Dates 0 and 1 are level on everything; the draw fixed at the start picks one.
   assert.deepEqual(closed.body.poll.decision.tied, [0, 1]);
   assert.equal(closed.body.poll.decision.drawn, true);
@@ -210,6 +215,19 @@ test('a poll whose deadline passes closes by itself and decides', async () => {
   const reopened = await call('POST', '/polls/team-dinner/reopen', { token, admin: adminKey });
   assert.equal(reopened.body.poll.deadline, null);
   assert.equal(reopened.body.poll.closedAt, null);
+  assert.equal(reopened.body.ballots[0].grades, undefined);
+});
+
+test('a choice poll takes every option in its place and goes with the one that beats every other', async () => {
+  const { call, token, adminKey } = await made({ kind: 'choice', options: ['고깃집', '횟집', '중식당'] });
+  const vote = (name, grades) => call('PUT', '/polls/team-dinner/ballot', { token, body: { name, grades } });
+  assert.equal((await vote('김민수', [2, 2, 1])).status, 400);
+  // Points, 2 for the first and 0 for the last: 횟집 beats 고깃집 2-1 and 중식당 3-0.
+  for (const [name, grades] of [['김민수', [1, 2, 0]], ['이영희', [0, 2, 1]], ['박지훈', [2, 1, 0]]]) {
+    assert.equal((await vote(name, grades)).status, 200);
+  }
+  const closed = await call('POST', '/polls/team-dinner/close', { token, admin: adminKey });
+  assert.deepEqual(closed.body.poll.decision, { index: 1, tied: [1], drawn: false });
 });
 
 test('the maker deletes the poll, which frees its ID', async () => {

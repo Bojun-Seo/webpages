@@ -12,12 +12,18 @@
 // The maker's device draws a seed when the poll is made and puts only its
 // hash in the poll; closing the poll shows the seed, which orders a draw
 // between options level at the top. Every device checks the seed against
-// the hash, so the maker cannot draw again.
+// the hash, so the maker cannot draw again. Until the poll closes the page
+// is told who voted but not how, as the API tells it; the link itself
+// carries every ballot, so that the poll can close anywhere.
 //
 // Nothing here imports ../common/, whose path differs in a browser and in
 // Node; the page hands in the poll rules and the decision.
 
+// The version of a link's payload, and of the poll it carries. A poll of
+// version 1 graded a choice's options from 안 돼요 to 최고 instead of
+// putting them in order; `checked` brings it up to date.
 export const VERSION = 1;
+export const STATE_VERSION = 2;
 
 // PBKDF2 rounds for the key: slow enough that guessing PINs costs time,
 // quick enough for a phone. Tests pass fewer.
@@ -155,6 +161,29 @@ function newer(a, b, time = 't') {
 
 const byTime = (a, b) => a.t - b.t || (a.i < b.i ? -1 : a.i > b.i ? 1 : 0);
 
+// A ballot's grades as a link carries them, one character for each option:
+// its grade, or for a choice its points, in base 36.
+const gradesOf = (text) => [...text].map((digit) => parseInt(digit, 36));
+const textOf = (grades) => grades.map((grade) => grade.toString(36)).join('');
+
+// A 32-bit FNV-1a hash of `text`.
+function hash32(text) {
+  let hash = 0x811c9dc5;
+  for (const byte of encoder.encode(text)) hash = Math.imul(hash ^ byte, 0x01000193) >>> 0;
+  return hash;
+}
+
+// The points of a version 1 choice ballot `id` that graded the options
+// `grades`: its options best graded first, and options graded alike in an
+// order drawn from the ballot's ID and theirs, the same on every device and
+// favouring no place on the list.
+function pointsFromGrades(id, grades, pointsOf) {
+  const order = grades.map((grade, index) => ({ index, grade, draw: hash32(`${id}:${index}`) }))
+    .sort((a, b) => b.grade - a.grade || a.draw - b.draw || a.index - b.index)
+    .map((entry) => entry.index);
+  return pointsOf(order);
+}
+
 // Two states of one poll as one: its definition as `base` has it, each
 // ballot's latest change, the latest open or close, and the seed if either
 // shows it. The same however many times and in whatever order.
@@ -213,13 +242,15 @@ export async function tieOrderOf(seed, count) {
   return keyed.sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([, index]) => index);
 }
 
-// `state` as it arrived in a link, checked: its poll whole, and of its
-// ballots only those that fit it. Throws when the poll does not hold up.
-export function checked(state, { KINDS, LIMITS, SCALES, isDate }) {
+// `state` as it arrived in a link or was kept, checked and brought up to
+// date: its poll whole, and of its ballots only those that fit it. Throws
+// when the poll does not hold up.
+export function checked(state, { KINDS, LIMITS, gradesFit, pointsOf, isDate }) {
   const fail = () => {
     throw new Error('not a poll');
   };
-  if (!state || state.v !== VERSION || typeof state.uid !== 'string' || typeof state.id !== 'string') fail();
+  if (!state || ![1, STATE_VERSION].includes(state.v)) fail();
+  if (typeof state.uid !== 'string' || typeof state.id !== 'string') fail();
   if (!KINDS.includes(state.kind) || typeof state.title !== 'string' || !state.title) fail();
   const { options } = state;
   if (!Array.isArray(options) || options.length < LIMITS.minOptions || options.length > LIMITS.options[state.kind]) fail();
@@ -230,14 +261,22 @@ export function checked(state, { KINDS, LIMITS, SCALES, isDate }) {
   if (state.deadline !== null && Number.isNaN(Date.parse(state.deadline))) fail();
   if (!/^[0-9a-f]{64}$/.test(state.seedHash) || typeof state.status?.closed !== 'boolean') fail();
   if (!Number.isFinite(state.status.at)) fail();
-  const top = SCALES[state.kind].grades.length - 1;
-  const grades = new RegExp(`^[0-${top}]{${options.length}}$`);
-  const ballots = (Array.isArray(state.ballots) ? state.ballots : []).filter((ballot) => (
-    typeof ballot?.i === 'string' && Number.isFinite(ballot.t)
-    && (ballot.x === 1 || (typeof ballot.n === 'string' && ballot.n !== '' && [...ballot.n].length <= LIMITS.name
-      && grades.test(ballot.g)))));
+  const graded = state.v === 1 && state.kind === 'choice';
+  const ballots = (Array.isArray(state.ballots) ? state.ballots : []).flatMap((ballot) => {
+    if (typeof ballot?.i !== 'string' || !Number.isFinite(ballot.t)) return [];
+    if (ballot.x === 1) return [{ i: ballot.i, t: ballot.t, x: 1 }];
+    if (typeof ballot.n !== 'string' || ballot.n === '' || [...ballot.n].length > LIMITS.name) return [];
+    if (typeof ballot.g !== 'string' || !/^[0-9a-z]+$/.test(ballot.g)) return [];
+    let grades = gradesOf(ballot.g);
+    if (graded) {
+      if (grades.length !== options.length || grades.some((grade) => grade > 4)) return [];
+      grades = pointsFromGrades(ballot.i, grades, pointsOf);
+    }
+    if (!gradesFit(state.kind, options.length, grades)) return [];
+    return [{ i: ballot.i, n: ballot.n, g: textOf(grades), t: ballot.t }];
+  });
   return {
-    v: VERSION,
+    v: STATE_VERSION,
     uid: state.uid,
     id: state.id,
     kind: state.kind,
@@ -249,7 +288,7 @@ export function checked(state, { KINDS, LIMITS, SCALES, isDate }) {
     seedHash: state.seedHash,
     status: { closed: state.status.closed, at: state.status.at },
     seed: typeof state.seed === 'string' ? state.seed : null,
-    ballots: ballots.slice(0, LIMITS.ballots * 3).map(({ i, n, g, t, x }) => (x === 1 ? { i, t, x } : { i, n, g, t })),
+    ballots: ballots.slice(0, LIMITS.ballots * 3),
   };
 }
 
@@ -268,7 +307,23 @@ async function trusted(state) {
 // { read(), write(polls) } of this device's polls by group ID, each
 // { uid, key, state }.
 export function createLinkClient({ rules, decide, storage, now = Date.now, iterations = ITERATIONS }) {
-  const polls = () => storage.read() || {};
+  // The polls this device keeps; one kept from before is brought up to date
+  // the first time it is read.
+  const polls = () => {
+    const all = storage.read() || {};
+    let changed = false;
+    for (const record of Object.values(all)) {
+      if (record?.state?.v === STATE_VERSION) continue;
+      try {
+        record.state = checked(record.state, rules);
+        changed = true;
+      } catch {
+        // Left as it is; a link of the poll replaces it.
+      }
+    }
+    if (changed) storage.write(all);
+    return all;
+  };
   const keep = (id, record) => storage.write({ ...polls(), [id]: record });
   const kept = (id) => {
     const record = polls()[id];
@@ -284,21 +339,21 @@ export function createLinkClient({ rules, decide, storage, now = Date.now, itera
   async function view(id, extra = {}) {
     const { state } = polls()[id];
     const shut = closedAt(state, now());
-    const ballots = counted(state, rules.nameKey).map((ballot) => ({
-      id: ballot.i, name: ballot.n, grades: [...ballot.g].map(Number), at: iso(ballot.t),
+    const all = counted(state, rules.nameKey).map((ballot) => ({
+      id: ballot.i, name: ballot.n, grades: gradesOf(ballot.g), at: iso(ballot.t),
     }));
     let decision = null;
-    if (shut !== null && ballots.length > 0) {
-      const top = rules.SCALES[state.kind].grades.length - 1;
+    if (shut !== null && all.length > 0) {
       const order = state.seed ? await tieOrderOf(state.seed, state.options.length) : [];
-      decision = decide(ballots, state.options.length, top, order);
+      decision = decide(state.kind, all, state.options.length, order);
       // Level at the top, and the maker has not shown the seed yet.
       if (decision.drawn && !state.seed) decision = { index: null, tied: decision.tied, drawn: false, pending: true };
     }
     const { kind, title, note, options, createdAt, deadline } = state;
     return {
       poll: { id, kind, title, note, options, createdAt, deadline, closedAt: shut === null ? null : iso(shut), decision },
-      ballots,
+      // Until the poll closes, who voted but not how.
+      ballots: shut === null ? all.map(({ id: ballotId, name, at }) => ({ id: ballotId, name, at })) : all,
       sameNames: sameNames(state, rules.nameKey),
       ...extra,
     };
@@ -351,7 +406,7 @@ export function createLinkClient({ rules, decide, storage, now = Date.now, itera
       const uid = randomId(12);
       const seed = randomId(16);
       const state = {
-        v: VERSION, uid, id, ...result.poll, createdAt: iso(now()), seedHash: await sha256Hex(seed),
+        v: STATE_VERSION, uid, id, ...result.poll, createdAt: iso(now()), seedHash: await sha256Hex(seed),
         status: { closed: false, at: now() }, seed: null, ballots: [],
       };
       const key = await deriveKey(id, input.pin, uid, iterations);
@@ -435,7 +490,7 @@ export function createLinkClient({ rules, decide, storage, now = Date.now, itera
       if (!mine && live.length >= rules.LIMITS.ballots) {
         throw new LinkError(409, 'full', `한 투표에는 ${rules.LIMITS.ballots}명까지 참여할 수 있어요.`);
       }
-      const ballot = { i: mine ? mine.i : randomId(6), n: name, g: grades.join(''), t: after(mine ? mine.t : 0) };
+      const ballot = { i: mine ? mine.i : randomId(6), n: name, g: textOf(grades), t: after(mine ? mine.t : 0) };
       const ballots = [...state.ballots.filter((one) => one.i !== ballot.i), ballot].sort(byTime);
       keep(id, { ...record, state: { ...state, ballots } });
       return { ballotId: ballot.i, ...(mine ? {} : { ballotKey: 'own' }), ...await view(id) };

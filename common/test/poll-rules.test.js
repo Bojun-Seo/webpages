@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { addDays } from '../site/calendar.js';
 import {
-  LIMITS, SCALES, checkBallot, checkPoll, cleanText, idProblem, nameKey, newPinProblem, normalizeId, pinProblem,
-  weakPin,
+  DATE_GRADES, LIMITS, MEH, NO, YES, checkBallot, checkPoll, cleanText, gradesFit, idProblem, nameKey, newPinProblem,
+  normalizeId, orderOf, pinProblem, pointsOf, weakPin,
 } from '../site/poll-rules.js';
 
 // 20 November 2026, 10:00 in Korea.
@@ -82,21 +82,27 @@ test('a deadline is a time ahead, within a year', () => {
   assert.match(at('someday').problem, /다시 골라/);
 });
 
-test('a ballot names its voter and grades every option within the scale', () => {
+test('a ballot names its voter and answers every date ✕, △ or ○', () => {
   const poll = { kind: 'date', options: [{ date: '2026-12-03' }, { date: '2026-12-04' }] };
   assert.deepEqual(checkBallot({ name: ' 김민수 ', grades: [2, 0] }, poll), { ballot: { name: '김민수', grades: [2, 0] } });
   assert.match(checkBallot({ name: ' ', grades: [2, 0] }, poll).problem, /기명 투표/);
   assert.match(checkBallot({ name: '가'.repeat(21), grades: [2, 0] }, poll).problem, /20자까지/);
-  assert.match(checkBallot({ name: '김민수', grades: [2] }, poll).problem, /모든 후보/);
-  assert.match(checkBallot({ name: '김민수', grades: [2, 3] }, poll).problem, /모든 후보/);
-  assert.match(checkBallot({ name: '김민수', grades: [2, 1.5] }, poll).problem, /모든 후보/);
-  assert.ok(checkBallot({ name: '김민수', grades: [4, 0] }, { ...poll, kind: 'choice' }).ballot);
+  assert.match(checkBallot({ name: '김민수', grades: [2] }, poll).problem, /모든 후보에 답해/);
+  assert.match(checkBallot({ name: '김민수', grades: [2, 3] }, poll).problem, /모든 후보에 답해/);
+  assert.match(checkBallot({ name: '김민수', grades: [2, 1.5] }, poll).problem, /모든 후보에 답해/);
+  assert.deepEqual(DATE_GRADES.map((grade) => grade.short), ['✕', '△', '○']);
+  assert.deepEqual([NO, MEH, YES], [0, 1, 2]);
 });
 
-test('every scale runs from a grade that says no to more than one that says yes', () => {
-  for (const scale of Object.values(SCALES)) {
-    assert.equal(scale.grades[0].tone, 'no');
-    assert.ok(scale.grades.length >= 3);
-    assert.ok(scale.approveAt > 0 && scale.approveAt < scale.grades.length);
-  }
+test('a choice ballot puts every option in its own place', () => {
+  const poll = { kind: 'choice', options: [{ label: '고깃집' }, { label: '횟집' }, { label: '중식당' }] };
+  assert.ok(checkBallot({ name: '김민수', grades: [0, 2, 1] }, poll).ballot);
+  assert.match(checkBallot({ name: '김민수', grades: [2, 2, 1] }, poll).problem, /모든 후보에 순위를/);
+  assert.match(checkBallot({ name: '김민수', grades: [3, 2, 1] }, poll).problem, /모든 후보에 순위를/);
+  assert.match(checkBallot({ name: '김민수', grades: [1, 0] }, poll).problem, /모든 후보에 순위를/);
+  // The points of an order, n - 1 for the first, and back.
+  assert.deepEqual(pointsOf([1, 2, 0]), [0, 2, 1]);
+  assert.deepEqual(orderOf([0, 2, 1]), [1, 2, 0]);
+  assert.equal(gradesFit('choice', 3, pointsOf([2, 0, 1])), true);
+  assert.equal(gradesFit('date', 2, [2, -1]), false);
 });

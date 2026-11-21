@@ -15,15 +15,18 @@ import {
 } from '../common/calendar.js';
 import { $, el } from '../common/dom.js';
 import * as pollRules from '../common/poll-rules.js';
-import { decide, otherRules, pairwise, rank } from '../common/social-choice.js';
+import { decide, mileage, otherRules, pairwise, rank, scoreOf } from '../common/social-choice.js';
 
 const {
-  LIMITS, SCALES, checkBallot, checkPoll, idProblem, newPinProblem, normalizeId, pinProblem, weakPin,
+  DATE_GRADES, LIMITS, MEH, NO, YES, checkBallot, checkPoll, idProblem, newPinProblem, normalizeId, orderOf, pinProblem,
+  pointsOf, weakPin,
 } = pollRules;
 
 // Where this browser keeps, for each poll it has been in, the token the
-// PIN unlocked, the PIN, the maker's admin key and the keys of the ballots
-// cast from it: { [id]: { token, pin, adminKey, keys, current, title, kind, seen } }.
+// PIN unlocked, the PIN, the maker's admin key, the keys of the ballots
+// cast from it and the grades they were last sent with, which no one is
+// told until the poll closes:
+// { [id]: { token, pin, adminKey, keys, mine, current, title, kind, seen } }.
 const STORE_KEY = 'fair-pick.polls';
 
 // Where this browser keeps, when polls live in links, each poll it has by
@@ -76,9 +79,9 @@ const state = {
   picked: new Set(),
   choices: ['', ''],
   // The poll shown, its ballots and when they were loaded, and the ballot
-  // being filled in: { pollId, ballotId, name, grades }, a grade null until
-  // picked. It outlives a reload of the poll, so what the voter has picked
-  // stays picked.
+  // being filled in: { pollId, ballotId, count, name, grades, order }, as
+  // ensureDraft makes it. It outlives a reload of the poll, so what the
+  // voter has picked stays picked.
   poll: null,
   ballots: [],
   loadedAt: 0,
@@ -494,8 +497,8 @@ async function onCreate(event) {
       navigate(`?g=${encodeURIComponent(data.poll.id)}`);
     } catch (error) {
       say('create-message', error.message);
-      if (error.body.field === 'id') $('id-input').focus();
-      else if (error.body.field === 'pin') $('pin-input').focus();
+      if (error.body?.field === 'id') $('id-input').focus();
+      else if (error.body?.field === 'pin') $('pin-input').focus();
     }
   });
 }
@@ -706,15 +709,23 @@ function renderDecision() {
   }
   const { text, holiday } = optionOf(poll, index);
   // How the rule put it first, from the ballots it was decided by.
-  const ranked = rank(ballots, poll.options.length, SCALES[poll.kind].grades.length - 1);
+  const ranked = rank(poll.kind, ballots, poll.options.length);
   const placed = ranked.find((t) => t.index === index);
+  // Who said they cannot come on the day picked, named for all to see.
+  const absent = poll.kind === 'date' ? ballots.filter((ballot) => ballot.grades?.[index] === NO) : [];
   box.className = 'decision';
   box.replaceChildren(
     el('span', { class: 'label' }, `${timeText(poll.closedAt)} 마감 · ${ballots.length}명 투표 · 결정`),
     el('strong', null, holiday ? `${text} · ${holiday}` : text),
     el('p', null, drawn
       ? `공동 1위 ${tied.length}개 가운데, 투표를 만들 때 미리 뽑아 둔 무작위 순서로 골랐어요.`
-      : placed && reason(placed, ranked)));
+      : placed && reason(placed, ranked)),
+    poll.kind === 'date' && (absent.length > 0
+      ? el('div', { class: 'absent', id: 'absent' },
+        el('span', { class: 'absent-head' }, `불참 ${absent.length}명`),
+        el('span', { class: 'absent-names' }, absent.map((ballot) => ballot.name).join(', ')),
+        el('small', null, '이날 ✕ 못 가요로 답한 사람이에요.'))
+      : el('p', { class: 'all-in' }, '투표한 사람 모두 이날 올 수 있어요.')));
 }
 
 // The link to the poll: on the API, its address; in link mode, the link
@@ -821,61 +832,124 @@ function currentBallot() {
   return ballots.find((ballot) => ballot.id === entry.current && keys[ballot.id]) || null;
 }
 
+// The grades this device last sent for ballot `id`, which the page is not
+// told before the poll closes, its own no more than anyone's.
+function sentGrades(entry, id) {
+  const grades = entry?.mine?.[id];
+  return Array.isArray(grades) ? grades : null;
+}
+
 function ensureDraft() {
   const { poll } = state;
+  const count = poll.options.length;
   const mine = currentBallot();
   const want = mine ? mine.id : null;
   const { draft } = state;
-  if (draft && draft.pollId === poll.id && draft.ballotId === want && draft.grades.length === poll.options.length) {
-    return draft;
-  }
+  if (draft && draft.pollId === poll.id && draft.ballotId === want && draft.count === count) return draft;
+  const had = mine ? mine.grades || sentGrades(entryOf(poll.id), mine.id) : null;
+  const fits = Boolean(had) && had.length === count;
   state.draft = {
     pollId: poll.id,
     ballotId: want,
+    count,
     name: mine ? mine.name : '',
-    grades: mine ? [...mine.grades] : poll.options.map(() => null),
+    // For a date, each date's grade, null until picked; for a choice, the
+    // order so far, best first.
+    grades: poll.kind === 'date' ? (fits ? [...had] : Array(count).fill(null)) : null,
+    order: poll.kind === 'choice' ? (fits ? orderOf(had) : []) : null,
     showMissing: false,
   };
   return state.draft;
 }
 
-// The scores of a poll's scale, the best first, as the ballot shows them.
-function bestFirst(poll) {
-  return SCALES[poll.kind].grades.map((_, score) => score).reverse();
+// The grades of a date ballot as it shows them, ○ first.
+const DATE_ORDER = [YES, MEH, NO];
+
+function gradeText(grade) {
+  const { short, label } = DATE_GRADES[grade];
+  return `${short} ${label}`;
 }
 
-function gradeText(poll, score) {
-  const grade = SCALES[poll.kind].grades[score];
-  return poll.kind === 'date' ? `${grade.short} ${grade.label}` : grade.label;
-}
-
-function ballotRow(index, closed) {
+function dateRow(index, closed) {
   const { poll, draft } = state;
-  const order = bestFirst(poll);
   const row = el('li', { 'data-index': index, class: draft.showMissing && draft.grades[index] == null ? 'missing' : null });
   row.append(el('fieldset', null,
     el('legend', null, optionNode(poll, index)),
-    el('div', { class: 'grades', style: `--count: ${order.length}` }, order.map((score) => el('label', {
-      class: `grade tone-${SCALES[poll.kind].grades[score].tone}`,
+    el('div', { class: 'grades', style: `--count: ${DATE_ORDER.length}` }, DATE_ORDER.map((grade) => el('label', {
+      class: `grade tone-${DATE_GRADES[grade].tone}`,
     }, el('input', {
-      type: 'radio', name: `grade-${index}`, value: score, checked: draft.grades[index] === score, disabled: closed,
+      type: 'radio', name: `grade-${index}`, value: grade, checked: draft.grades[index] === grade, disabled: closed,
       onchange: () => {
-        draft.grades[index] = score;
+        draft.grades[index] = grade;
         row.classList.remove('missing');
         updateLeft();
       },
-    }), el('span', null, gradeText(poll, score)))))));
+    }), el('span', null, gradeText(grade)))))));
   return row;
 }
 
+// The order a choice ballot gives: the options put in order, and the one
+// left, if one is, last; null while more are left.
+function fullOrder(draft, count) {
+  if (draft.order.length === count) return draft.order;
+  if (draft.order.length !== count - 1) return null;
+  return [...draft.order, [...Array(count).keys()].find((index) => !draft.order.includes(index))];
+}
+
+// An option of a choice ballot: a button that puts it next in the order,
+// or takes it out again. The one left once every other is in goes last.
+function choiceRow(index, closed) {
+  const { poll, draft } = state;
+  const count = poll.options.length;
+  const place = draft.order.indexOf(index);
+  const last = place < 0 && draft.order.length === count - 1;
+  const { text } = optionOf(poll, index);
+  let label = `${text}, 누르면 ${draft.order.length + 1}위로 넣어요.`;
+  if (place >= 0) label = `${text}, ${place + 1}위. 누르면 순위에서 빼요.`;
+  else if (last) label = `${text}, 하나 남아서 저절로 ${count}위예요.`;
+  return el('li', { 'data-index': index, class: draft.showMissing && place < 0 && !last ? 'missing' : null },
+    el('button', {
+      type: 'button',
+      class: `rank-pick${place >= 0 ? ' ranked' : ''}${last ? ' last' : ''}`,
+      'aria-pressed': String(place >= 0),
+      'aria-label': label,
+      'data-focus': `rank:${index}`,
+      disabled: closed || last,
+      onclick: () => {
+        if (place >= 0) draft.order.splice(place, 1);
+        else draft.order.push(index);
+        keepFocus($('ballot'), renderBallotRows, () => $('ballot').querySelector('button:not(:disabled)'));
+        updateLeft();
+      },
+    },
+    el('span', { class: 'rank-num', 'aria-hidden': 'true' }, place >= 0 ? String(place + 1) : last ? String(count) : ''),
+    el('span', { class: 'opt' }, text)));
+}
+
 function renderBallotRows() {
-  const closed = Boolean(state.poll.closedAt);
-  $('ballot').replaceChildren(...state.poll.options.map((_, index) => ballotRow(index, closed)));
+  const { poll } = state;
+  const closed = Boolean(poll.closedAt);
+  const row = poll.kind === 'date' ? dateRow : choiceRow;
+  $('ballot').classList.toggle('ranking', poll.kind === 'choice');
+  $('ballot').replaceChildren(...poll.options.map((_, index) => row(index, closed)));
+}
+
+// What each ○ of the date ballot being filled in weighs: its mileage.
+function renderMileage() {
+  const { poll, draft } = state;
+  const node = $('mileage');
+  node.hidden = poll.kind !== 'date' || Boolean(poll.closedAt);
+  if (node.hidden) return;
+  const count = poll.options.length;
+  const now = mileage(draft.grades.map((grade) => grade ?? YES));
+  node.replaceChildren(el('strong', null, `내 마일리지 ${percent(now)}`),
+    ` · 내 ○ 하나의 무게예요. 100%에서 시작해 ✕ 하나에 1/${count}, △ 하나에 그 절반씩 줄어요.`);
 }
 
 function updateLeft() {
   const { poll, draft } = state;
   const mine = currentBallot();
+  renderMileage();
   if (poll.closedAt) {
     $('vote-state').textContent = mine
       ? `${mine.name} 님으로 투표했고, 마감되어 더 바꿀 수 없어요.`
@@ -886,17 +960,28 @@ function updateLeft() {
     $('vote-state').textContent = `${mine.name} 님으로 ${timeText(mine.at)}에 투표했어요.`;
     return;
   }
-  const left = draft.grades.filter((grade) => grade == null).length;
-  $('vote-state').textContent = left
-    ? `후보 ${draft.grades.length}개 가운데 ${left}개 남았어요.`
-    : '모두 골랐어요.';
+  if (poll.kind === 'date') {
+    const left = draft.grades.filter((grade) => grade == null).length;
+    $('vote-state').textContent = left ? `날짜 ${draft.grades.length}개 가운데 ${left}개 남았어요.` : '모두 골랐어요.';
+    return;
+  }
+  const left = poll.options.length - draft.order.length;
+  $('vote-state').textContent = left > 1 ? `순위를 매길 후보가 ${left}개 남았어요.` : '순위를 모두 매겼어요.';
 }
 
-function fillRest(score) {
+function fillRest(grade) {
   const { draft } = state;
-  draft.grades = draft.grades.map((grade) => grade ?? score);
+  draft.grades = draft.grades.map((value) => value ?? grade);
   renderBallotRows();
   updateLeft();
+}
+
+function resetOrder() {
+  state.draft.order = [];
+  state.draft.showMissing = false;
+  renderBallotRows();
+  updateLeft();
+  $('ballot').querySelector('button')?.focus();
 }
 
 function renderBallot() {
@@ -908,12 +993,18 @@ function renderBallot() {
   $('vote-form').hidden = closed;
   $('voter-name').value = draft.name;
   $('voter-name').disabled = closed;
-  $('quick-fill').replaceChildren(...(closed ? [] : [
-    el('span', null, '안 고른 후보 모두'),
-    ...bestFirst(poll).map((score) => el('button', {
-      type: 'button', class: 'ghost', onclick: () => fillRest(score),
-    }, gradeText(poll, score))),
-  ]));
+  $('vote-help').textContent = poll.kind === 'date'
+    ? '날짜마다 ○ 좋아요, △ 되긴 해요(올 수는 있지만 다른 날이 좋아요), ✕ 못 가요 가운데 골라 주세요.'
+    : '좋은 순서대로 후보를 눌러 주세요. 누른 차례대로 1위, 2위가 되고, 마지막 하나는 저절로 꼴찌가 돼요. 순위가 붙은 후보를 다시 누르면 빠져요.';
+  let quick = [];
+  if (!closed && poll.kind === 'date') {
+    quick = [el('span', null, '안 고른 날 모두'), ...DATE_ORDER.map((grade) => el('button', {
+      type: 'button', class: 'ghost', onclick: () => fillRest(grade),
+    }, gradeText(grade)))];
+  } else if (!closed) {
+    quick = [el('button', { type: 'button', class: 'ghost', onclick: resetOrder }, '처음부터 다시 고르기')];
+  }
+  $('quick-fill').replaceChildren(...quick);
   renderBallotRows();
   $('vote-submit').textContent = mine ? '고치기' : '투표하기';
   $('vote-submit').disabled = closed;
@@ -922,21 +1013,37 @@ function renderBallot() {
   updateLeft();
 }
 
+// The grades the ballot being filled in gives, or null after saying what
+// is still missing.
+function draftGrades() {
+  const { poll, draft } = state;
+  if (poll.kind === 'date') {
+    const missing = draft.grades.findIndex((grade) => grade == null);
+    if (missing < 0) return draft.grades;
+    draft.showMissing = true;
+    for (const row of $('ballot').children) row.classList.toggle('missing', draft.grades[row.dataset.index] == null);
+    const count = draft.grades.filter((grade) => grade == null).length;
+    say('vote-message', `아직 고르지 않은 날이 ${count}개 있어요.`);
+    $('ballot').children[missing].querySelector('input').focus();
+    return null;
+  }
+  const order = fullOrder(draft, poll.options.length);
+  if (order) return pointsOf(order);
+  draft.showMissing = true;
+  renderBallotRows();
+  say('vote-message', `아직 순위를 매기지 않은 후보가 ${poll.options.length - draft.order.length}개 있어요.`);
+  $('ballot').querySelector('.missing button')?.focus();
+  return null;
+}
+
 async function onVote(event) {
   event.preventDefault();
   const { poll, draft } = state;
   if (!poll || poll.closedAt) return;
   draft.name = $('voter-name').value;
-  const missing = draft.grades.findIndex((grade) => grade == null);
-  if (missing >= 0) {
-    draft.showMissing = true;
-    for (const row of $('ballot').children) row.classList.toggle('missing', draft.grades[row.dataset.index] == null);
-    const count = draft.grades.filter((grade) => grade == null).length;
-    say('vote-message', `아직 고르지 않은 후보가 ${count}개 있어요.`);
-    $('ballot').children[missing].querySelector('input').focus();
-    return;
-  }
-  const checked = checkBallot({ name: draft.name, grades: draft.grades }, poll);
+  const grades = draftGrades();
+  if (!grades) return;
+  const checked = checkBallot({ name: draft.name, grades }, poll);
   if (checked.problem) {
     say('vote-message', checked.problem);
     $('voter-name').focus();
@@ -953,15 +1060,15 @@ async function onVote(event) {
         { ...checked.ballot, ballotId: changing || undefined },
       );
       if (data.ballotKey) keys[data.ballotId] = data.ballotKey;
-      updateEntry(poll.id, { keys, current: data.ballotId });
+      const mine = { ...(entry.mine || {}), [data.ballotId]: [...checked.ballot.grades] };
+      updateEntry(poll.id, { keys, mine, current: data.ballotId });
       markUnsent(poll.id, 'changed');
-      state.draft = {
-        pollId: poll.id, ballotId: data.ballotId, name: checked.ballot.name, grades: [...checked.ballot.grades],
-        showMissing: false,
-      };
+      state.draft = null;
       take(data);
       renderPoll();
-      say('vote-message', changing ? '고쳤어요.' : '투표했어요. 마감 전에는 언제든 고칠 수 있어요.', true);
+      say('vote-message', changing
+        ? '고쳤어요. 결과는 마감한 뒤에 공개돼요.'
+        : '투표했어요. 마감 전에는 언제든 고칠 수 있고, 결과는 마감한 뒤에 공개돼요.', true);
     } catch (error) {
       if (error.status === 401) {
         signedOut(error);
@@ -980,7 +1087,7 @@ async function onVote(event) {
         renderVoters();
       }
       say('vote-message', error.message);
-      if (error.body.field === 'name') $('voter-name').focus();
+      if (error.body?.field === 'name') $('voter-name').focus();
     }
   });
 }
@@ -1013,8 +1120,10 @@ async function onRemoveMine() {
     try {
       const data = await api.unvote(poll.id, { ...authOf(entry), ballotKey: entry.keys?.[mine.id] }, mine.id);
       const keys = { ...(entry.keys || {}) };
+      const sent = { ...(entry.mine || {}) };
       delete keys[mine.id];
-      updateEntry(poll.id, { keys, current: null });
+      delete sent[mine.id];
+      updateEntry(poll.id, { keys, mine: sent, current: null });
       markUnsent(poll.id, 'changed');
       state.draft = null;
       take(data);
@@ -1027,10 +1136,6 @@ async function onRemoveMine() {
   });
 }
 
-function namesWith(index, score) {
-  return state.ballots.filter((ballot) => ballot.grades[index] === score).map((ballot) => ballot.name);
-}
-
 // `word` with the particle that follows it, the first of `pair` after a
 // final consonant and the second after a vowel: 날이, 후보가. Only ㄹ takes
 // 로 rather than 으로.
@@ -1039,6 +1144,11 @@ function josa(word, pair) {
   const code = word.charCodeAt(word.length - 1) - 0xac00;
   const last = code >= 0 && code < 11172 ? code % 28 : 0;
   return word + (last === 0 || (vowel === '로' && last === 8) ? vowel : consonant);
+}
+
+// A number with 으로 or 로 as it is read: 영, 삼, 육 and 십 take 으로.
+function withRo(number) {
+  return `${number}${/[036]$/.test(number) ? '으로' : '로'}`;
 }
 
 // What an option is called in a sentence: its label, for a date with its
@@ -1053,45 +1163,47 @@ function points(n) {
   return `${Number.isInteger(n) ? n : n.toFixed(1)}점`;
 }
 
+// A share as it reads: 81%.
+function percent(share) {
+  return `${Math.round(share * 100)}%`;
+}
+
+// A date's preference score as it reads: 1.75.
+function scoreText(score) {
+  return String(Number(scoreOf(score, state.poll.options.length).toFixed(2)));
+}
+
 // Why option `t` is where it is, from how the rule settled its place.
 function reason(t, ranked) {
   const { poll } = state;
   const date = poll.kind === 'date';
-  const word = date ? '날' : '후보';
-  // Below first place, the rule chose among the options not yet placed;
-  // of those, only the ones the fewest cannot make were in the running.
+  // Below first place, the rule chose among the options not yet placed.
   const after = t.rank > 1 ? '위 순위를 빼면, ' : '';
-  const left = ranked.filter((u) => u.rank >= t.rank).length;
-  const among = t.pool.length === left ? ''
-    : `${t.vetoes === 0 ? "'안 돼요'가 없는" : `'안 돼요'가 가장 적은(${t.vetoes}명)`} ${word} ${t.pool.length}개 가운데 `;
-  const split = t.cycle ? '맞대결이 서로 물고 물려(콩도르세의 역설)' : '맞대결에서 비겨';
   switch (t.by) {
-    case 'veto':
-      return t.vetoes === 0
-        ? `${after}'안 돼요'가 아무도 없는 ${josa(word, '은/는')} 이것뿐이에요.`
-        : `${after}'안 돼요'가 ${t.vetoes}명으로 가장 적어요.`;
+    case 'absent':
+      return t.absent === 0
+        ? `${after}투표한 사람이 모두 올 수 있는 날은 이것뿐이에요.`
+        : `${after}못 오는 사람이 ${t.absent}명으로 가장 적어요.`;
+    case 'score': {
+      const left = ranked.filter((u) => u.rank >= t.rank).length;
+      const who = t.absent === 0 ? '모두 올 수 있는' : `못 오는 사람이 가장 적은(${t.absent}명)`;
+      const among = t.pool.length === left ? '' : `${who} 날 ${t.pool.length}개 가운데 `;
+      return `${after}${among}선호 점수가 ${withRo(scoreText(t.score))} 가장 높아요.`;
+    }
     case 'condorcet':
-      return among
-        ? `${after}${among}맞대결에서 모두 이겨요 (콩도르세 승자).`
-        : `${after}맞대결에서 다른 모든 ${josa(word, '을/를')} 이겨요 (콩도르세 승자).`;
-    case 'borda':
-      return `${after}${among}${split} 모두를 이기는 ${josa(word, '이/가')} 없어, 보르다 점수로 정했어요. `
-        + `${points(t.borda[t.index])}으로 가장 높아요.`;
-    case 'nash':
-      return `${after}${split} 보르다 점수까지 같아, ${date ? '○가 더 많은' : '만족도를 곱한 값이 더 큰'} 쪽이에요.`;
-    case 'leximin':
-      return `${after}${split} 보르다 점수와 만족도 곱까지 같아, 가장 불만인 사람이 덜 불만인 쪽이에요.`;
-    case 'tie': {
+      return `${after}맞대결에서 다른 모든 후보를 이겨요 (콩도르세 승자).`;
+    case 'borda': {
+      const split = t.cycle ? '맞대결이 서로 물고 물려(콩도르세의 역설)' : '맞대결에서 비겨';
+      return `${after}${split} 모두를 이기는 후보가 없어, 보르다 점수로 정했어요. ${points(t.borda[t.index])}으로 가장 높아요.`;
+    }
+    case 'tie':
       if (t.rank !== 1) return '앞뒤를 가릴 수 없어 같은 순위예요.';
       if (poll.decision?.drawn && poll.decision.index === t.index) {
         return '끝까지 같아 공동 1위였고, 투표를 만들 때 미리 뽑아 둔 무작위 순서로 뽑혔어요.';
       }
-      return poll.closedAt
-        ? '끝까지 같아 공동 1위였어요.'
-        : `${split} 보르다 점수와 만족도까지 같아 공동 1위예요. 마감하면 투표를 만들 때 미리 뽑아 둔 무작위 순서로 하나를 고릅니다.`;
-    }
+      return '끝까지 같아 공동 1위였어요.';
     default:
-      return ranked.length > 1 ? '남은 후보가 이것뿐이에요.' : '';
+      return ranked.length > 1 ? `남은 ${josa(date ? '날' : '후보', '이/가')} 이것뿐이에요.` : '';
   }
 }
 
@@ -1100,52 +1212,90 @@ function recordText({ won, drew, lost }) {
   return [`${won}승`, drew > 0 && `${drew}무`, `${lost}패`].filter(Boolean).join(' ');
 }
 
-function resultRow(t, ranked, wins) {
-  const { poll } = state;
-  const scale = SCALES[poll.kind];
-  const counts = bestFirst(poll).map((score) => ({ score, n: t.counts[score] }));
+function rankBadge(t, ranked) {
   const sharing = ranked.filter((u) => u.rank === t.rank).length > 1;
+  return el('div', { class: 'rank-badge', 'aria-label': `${sharing ? '공동 ' : ''}${t.rank}위` },
+    sharing && el('small', null, '공동'), String(t.rank));
+}
+
+// A bar of `parts`, { tone, n, label }, each as long as its count.
+function barOf(parts) {
+  return el('div', { class: 'bar', role: 'img', 'aria-label': parts.map(({ label, n }) => `${label} ${n}명`).join(', ') },
+    parts.filter(({ n }) => n > 0).map(({ tone, n }) => {
+      const part = el('span', { class: `tone-${tone}` });
+      part.style.flexGrow = String(n);
+      return part;
+    }));
+}
+
+function resultRow(t, ranked, body, who) {
+  const { poll } = state;
   const first = t.rank === 1;
-  const stats = [
-    poll.kind === 'date'
-      ? counts.map(({ score, n }) => `${scale.grades[score].short} ${n}`).join(' · ')
-      : `안 돼요 ${t.vetoes}명`,
-    ranked.length > 1 && `맞대결 ${recordText(t.record)}`,
-    t.borda && `보르다 ${points(t.borda[t.index])}`,
-  ].filter(Boolean).join(' · ');
-  const bar = el('div', {
-    class: 'bar', role: 'img',
-    'aria-label': counts.map(({ score, n }) => `${scale.grades[score].label} ${n}명`).join(', '),
-  }, counts.filter(({ n }) => n > 0).map(({ score, n }) => {
-    const part = el('span', { class: `tone-${scale.grades[score].tone}` });
-    part.style.flexGrow = String(n);
-    return part;
-  }));
-  const duels = ranked.filter((u) => u.index !== t.index).map((u) => {
-    const [mine, theirs] = [wins[t.index][u.index], wins[u.index][t.index]];
-    const outcome = mine > theirs ? '승' : mine < theirs ? '패' : '무';
-    // An opponent more cannot make was out of the running, whatever the score.
-    const out = u.vetoes > t.vetoes ? ` (상대는 안 돼요 ${u.vetoes}명)` : '';
-    return el('li', { class: `duel duel-${outcome === '승' ? 'won' : outcome === '패' ? 'lost' : 'drew'}` },
-      el('span', null, nameOf(u.index)), ` ${mine} 대 ${theirs} ${outcome}${out}`);
-  });
   return el('li', { class: `result${first ? ' first' : ''}` },
-    el('div', { class: 'rank-badge', 'aria-label': `${sharing ? '공동 ' : ''}${t.rank}위` },
-      sharing && el('small', null, '공동'), String(t.rank)),
+    rankBadge(t, ranked),
     el('div', { class: 'result-body' },
       el('div', { class: 'result-label' }, optionNode(poll, t.index, 'strong'),
         poll.decision?.index === t.index && el('span', { class: 'tag decided' }, '결정')),
-      bar,
-      el('p', { class: 'stats' }, stats),
+      body,
       first && el('p', { class: 'why' }, reason(t, ranked)),
-      el('details', { class: 'who' }, el('summary', null, '누가 어떻게 골랐나요'),
-        !first && el('p', { class: 'why' }, reason(t, ranked)),
-        el('dl', null, counts.filter(({ n }) => n > 0).map(({ score }) => [
-          el('dt', { class: `tone-${scale.grades[score].tone}` }, scale.grades[score].label),
-          el('dd', null, namesWith(t.index, score).join(', ')),
-        ])),
-        duels.length > 0 && [el('p', { class: 'duels-title' }, '맞대결 (이 후보를 더 높게 고른 사람 대 상대를 더 높게 고른 사람)'),
-          el('ul', { class: 'duels' }, duels)])));
+      el('details', { class: 'who' }, el('summary', null, who.title), !first && el('p', { class: 'why' }, reason(t, ranked)),
+        who.body)));
+}
+
+function dateResult(t, ranked) {
+  const { ballots } = state;
+  const parts = DATE_ORDER.map((grade) => ({ grade, tone: DATE_GRADES[grade].tone, label: DATE_GRADES[grade].label, n: t.counts[grade] }));
+  const names = (grade) => ballots.filter((ballot) => ballot.grades[t.index] === grade)
+    .map((ballot) => (grade === YES ? `${ballot.name} ${percent(mileage(ballot.grades))}` : ballot.name)).join(', ');
+  return resultRow(t, ranked, [
+    barOf(parts),
+    el('p', { class: 'stats' }, `${parts.map(({ grade, n }) => `${DATE_GRADES[grade].short} ${n}`).join(' · ')} · 선호 점수 ${scoreText(t.score)}`),
+  ], {
+    title: '누가 어떻게 골랐나요',
+    body: [
+      el('dl', null, parts.filter(({ n }) => n > 0).map(({ grade, tone }) => [
+        el('dt', { class: `tone-${tone}` }, gradeText(grade)),
+        el('dd', null, names(grade)),
+      ])),
+      t.counts[YES] > 0 && el('p', { class: 'fine' }, '%는 마일리지, 선호 점수는 ○를 준 사람들의 마일리지 합이에요.'),
+    ],
+  });
+}
+
+// The tone of place `place` of `count`: the first best, the last meh.
+function placeTone(place, count) {
+  if (place === 0) return 'best';
+  if (place === count - 1) return 'meh';
+  return place / (count - 1) < 0.5 ? 'good' : 'mid';
+}
+
+function choiceResult(t, ranked, wins) {
+  const { poll, ballots } = state;
+  const count = poll.options.length;
+  const places = Array.from({ length: count }, (_, place) => ({
+    place,
+    tone: placeTone(place, count),
+    label: `${place + 1}위`,
+    voters: ballots.filter((ballot) => ballot.grades[t.index] === count - 1 - place).map((ballot) => ballot.name),
+  })).map((part) => ({ ...part, n: part.voters.length }));
+  const duels = ranked.filter((u) => u.index !== t.index).map((u) => {
+    const [mine, theirs] = [wins[t.index][u.index], wins[u.index][t.index]];
+    const outcome = mine > theirs ? 'won' : mine < theirs ? 'lost' : 'drew';
+    return el('li', { class: `duel duel-${outcome}` },
+      el('span', null, nameOf(u.index)), ` ${mine} 대 ${theirs} ${{ won: '승', lost: '패', drew: '무' }[outcome]}`);
+  });
+  const stats = [`1위 ${t.firsts}명`, ranked.length > 1 && `맞대결 ${recordText(t.record)}`, `보르다 ${points(t.total)}`];
+  return resultRow(t, ranked, [barOf(places), el('p', { class: 'stats' }, stats.filter(Boolean).join(' · '))], {
+    title: '누가 몇 위로 골랐나요',
+    body: [
+      el('dl', null, places.filter(({ n }) => n > 0).map(({ label, tone, voters }) => [
+        el('dt', { class: `tone-${tone}` }, label),
+        el('dd', null, voters.join(', ')),
+      ])),
+      duels.length > 0 && [el('p', { class: 'duels-title' }, '맞대결 (이 후보를 더 위에 둔 사람 대 상대를 더 위에 둔 사람)'),
+        el('ul', { class: 'duels' }, duels)],
+    ],
+  });
 }
 
 // What the page says when majorities give no Condorcet winner at the top:
@@ -1155,28 +1305,26 @@ function renderParadox(ranked, wins) {
   const [first] = ranked;
   box.hidden = !first || first.smith.length < 2;
   if (box.hidden) return;
-  const word = state.poll.kind === 'date' ? '날' : '후보';
   if (first.cycle) {
     const circle = [...first.cycle, first.cycle[0]];
     box.replaceChildren(
       el('strong', null, '콩도르세의 역설'),
-      el('p', null, `다수결로 둘씩 견주면 ${word}들이 서로 물고 물려서, 모두를 이기는 ${josa(word, '이/가')} 없어요. 화살표는 이긴 쪽에서 진 쪽으로, 숫자는 더 높게 고른 사람 수예요.`),
+      el('p', null, '다수결로 둘씩 견주면 후보들이 서로 물고 물려서, 모두를 이기는 후보가 없어요. 화살표는 이긴 쪽에서 진 쪽으로, 숫자는 더 위에 둔 사람 수예요.'),
       el('ol', { class: 'circle' }, circle.slice(0, -1).map((a, i) => {
         const b = circle[i + 1];
         return el('li', null, el('span', null, nameOf(a)), el('span', { class: 'arrow' }, ` ${wins[a][b]}:${wins[b][a]} → `),
           el('span', null, nameOf(b)));
       })),
-      el('p', null, `그래서 물고 물린 ${word}들(${first.smith.length}개) 가운데 보르다 점수가 가장 높은 ${josa(word, '을/를')} 골라요. 보르다 점수는 모든 맞대결을 한꺼번에 더하므로, 돌고 도는 부분은 서로 지워집니다.`));
+      el('p', null, `그래서 물고 물린 후보들(${first.smith.length}개) 가운데 보르다 점수가 가장 높은 후보를 골라요. 보르다 점수는 모든 맞대결을 한꺼번에 더하므로, 돌고 도는 부분은 서로 지워집니다.`));
     return;
   }
   box.replaceChildren(
     el('strong', null, '맞대결에서 비김'),
-    el('p', null, `맞대결에서 비긴 ${josa(word, '이/가')} 있어 모두를 이기는 ${josa(word, '이/가')} 없어요. 그래서 맨 위에서 비긴 ${word}들(${first.smith.length}개) 가운데 보르다 점수가 가장 높은 ${josa(word, '을/를')} 골라요.`));
+    el('p', null, `맞대결에서 비긴 후보가 있어 모두를 이기는 후보가 없어요. 그래서 맨 위에서 비긴 후보들(${first.smith.length}개) 가운데 보르다 점수가 가장 높은 후보를 골라요.`));
 }
 
 function renderResultCalendar(ranked) {
   const { poll, ballots } = state;
-  const scale = SCALES[poll.kind];
   const byDate = new Map(poll.options.map((option, index) => [option.date, ranked.find((t) => t.index === index)]));
   const months = [...new Set(poll.options.map((option) => option.date.slice(0, 7)))];
   const voters = ballots.length;
@@ -1193,96 +1341,103 @@ function renderResultCalendar(ranked) {
           const kind = dayKind(iso, state.holidays);
           const t = byDate.get(iso);
           if (!t) return el('span', { class: `rc-day ${kind}`, 'aria-hidden': 'true' }, String(Number(iso.slice(8))));
-          const can = t.grades.filter((grade) => grade >= scale.approveAt).length;
-          const all = t.counts[t.counts.length - 1];
-          const heat = all === voters ? 3 : t.vetoes === 0 ? 2 : can * 2 >= voters ? 1 : 0;
+          const can = voters - t.absent;
+          const heat = t.counts[YES] === voters ? 3 : t.absent === 0 ? 2 : can * 2 >= voters ? 1 : 0;
           return el('span', {
             class: `rc-day candidate ${kind}${t.rank === 1 ? ' top' : ''}`,
             'data-heat': heat,
             title: `${dateLabel(iso, 0)} · ${t.rank}위 · ${voters}명 중 ${can}명 가능`,
           }, el('span', null, String(Number(iso.slice(8)))), el('span', { class: 'rc-count' }, `${can}/${voters}`));
         })));
-  }), el('p', { class: 'rc-legend' }, '칸의 숫자는 되는 사람(○ 또는 △)/투표한 사람입니다. 진할수록 모두가 되고, 테두리가 진한 날이 1위입니다.'));
+  }), el('p', { class: 'rc-legend' }, '칸의 숫자는 올 수 있는 사람(○ 또는 △)/투표한 사람입니다. 진할수록 모두가 되고, 테두리가 진한 날이 1위입니다.'));
 }
 
-const OTHER_RULES = [
-  ['approval', '승인 투표', {
-    date: "'되긴 해요' 이상이 가장 많은 날. 흔히 일정을 잡는 방식이에요.",
-    choice: "'보통' 이상이 가장 많은 후보.",
-  }],
-  ['sum', '점수 합계 (공리주의)', '모두의 점수를 더한 값이 가장 큰 것. 여럿의 작은 만족이 한 사람의 큰 불만을 덮을 수 있어요.'],
-  ['borda', '보르다 점수', '한 사람마다 다른 후보보다 높게 매긴 만큼 1점, 같게 매긴 만큼 0.5점을 더한 것. 콩도르세의 역설이 없지만, 비슷한 후보가 늘면 결과가 흔들릴 수 있어요.'],
-  ['nash', '내쉬 사회후생 (만족도 곱)', "'안 돼요'가 가장 적은 것 가운데 점수를 곱한 값이 가장 큰 것. 다수의 만족과 소수의 불만을 함께 따져요."],
-  ['rawls', '최소 수혜자 우선 (롤스)', '가장 낮은 점수가 가장 높은 것. 여럿이 크게 좋아하는 것을 놓칠 수 있어요.'],
-  ['median', '다수 판단 (중앙값)', '절반 이상이 그 점수 이상을 준 점수, 곧 중앙값이 가장 높은 것 (발린스키·라라키).'],
-  ['condorcet', '콩도르세 승자', "'안 돼요'를 따로 보지 않고, 다른 모든 후보와 일대일로 붙어 모두 이기는 것."],
-];
+const OTHER_RULES = {
+  date: [
+    ['flat', '마일리지 없이', '못 오는 사람이 가장 적은 날 가운데, 누구의 ○든 한 표로 세어 가장 많은 날.'],
+    ['likes', '○만 센다면', '못 오는 사람은 따지지 않고 ○가 가장 많은 날.'],
+    ['sum', '점수 합계 (공리주의)', '○ 2점, △ 1점, ✕ 0점을 모두 더한 값이 가장 큰 날. 여럿의 작은 만족이 몇 사람의 불참을 덮을 수 있어요.'],
+  ],
+  choice: [
+    ['plurality', '최다 1위', '1위로 꼽은 사람이 가장 많은 후보. 흔한 다수결이지만, 표가 갈리면 다수가 꺼리는 후보가 뽑힐 수 있어요.'],
+    ['borda', '보르다 점수', '모든 후보와 견준 보르다 점수가 가장 높은 후보. 역설은 없지만, 비슷한 후보가 늘면 결과가 흔들릴 수 있어요.'],
+    ['copeland', '맞대결 승수 (코플랜드)', '맞대결에서 가장 많이 이긴 후보. 비기면 반 승으로 셉니다.'],
+    ['rawls', '최소 수혜자 우선 (롤스)', '가장 낮은 순위가 가장 높은 후보. 누구에게도 꼴찌가 아닌 쪽이지만, 여럿이 크게 원하는 후보를 놓칠 수 있어요.'],
+  ],
+};
 
 function renderOthers(ranked) {
   const { poll, ballots } = state;
-  const picks = otherRules(ballots, poll.options.length, SCALES[poll.kind].grades.length - 1, SCALES[poll.kind].approveAt);
+  const picks = otherRules(poll.kind, ballots, poll.options.length);
   const fair = ranked.filter((t) => t.rank === 1).map((t) => t.index);
   const same = (list) => list.length === fair.length && list.every((index) => fair.includes(index));
-  $('others').replaceChildren(...OTHER_RULES.map(([key, name, what]) => {
-    const list = picks[key];
-    let text = list.map((index) => nameOf(index)).join(', ');
-    if (list.length === 0) {
-      text = picks.cycle
-        ? `없음. 콩도르세의 역설: ${[...picks.cycle, picks.cycle[0]].map((index) => nameOf(index)).join(' → ')}`
-        : '없음. 맞대결에서 비긴 후보가 있어요';
-    }
-    return el('li', null,
-      el('span', { class: 'rule-name' }, name),
-      el('span', { class: 'fine' }, typeof what === 'string' ? what : what[poll.kind]),
-      el('span', { class: 'rule-pick' }, `→ ${text}`, list.length > 0 && same(list) && el('span', { class: 'same' }, ' 이 페이지와 같아요')));
-  }));
+  $('others').replaceChildren(...OTHER_RULES[poll.kind].map(([key, name, what]) => el('li', null,
+    el('span', { class: 'rule-name' }, name),
+    el('span', { class: 'fine' }, what),
+    el('span', { class: 'rule-pick' }, `→ ${picks[key].map((index) => nameOf(index)).join(', ')}`,
+      same(picks[key]) && el('span', { class: 'same' }, ' 이 페이지와 같아요')))));
 }
 
 function renderHow() {
-  const date = state.poll.kind === 'date';
-  const word = date ? '날' : '후보';
-  const steps = [
-    `'안 돼요'가 가장 적은 ${word}만 남겨요. 그 ${josa(word, '으로/로')} 정하면 빠져야 하는 사람이 가장 적어요.`,
-    `그중 맞대결에서 다른 모든 ${josa(word, '을/를')} 이기는 ${josa(word, '이/가')} 있으면(콩도르세 승자) 그 ${josa(word, '이에요/예요')}. 두 ${word} 가운데 한쪽을 더 높게 고른 사람이 많으면 그쪽이 이겨요.`,
-    `서로 물고 물리거나 비겨서 그런 ${josa(word, '이/가')} 없으면(콩도르세의 역설), 물고 물린 ${word}들 가운데 보르다 점수가 가장 높은 ${josa(word, '이에요/예요')}. 한 사람마다 다른 ${word}보다 높게 고른 만큼 1점, 같게 고른 만큼 0.5점을 줘요.`,
-    date
-      ? '그래도 같으면 ○가 더 많은 날(만족도 곱), 끝까지 같으면 공동 순위로 두고 마감할 때 투표를 만들 때 미리 뽑아 둔 무작위 순서로 골라요.'
-      : '그래도 같으면 점수(최고 4 · 좋아요 3 · 보통 2 · 별로 1)를 곱한 값이 큰 후보, 그다음 가장 낮은 점수가 높은 후보예요. 끝까지 같으면 공동 순위로 두고 마감할 때 투표를 만들 때 미리 뽑아 둔 무작위 순서로 골라요.',
-    `1위를 뺀 나머지로 같은 과정을 되풀이해 2위, 3위를 정해요.`,
-  ];
+  const steps = state.poll.kind === 'date'
+    ? [
+      '✕(못 가요)가 가장 적은 날만 남겨요. 가장 많은 사람이 올 수 있는 날이에요. 여기서는 누구나 한 사람으로 셉니다.',
+      '그중 선호 점수가 가장 높은 날이에요. 선호 점수는 그날에 ○를 준 사람들의 마일리지를 더한 값이에요.',
+      `마일리지는 모두 100%에서 시작해 ✕ 하나에 1/${state.poll.options.length}(후보 날짜 수), △ 하나에 그 절반씩 줄고, 남은 만큼이 그 사람 ○ 하나의 무게예요. 여러 날을 열어 둔 사람의 ○는 더 무겁고, 그런 사람이 △를 준 날은 그만큼 점수를 덜 받아요. ✕와 △는 남에게 맞춰 달라는 부탁이라 그만큼 마일리지가 드는 셈이에요.`,
+      '그래도 같으면 공동 순위로 두고, 마감할 때 투표를 만들 때 미리 뽑아 둔 무작위 순서로 하나를 골라요.',
+      '뽑힌 날에 ✕를 준 사람은 결정 바로 밑에 불참자로 이름이 나와요.',
+      '1위를 뺀 나머지로 같은 과정을 되풀이해 2위, 3위를 정해요.',
+    ]
+    : [
+      '모두가 모든 후보에 순위를 매겨요. 후보가 n개면 누구나 n-1점부터 0점까지를 한 번씩 주는 셈이라, 누구의 표든 무게가 같아요.',
+      '맞대결에서 다른 모든 후보를 이기는 후보가 있으면(콩도르세 승자) 그 후보예요. 두 후보 가운데 한쪽을 더 위에 둔 사람이 많으면 그쪽이 이겨요.',
+      '서로 물고 물리거나 비겨서 그런 후보가 없으면(콩도르세의 역설), 물고 물린 후보들 가운데 보르다 점수가 가장 높은 후보예요. 한 사람마다 아래에 둔 후보 하나에 1점씩 줘요.',
+      '그래도 같으면 공동 순위로 두고, 마감할 때 투표를 만들 때 미리 뽑아 둔 무작위 순서로 하나를 골라요.',
+      '1위를 뺀 나머지로 같은 과정을 되풀이해 2위, 3위를 정해요.',
+    ];
+  steps.push('누가 무엇을 골랐는지와 순위는 마감한 뒤에 공개돼요. 남의 표를 보고 셈을 해서 투표하는 일을 막기 위해서예요.');
   $('how-steps').replaceChildren(...steps.map((step) => el('li', null, step)));
 }
 
 function renderResults() {
   const { poll, ballots } = state;
-  const has = ballots.length > 0;
+  const closed = Boolean(poll.closedAt);
+  const shown = closed && ballots.length > 0;
   renderHow();
-  $('others-panel').hidden = !has;
-  $('result-cal').hidden = !has || poll.kind !== 'date';
+  $('others-panel').hidden = !shown;
+  $('result-cal').hidden = !shown || poll.kind !== 'date';
   $('paradox').hidden = true;
-  if (!has) {
-    $('results-summary').textContent = '';
-    $('results').replaceChildren(el('li', { class: 'empty' },
-      poll.closedAt ? '아무도 투표하지 않았어요.' : '아직 아무도 투표하지 않았어요. 첫 투표를 해 주세요.'));
+  if (!shown) {
+    $('results-summary').textContent = closed ? '' : `${ballots.length}명 투표 · 마감 뒤 공개`;
+    $('results').replaceChildren(el('li', { class: 'empty' }, closed
+      ? '아무도 투표하지 않았어요.'
+      : `${ballots.length ? '' : '아직 아무도 투표하지 않았어요. '}누가 무엇을 골랐는지와 순위는 마감한 뒤에 모두에게 공개돼요. 그 전에는 누가 투표했는지만 보여요.`));
     return;
   }
   const count = poll.options.length;
-  const ranked = rank(ballots, count, SCALES[poll.kind].grades.length - 1);
-  const wins = pairwise(ballots, count);
-  $('results-summary').textContent = `${ballots.length}명 · ${poll.closedAt ? '마감 결과' : '지금까지'}${LINKS ? ' · 이 기기가 받은 투표' : ''}`;
-  renderParadox(ranked, wins);
-  $('results').replaceChildren(...ranked.map((t) => resultRow(t, ranked, wins)));
-  if (poll.kind === 'date') renderResultCalendar(ranked);
+  const ranked = rank(poll.kind, ballots, count);
+  $('results-summary').textContent = `${ballots.length}명 · 마감 결과${LINKS ? ' · 이 기기가 받은 투표' : ''}`;
+  if (poll.kind === 'date') {
+    $('results').replaceChildren(...ranked.map((t) => dateResult(t, ranked)));
+    renderResultCalendar(ranked);
+  } else {
+    const wins = pairwise(ballots, count);
+    renderParadox(ranked, wins);
+    $('results').replaceChildren(...ranked.map((t) => choiceResult(t, ranked, wins)));
+  }
   renderOthers(ranked);
 }
 
 function renderVoters() {
   const { poll, ballots } = state;
   const keys = entryOf(poll.id)?.keys || {};
+  // After a date poll closes, each voter's mileage, which weighed their ○.
+  const weighed = Boolean(poll.closedAt) && poll.kind === 'date';
   $('voters-section').hidden = ballots.length === 0;
   $('voters').replaceChildren(...ballots.map((ballot) => {
     const editable = Boolean(keys[ballot.id]) && !poll.closedAt && state.draft?.ballotId !== ballot.id;
     return el('li', { class: editable ? null : 'plain' }, ballot.name,
+      weighed && ballot.grades && el('small', { class: 'mileage-tag' }, `마일리지 ${percent(mileage(ballot.grades))}`),
       editable && el('button', {
         type: 'button', class: 'ghost', 'aria-label': `${ballot.name} 님의 투표 고치기`,
         onclick: () => editBallot(ballot.id),

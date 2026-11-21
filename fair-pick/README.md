@@ -2,8 +2,9 @@
 
 A page for a group that has to settle on one thing together, a date or a place for a team
 dinner (회식), a menu, anything: its maker sets up a poll under a group ID and a PIN of their
-choosing, the others get in with both, each grades every option under their own name, and the
-page picks the option the group goes with by a rule from social choice theory, the part of
+choosing, the others get in with both and vote under their own names, each date ○, △ or ✕ and
+every other option in order, and the page picks the option the group goes with by a rule from
+social choice theory, the part of
 economics that studies how a group should choose. Dates are picked on a Korean calendar, with
 Sundays and public holidays in red and Saturdays in blue; the holidays are those in
 [`common/site/holidays.json`](../common/README.md#update-the-holidays).
@@ -44,19 +45,24 @@ live](#where-the-polls-live) changes how a poll gets from one phone to another.
 2. **Getting in.** It takes the group ID and the PIN. The browser remembers a poll it has been in,
    so the page opens straight to it after that and lists it on the home page; 이 기기에서 이 투표 잊기
    forgets it.
-3. **Voting, by name.** A voter gives their name and grades every option: dates 좋아요 ○, 되긴 해요 △
-   or 안 돼요 ✕; other options 최고, 좋아요, 보통, 별로 or 안 돼요. "안 돼요" says they cannot
-   come or cannot have it at all. 안 고른 후보 모두 fills the rest with one grade. The browser keeps
-   the key of each ballot cast from it, so the voter can change or take back their ballot until
-   the poll closes; a second ballot under a name already taken is turned down. One phone can vote
-   for several people with 다른 사람으로 새로 투표.
-4. **Results**, live for everyone who is in: the options in the order of the rule below, each
-   with how many gave each grade, who they were, its head-to-head record and why it is where it
-   is; the circle, when majorities go round in one; for dates the same on a calendar; and what
-   seven other well-known rules would pick from the same ballots.
+3. **Voting, by name.** A voter gives their name and answers every date 좋아요 ○ (would like it),
+   되긴 해요 △ (can come, would rather not) or 못 가요 ✕ (cannot come); 안 고른 날 모두 fills the
+   rest with one answer, and the ballot shows the voter's mileage, below, as they go. Other options
+   they put in order, tapping them best first; the one left goes last by itself, a tap on one in
+   the order takes it out again, and 처음부터 다시 고르기 starts over. The browser keeps the key of
+   each ballot cast from it and what it was cast with, so the voter can change or take back their
+   ballot until the poll closes; a second ballot under a name already taken is turned down. One
+   phone can vote for several people with 다른 사람으로 새로 투표.
+4. **Results, once the poll closes.** Until then everyone sees who voted but not how, the maker
+   too, so that nobody votes by what the others did. Then the options show in the order of the
+   rule below, each with who answered what or put it where, and why it is where it is: for a date
+   its score and each voter's mileage, and on a calendar; for an option its head-to-head record,
+   its Borda points and the circle, when majorities go round in one. Beside them, what other
+   well-known rules would pick from the same ballots.
 5. **Closing.** The poll closes at its deadline, or when its maker closes it, and the decision
-   shows at the top. The maker's menu also reopens the poll, takes out any ballot, and deletes
-   the poll. It opens on the device that made the poll; another needs the admin code it shows.
+   shows at the top; for a date, with the names of those who said they cannot come that day. The
+   maker's menu also reopens the poll, takes out any ballot, and deletes the poll. It opens on the
+   device that made the poll; another needs the admin code it shows.
 6. **Sharing.** 함께할 사람 부르기 copies the link, or an invitation with the link, the group ID and,
    where the device knows it, the PIN, or hands it to the phone's share sheet.
 
@@ -65,46 +71,62 @@ live](#where-the-polls-live) changes how a poll gets from one phone to another.
 Picking one option everyone shares is a question of social choice (Arrow, Sen) rather than of
 matching (Gale, Shapley and Roth), which pairs people with different things. Arrow's theorem
 says no rule satisfies every fairness property at once, so the page fixes its rule before anyone
-votes, says it on the page, and shows beside the result what other rules would have picked.
+votes, says it on the page, and shows beside the result what other rules would have picked. A
+date and a place are asked differently, since a date is first a question of who can come and a
+place only of who likes what. `common/site/social-choice.js` places the options one place at a
+time, first place first, each time among the options not yet placed.
 
-A voter prefers one option to another when they grade it higher: 최고 over 좋아요 over 보통 over
-별로 over 안 돼요, and for dates ○ over △ over ✕. `common/site/social-choice.js` places the options
-one place at a time, first place first, each time among the options not yet placed:
+### Dates: ○, △ or ✕, and mileage
 
-1. **Fewest 안 돼요.** Only the options the fewest cannot make stay in the running. An option
-   someone cannot make leaves them out, so the options everyone can share come first: the worst
-   off first, after Rawls.
-2. **The Condorcet winner.** Of those, the option that beats every other head to head, more voters
-   grading it higher, is placed: what a majority prefers to anything else.
-3. **The Condorcet paradox, settled by Borda.** Majorities can go round in a circle, as in
+1. **Fewest ✕.** Only the dates the fewest cannot come to stay in the running, every voter counting
+   one: a dinner is first for everyone who can be there.
+2. **The highest preference score.** Of those, the date whose ○ weigh the most: the sum of the
+   mileage of the voters who gave it ○. Every voter starts with a mileage of 100%; each ✕ they give
+   takes 1/n off it and each △ half that, n being the number of dates, and what is left weighs
+   each of their ○. ✕ and △ ask the others to fit around the voter, so they cost what they ask: a
+   voter who leaves many dates open says more with each ○, and a date they give △ loses more, than
+   one who shuts many. Giving △ to every date but a favourite, to push it, mostly spends the
+   mileage that would have pushed it.
+3. **Absent, by name.** When the date picked is one someone gave ✕, the decision names them under
+   it. A ✕ cast only to steer the date away is a claim made in front of the group: if that day is
+   picked anyway, its maker is listed as absent, and everyone sees if they come after all.
+
+Each date gets one score, so the order never goes round in a circle.
+
+### Places and other options: an order
+
+A voter puts every option in order. Each ballot hands out the same points, n - 1 for the first down
+to 0 for the last, so no ballot weighs more than another and nobody can rule an option out alone.
+
+1. **The Condorcet winner.** The option that beats every other head to head, more voters putting it
+   above, is placed: what a majority prefers to anything else.
+2. **The Condorcet paradox, settled by Borda.** Majorities can go round in a circle, as in
    rock-paper-scissors: A beats B, B beats C and C beats A, and no option beats every other. The
    rule then takes the options caught in the circle, the top cycle (Smith set), and of them the one
-   with the most Borda points, a point from each voter for every other option in the running they
-   grade lower and half a point for every one they grade the same. Borda adds every head-to-head
-   contest up at once, so what goes round in the circle cancels out (Saari), and a Condorcet winner
-   else Borda's is Black's method (1958). Options that draw head to head are settled the same way.
-4. **Then the product of the grades.** Still level, the largest product of the scores of those who
-   can come (최고 4, 좋아요 3, 보통 2, 별로 1; ○ 2, △ 1), the Nash social welfare (Nash 1950; Kaneko
-   and Nakamura 1979), which falls sharply when anyone is unhappy; for dates, the most ○. Then the
-   happier least happy voter (leximin).
+   with the most Borda points, a point from each voter for every other option still in the running
+   they put below it. Borda adds every head-to-head contest up at once, so what goes round in the
+   circle cancels out (Saari), and a Condorcet winner else Borda's is Black's method (1958). Options
+   that draw head to head are settled the same way.
 
-Options level after all four share the place. When a poll closes with several first, it goes with
-the one that comes first in an order the API drew at random when the poll was made. Nobody sees
-the order, and since it was drawn once, closing again cannot draw again. In a perfectly even circle,
-three voters each preferring a different option, that order decides.
+### Either way
 
-The results show the circle when there is one, with the majorities that make it, each option's
-head-to-head wins, draws and losses and its score against every other option, and why each place
-went as it did. The tests check, on random ballots, that the rule is Pareto efficient, an option
-that someone grades higher and nobody lower always ranking above, and Condorcet consistent, an
-option that beats every other in the running always placed first. Beside the result the page shows
-approval voting (the most 되긴 해요 or 보통 and above, the usual way of finding a date), the largest
-sum (utilitarian), Borda alone, Nash's product, leximin alone (Rawls), majority judgment (the best
-median, Balinski and Laraki 2007) and the Condorcet winner, or the circle when there is none.
+Options still level share the place. When a poll closes with several first, it goes with the one
+that comes first in an order drawn at random when the poll was made, by the API or, in links, by
+the maker's phone. Nobody sees the order, and since it was drawn once, closing again cannot draw
+again. In a perfectly even circle, three voters each preferring a different option, that order
+decides.
 
-The rule sides with a majority once nobody is left out. Where three love one restaurant and two
-find it 별로 while everyone finds another 좋아요, it takes the first, though Nash's product would
-take the second; a voter who cannot go somewhere says 안 돼요, which step 1 puts first.
+Until the poll closes the page shows who voted but not how, the maker included: whoever could see
+the others' ballots could work out the one false ✕ or the one option put last that tips the result.
+The API sends no ballot's answers before the close. In links every ballot travels in the link all
+along, so that any phone can close the poll, and a member set on it could unseal a link and look.
+
+The tests check, on random ballots, that an option every voter puts above another always ranks
+above it, that a Condorcet winner always comes first, and that a date answered better by one voter
+and no worse by anyone ranks above. Beside the result the page shows, for dates, the rule without
+mileage (every ○ one vote), the most ○ whoever cannot come, and the largest sum (utilitarian; ○ 2,
+△ 1); for options, the most first places (plurality), Borda alone, the most head-to-head wins
+(Copeland) and the best lowest place (Rawls's leximin).
 
 ## Where the polls live
 
@@ -134,7 +156,9 @@ Until the repository variable `FAIR_PICK_API` names an API, the page keeps its p
    decision waits for the maker's phone, which shows the seed the next time it opens the poll.
 
 A link for thirty voters on a whole month of dates stays under 4,000 characters, which the tests
-check; a usual poll's is a few hundred.
+check; a usual poll's is a few hundred. A link from before places were put in order, which graded
+them from 안 돼요 to 최고, opens with each ballot's grades turned into an order, places graded alike
+in an order drawn from the ballot's ID, the same on every phone; its dates keep their ○, △ and ✕.
 
 ### On the API
 
@@ -146,7 +170,7 @@ with the group ID and PIN sees the same poll at once from any phone, with no lin
 
 In links:
 
-- **Whoever has a link, the group ID and the PIN** sees the poll and every ballot and name in it,
+- **Whoever has a link, the group ID and the PIN** sees the poll and who voted, how once it closes,
   and can vote. With no server, nothing limits how often a PIN is guessed: each guess takes a
   PBKDF2 derivation, under a second on a phone but far less on a graphics card, where an
   eight-digit PIN falls in hours to whoever has both the link and the group ID. So the links stay
@@ -163,8 +187,8 @@ In links:
 On the API:
 
 - **Anyone** can open the page and make a poll; an address may try to make twenty an hour.
-- **Whoever has the group ID and the PIN** sees the poll, every ballot and every name on it, and
-  can vote. The group ID must be one no other poll has. The API keeps the PIN as a salted SHA-256
+- **Whoever has the group ID and the PIN** sees the poll and every name on it, every ballot once
+  it closes, and can vote. The group ID must be one no other poll has. The API keeps the PIN as a salted SHA-256
   hash, so it can check a PIN but not give it back. An address that gets a poll's PIN wrong five times waits ten minutes, and a poll that
   sees fifty wrong PINs within an hour, from anywhere, takes none until the hour is out; the right
   PIN then waits too, since otherwise the guessing would go on. A wrong PIN and a group ID that
@@ -181,7 +205,8 @@ The page talks to the API with `fetch`; the API answers browsers on the page's o
 this machine only (`ALLOWED_ORIGINS` in `api/wrangler.toml`).
 
 Either way, the browser keeps for each poll it has been in the PIN, any admin code and the keys of
-the ballots cast from it, in its local storage under `fair-pick.polls`.
+the ballots cast from it with what they were cast with, in its local storage under
+`fair-pick.polls`.
 
 ## Set up the API
 
@@ -246,18 +271,23 @@ npm test
   the results differ from phone to phone, so the maker opens every link in the chat before closing.
 - In links, taking a poll away takes it off one phone only; the links in the chat still open it.
 
-- Options cannot be changed once a poll is made, since ballots already cast grade the old ones;
+- Options cannot be changed once a poll is made, since ballots already cast answer the old ones;
   the maker makes the poll again.
 - The PIN cannot be changed, and nobody can get it back from the API; the maker's device shows
   it. A lost admin code cannot be recovered either.
 - Voting by name trusts the name: anyone with the PIN may vote under a name nobody has used yet,
   and the maker takes out a ballot that should not be there.
-- The rule counts every voter the same. A dinner that cannot go ahead without someone is better
-  settled by that person's 안 돼요, which the rule already puts first.
-- Borda points, which settle a circle or a draw, can shift when options much alike are added, as a
-  run of similar dates; a Condorcet winner, where there is one, does not.
-- 안 돼요 is a veto, and a voter could cast it on every option but their favourite; the ballots are
-  named, so everyone in the poll sees who did.
+- Who can come counts everyone the same. A dinner that cannot go ahead without one person is
+  better given only the dates that person can make.
+- Mileage cannot tell a voter who has few free days from one who only says so; both say less with
+  each ○. A false ✕ still counts against a date as a true one does, and is checked only by the
+  name under the decision and by the results staying hidden until the close.
+- A voter can put the strongest rival of their favourite place last to bury it; with the results
+  hidden until the close they cannot tell which one that is.
+- Borda points, which settle a circle or a draw between places, can shift when options much alike
+  are added; a Condorcet winner, where there is one, does not.
+- A poll in links that closed before places were put in order and dates weighed by mileage is
+  counted again by the rule now when it is opened, and may come out differently.
 - Dates are whole days; a time of day goes in the note.
 - On the API, the results refresh when the page comes back into view and with 새로고침, not by
   themselves.

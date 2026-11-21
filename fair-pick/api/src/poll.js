@@ -11,7 +11,7 @@
 // workerd takes every name the Worker's main module exports for an entry
 // point, so the constants the tests read live here, not there.
 
-import { LIMITS, SCALES, checkBallot, checkPoll, nameKey, newPinProblem, pinProblem } from '../../../common/site/poll-rules.js';
+import { LIMITS, checkBallot, checkPoll, nameKey, newPinProblem, pinProblem } from '../../../common/site/poll-rules.js';
 import { decide } from '../../../common/site/social-choice.js';
 
 const MINUTE = 60e3;
@@ -93,12 +93,15 @@ function sameText(a, b) {
 const iso = (ms) => new Date(ms).toISOString();
 
 // What the page may see of a poll and its ballots: no PIN hash, no keys
-// and not the order a draw would take.
+// and not the order a draw would take, and until the poll closes who voted
+// but not how, so that nobody votes by what the others did.
 function view(poll, ballots) {
   const { id, kind, title, note, options, createdAt, deadline, closedAt, decision, expiresAt } = poll;
   return {
     poll: { id, kind, title, note, options, createdAt, deadline, closedAt, decision, expiresAt },
-    ballots: ballots.map(({ id: ballotId, name, grades, at }) => ({ id: ballotId, name, grades, at })),
+    ballots: ballots.map(({ id: ballotId, name, grades, at }) => ({
+      id: ballotId, name, at, ...(closedAt && { grades }),
+    })),
   };
 }
 
@@ -175,7 +178,7 @@ export class Poll {
   }
 
   decisionOf(poll, ballots) {
-    return decide(ballots, poll.options.length, SCALES[poll.kind].grades.length - 1, poll.tieOrder);
+    return decide(poll.kind, ballots, poll.options.length, poll.tieOrder);
   }
 
   // Closes a poll whose deadline has passed; says whether it did.

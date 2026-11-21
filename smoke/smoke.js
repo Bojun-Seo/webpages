@@ -65,6 +65,15 @@ function workdayAhead(holidays) {
   }
 }
 
+// Votes on fair-pick's choice ballot shown on `page` as `name`, tapping the
+// options at `order`, best first; the one left goes last by itself.
+async function rankVote(page, name, order) {
+  await page.fill('#voter-name', name);
+  for (const index of order) await page.locator('#ballot > li').nth(index).locator('button').click();
+  await page.click('#vote-submit');
+  await page.waitForFunction(() => /투표했어요/.test(document.getElementById('vote-message').textContent));
+}
+
 // What a page needs before it opens, by path.
 const setups = {
   // fair-pick with an API, which config.js names when the build has the
@@ -184,16 +193,9 @@ const checks = {
       await on.waitForFunction(() => document.getElementById('share-link').href.includes('#1.'));
       return on.getAttribute('#share-link', 'href');
     };
-    const vote = async (on, name, grades) => {
-      await on.fill('#voter-name', name);
-      for (const [i, grade] of grades.entries()) {
-        await on.locator('#ballot > li').nth(i).locator(`input[value="${grade}"]`).check({ force: true });
-      }
-      await on.click('#vote-submit');
-      await on.waitForFunction(() => /투표했어요/.test(document.getElementById('vote-message').textContent));
-    };
-    await vote(page, '갑', [4, 1]);
+    await rankVote(page, '갑', [0]);
     if (!(await page.isVisible('#send'))) problems.push('fair-pick: no link to send after a vote');
+    if (!/마감한 뒤에/.test(await page.textContent('#results'))) problems.push('fair-pick shows the results before the close');
     const first = await linkOf(page);
 
     // Another phone opens the link with the group ID and PIN, and votes.
@@ -211,7 +213,7 @@ const checks = {
     await second.fill('#gate-pin', '48291573');
     await second.click('#gate-submit');
     await second.waitForSelector('#poll-body:not([hidden])');
-    await vote(second, '을', [2, 4]);
+    await rankVote(second, '을', [1]);
     const back = await linkOf(second);
 
     // Its link brings that vote to the first phone, and the close goes back.
@@ -225,6 +227,8 @@ const checks = {
     await second.goto(await linkOf(page));
     await second.waitForSelector('#decision:not([hidden])');
     if (!(await second.isHidden('#vote-form'))) problems.push('fair-pick: the closing link leaves the other phone voting');
+    const shown = await second.textContent('#results');
+    if (!shown.includes('갑') || !shown.includes('을')) problems.push('fair-pick: the closed poll does not show who picked what');
     await other.close();
     return problems;
   },
@@ -255,14 +259,28 @@ const checks = {
     await page.click('#create-submit');
     await page.waitForSelector('#poll-body:not([hidden])');
 
-    // A named vote, every date filled at once, shows in the results.
+    // A named vote, every date ○ at once, shows who voted but not how until
+    // the close; a second, every date ✕, is named as absent from the day
+    // picked once the maker closes the poll.
     await page.fill('#voter-name', '점검');
     await page.locator('#quick-fill button').first().click();
     await page.click('#vote-submit');
     await page.waitForFunction(() => document.getElementById('vote-message').textContent !== '');
     const said = await page.textContent('#vote-message');
     if (!/투표했어요/.test(said)) problems.push(`fair-pick: voting says "${said}"`);
-    if (!(await page.textContent('#results')).includes('점검')) problems.push('fair-pick: the results do not name the voter');
+    if (!(await page.textContent('#voters')).includes('점검')) problems.push('fair-pick: the voters do not name the voter');
+    if ((await page.textContent('#results')).includes('점검')) problems.push('fair-pick: the results show a vote before the close');
+    await page.click('#vote-other');
+    await page.fill('#voter-name', '못감');
+    await page.locator('#quick-fill button').last().click();
+    await page.click('#vote-submit');
+    await page.waitForFunction(() => /투표했어요/.test(document.getElementById('vote-message').textContent));
+    await page.locator('#admin').evaluate((details) => { details.open = true; });
+    await page.click('#admin-close');
+    await page.waitForSelector('#decision:not([hidden])');
+    const absent = await page.locator('#absent').textContent().catch(() => '');
+    if (!absent.includes('못감')) problems.push(`fair-pick: the day picked names no one absent: "${absent}"`);
+    if (!(await page.textContent('#results')).includes('점검')) problems.push('fair-pick: the closed poll does not name the voters');
 
     // A wrong PIN is turned away with the tries left.
     await page.click('#view-poll .eyebrow a');
@@ -274,7 +292,8 @@ const checks = {
     if (!/번 더 틀리면/.test(wrong)) problems.push(`fair-pick: a wrong PIN says "${wrong}"`);
 
     // Majorities that go round in a circle, 가 over 나 3-2, 나 over 다 4-1 and
-    // 다 over 가 3-2, show as the Condorcet paradox, and 나 wins on Borda points.
+    // 다 over 가 3-2, show as the Condorcet paradox once the poll closes, and
+    // 나 wins on Borda points.
     await page.click('#new-link');
     await page.check('input[name="kind"][value="choice"]', { force: true });
     await page.fill('#title-input', '점검 장소');
@@ -286,16 +305,14 @@ const checks = {
     await page.fill('#pin-input', '482915');
     await page.click('#create-submit');
     await page.waitForSelector('#poll-body:not([hidden])');
-    const circle = [['갑', [4, 3, 2]], ['을', [4, 3, 2]], ['병', [2, 4, 3]], ['정', [2, 4, 3]], ['무', [3, 2, 4]]];
-    for (const [name, grades] of circle) {
+    const circle = [['갑', [0, 1]], ['을', [0, 1]], ['병', [1, 2]], ['정', [1, 2]], ['무', [2, 0]]];
+    for (const [name, order] of circle) {
       if (await page.isVisible('#vote-other')) await page.click('#vote-other');
-      await page.fill('#voter-name', name);
-      for (const [i, grade] of grades.entries()) {
-        await page.locator('#ballot > li').nth(i).locator(`input[value="${grade}"]`).check({ force: true });
-      }
-      await page.click('#vote-submit');
-      await page.waitForFunction(() => /투표했어요/.test(document.getElementById('vote-message').textContent));
+      await rankVote(page, name, order);
     }
+    await page.locator('#admin').evaluate((details) => { details.open = true; });
+    await page.click('#admin-close');
+    await page.waitForSelector('#decision:not([hidden])');
     if (!(await page.isVisible('#paradox'))) problems.push('fair-pick: a circle of majorities shows no paradox');
     const first = await page.locator('#results .result').first().textContent();
     if (!/^1나/.test(first) || !/보르다/.test(first)) {

@@ -10,8 +10,8 @@ tests and an API take the same file from `common/site/`.
 | [`site/dom.js`](site/dom.js) | `$`, an element by its ID, and `el`, which builds an element with its attributes, listeners and children | every page's `app.js` |
 | [`site/calendar.js`](site/calendar.js) | Dates in Korea (`koreaDate`, `isDate`, `addDays`) and a month as a Korean wall calendar shows it: weeks from Sunday, Sundays and holidays in red, Saturdays in blue | fair-pick's page and API |
 | [`site/holidays.json`](site/holidays.json) | Korea's public holidays by date, through 2027, from the 월력요항 the Korea AeroSpace Administration publishes each June | japan-flights' page and fare fetcher, fair-pick's calendar |
-| [`site/social-choice.js`](site/social-choice.js) | How a group settles on one option from everyone's grades, and what the other well-known voting rules would pick | fair-pick's page and API |
-| [`site/poll-rules.js`](site/poll-rules.js) | What a fair-pick poll and ballot may hold, the grades, and how a group ID and PIN look | fair-pick's page and API |
+| [`site/social-choice.js`](site/social-choice.js) | How a group settles on one option, a date by who can come and the mileage of each ○, an option by head-to-head majorities and Borda, and what other well-known rules would pick | fair-pick's page and API |
+| [`site/poll-rules.js`](site/poll-rules.js) | What a fair-pick poll and ballot may hold, how each kind is answered (○ △ ✕ for a date, an order for an option), and how a group ID and PIN look | fair-pick's page and API |
 | [`tools/serve.js`](tools/serve.js) | Serves the repository as Pages serves the built site, for every page's `npm run serve` | every page |
 
 The modules work in a browser and in Node alike: no DOM but in `dom.js`, nothing to install, and
