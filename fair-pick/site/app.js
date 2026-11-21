@@ -256,7 +256,7 @@ function show() {
 // --- Home ------------------------------------------------------------------
 
 function showHome() {
-  document.title = '모임 공정 투표';
+  document.title = '모임 투표';
   say('home-message', state.flash, true);
   state.flash = '';
   say('enter-message');
@@ -296,7 +296,7 @@ async function onEnter(event) {
 // --- A new poll ------------------------------------------------------------
 
 function showCreate() {
-  document.title = '새 투표 · 모임 공정 투표';
+  document.title = '새 투표 · 모임 투표';
   state.today = koreaDate();
   for (const date of [...state.picked]) if (date < state.today) state.picked.delete(date);
   const first = monthOf(state.today);
@@ -541,7 +541,7 @@ function showPoll(id) {
   }
   const entry = entryOf(id);
   $('poll-title').textContent = entry?.title || id;
-  document.title = `${entry?.title || id} · 모임 공정 투표`;
+  document.title = `${entry?.title || id} · 모임 투표`;
   if (!entry?.token && !entry?.adminKey) {
     if (LINKS) missing();
     else showGate();
@@ -578,7 +578,7 @@ function missing(message = '이 기기에 없는 투표예요. 단톡방에서 �
 
 // A link's poll new to this device, which its group ID and PIN open.
 function showJoin() {
-  document.title = '받은 투표 열기 · 모임 공정 투표';
+  document.title = '받은 투표 열기 · 모임 투표';
   $('poll-title').textContent = '받은 투표 열기';
   if (state.pending) showGate('', { askId: true });
   else missing('받은 투표 링크를 다시 열어 주세요.');
@@ -673,7 +673,7 @@ function renderPoll({ quiet = false } = {}) {
 
 function renderHeader() {
   const { poll, ballots } = state;
-  document.title = `${poll.title} · 모임 공정 투표`;
+  document.title = `${poll.title} · 모임 투표`;
   $('poll-kind').textContent = ` · ${KIND_NAMES[poll.kind]}`;
   $('poll-id').textContent = poll.id;
   $('poll-title').textContent = poll.title;
@@ -759,7 +759,7 @@ function inviteText(poll, pin) {
   const how = LINKS
     ? '링크를 열고 그룹 ID와 PIN을 넣은 뒤 이름을 걸고 투표해 주세요. 투표하면 나오는 새 링크를 이 방에 올려 주시면 서로의 투표가 합쳐져요.'
     : '링크를 열고 PIN을 넣은 뒤, 이름을 걸고 투표해 주세요.';
-  return [`[모임 공정 투표] ${poll.title}`, how, shareLink(poll.id), `그룹 ID: ${poll.id}`, pin && `PIN: ${pin}`]
+  return [`[모임 투표] ${poll.title}`, how, shareLink(poll.id), `그룹 ID: ${poll.id}`, pin && `PIN: ${pin}`]
     .filter(Boolean).join('\n');
 }
 
@@ -769,7 +769,7 @@ function sendText() {
   const { poll, ballots } = state;
   const entry = entryOf(poll.id) || {};
   if (entry.unsent === 'made') return inviteText(poll, entry.pin);
-  return [`[모임 공정 투표] ${poll.title} · ${ballots.length}명 투표${poll.closedAt ? ' · 마감' : ''}`, state.link].join('\n');
+  return [`[모임 투표] ${poll.title} · ${ballots.length}명 투표${poll.closedAt ? ' · 마감' : ''}`, state.link].join('\n');
 }
 
 function renderSend() {

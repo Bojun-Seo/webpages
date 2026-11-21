@@ -1,4 +1,4 @@
-# Fair Group Vote
+# Group Vote
 
 **Open the page: <https://bojun-seo.github.io/webpages/fair-pick/>**
 
