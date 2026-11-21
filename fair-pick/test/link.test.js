@@ -5,7 +5,6 @@ import * as pollRules from '../../common/site/poll-rules.js';
 import { decide } from '../../common/site/social-choice.js';
 import {
   STATE_VERSION, checked, closedAt, counted, createLinkClient, importKey, merge, payloadsIn, sameNames, seal, sha256Hex,
-  tieOrderOf,
 } from '../site/link.js';
 
 const rules = { ...pollRules, isDate };
@@ -72,14 +71,14 @@ test('votes go round in links and add up whatever order they are opened in', asy
 
   // Pasted together, as from a chat.
   const added = await a.client.absorb(`이영희: ${fromB}\n박지훈: https://x.test/fair-pick/#${fromC}`);
-  assert.deepEqual(added, [{ id: 'team-dinner', added: 1 }, { id: 'team-dinner', added: 1 }]);
+  assert.deepEqual(added, [{ id: 'team-dinner', added: 1, changed: true }, { id: 'team-dinner', added: 1, changed: true }]);
   assert.deepEqual(names(await a.client.load('team-dinner')), ['김민수', '박지훈', '이영희']);
   await b.client.absorb(fromC);
   await c.client.absorb(fromB);
   assert.deepEqual(names(await b.client.load('team-dinner')), ['김민수', '박지훈', '이영희']);
   assert.deepEqual(names(await c.client.load('team-dinner')), ['김민수', '박지훈', '이영희']);
   // Opening a link again adds nothing.
-  assert.deepEqual(await a.client.absorb(fromB), [{ id: 'team-dinner', added: 0 }]);
+  assert.deepEqual(await a.client.absorb(fromB), [{ id: 'team-dinner', added: 0, changed: false }]);
   // A link of a poll this phone does not keep is left alone.
   const other = await (await maker({ id: 'another-poll' })).a.client.linkOf('another-poll');
   assert.deepEqual(await a.client.absorb(other), []);
@@ -132,7 +131,7 @@ test('a name cast from two phones before either saw the other counts once, the l
   await assert.rejects(a.client.vote('team-dinner', {}, { name: '김민수', grades: [1, 1, 1] }), { status: 409, code: 'name' });
 });
 
-test('only the maker closes, and closing shows the seed that settles a tie the same everywhere', async () => {
+test('only the maker closes and spins the roulette for a tie, and its draw goes round to every phone', async () => {
   const { a, admin } = await maker();
   const b = phone();
   await b.client.open(await a.client.linkOf('team-dinner'), 'team-dinner', '482915');
@@ -140,16 +139,48 @@ test('only the maker closes, and closing shows the seed that settles a tie the s
   await b.client.vote('team-dinner', {}, { name: '이영희', grades: [1, 2, 0] });
   await assert.rejects(b.client.close('team-dinner', {}), { status: 403, code: 'admin' });
   await a.client.absorb(await b.client.linkOf('team-dinner'));
+  await assert.rejects(a.client.draw('team-dinner', admin), { status: 409, code: 'open' });
   const closed = await a.client.close('team-dinner', admin);
   assert.ok(closed.poll.closedAt);
-  assert.deepEqual(closed.poll.decision.tied, [0, 1]);
-  assert.equal(closed.poll.decision.drawn, true);
-  const order = await tieOrderOf(admin.adminKey, 3);
-  assert.equal(closed.poll.decision.index, order.find((index) => index < 2));
+  assert.deepEqual(closed.poll.decision, { index: null, tied: [0, 1], drawn: false, pending: true });
   await b.client.absorb(await a.client.linkOf('team-dinner'));
-  const seen = await b.client.load('team-dinner');
-  assert.deepEqual(seen.poll.decision, closed.poll.decision);
+  await assert.rejects(b.client.draw('team-dinner', {}), { status: 403, code: 'admin' });
+  const drawn = await a.client.draw('team-dinner', admin);
+  const picked = drawn.poll.decision.index;
+  assert.deepEqual(drawn.poll.decision, { index: picked, tied: [0, 1], drawn: true });
+  // Spinning again draws nothing new.
+  assert.equal((await a.client.draw('team-dinner', admin)).poll.decision.index, picked);
+  const [news] = await b.client.absorb(await a.client.linkOf('team-dinner'));
+  assert.deepEqual(news, { id: 'team-dinner', added: 0, changed: true });
+  assert.deepEqual((await b.client.load('team-dinner')).poll.decision, drawn.poll.decision);
   await assert.rejects(b.client.vote('team-dinner', {}, { name: '박지훈', grades: [2, 2, 2] }), { status: 423 });
+
+  // Reopened and closed on the same tie, the poll keeps what was drawn.
+  await a.client.reopen('team-dinner', admin);
+  assert.deepEqual((await a.client.close('team-dinner', admin)).poll.decision, drawn.poll.decision);
+});
+
+test('two phones of the maker that draw before seeing each other end with the first draw', async () => {
+  const { a, admin } = await maker();
+  await a.client.vote('team-dinner', {}, { name: '김민수', grades: [2, 2, 0] });
+  await a.client.close('team-dinner', admin);
+  const b = phone();
+  await b.client.open(await a.client.linkOf('team-dinner'), 'team-dinner', '482915');
+  // Both draw until they differ, as two phones may.
+  let first;
+  let second;
+  for (let i = 0; i < 64 && first?.poll.decision.index === second?.poll.decision.index; i++) {
+    a.storage.write({ 'team-dinner': { ...a.storage.read()['team-dinner'], state: { ...a.storage.read()['team-dinner'].state, draws: {} } } });
+    b.storage.write({ 'team-dinner': { ...b.storage.read()['team-dinner'], state: { ...b.storage.read()['team-dinner'].state, draws: {} } } });
+    first = await a.client.draw('team-dinner', admin);
+    b.clock.now = a.clock.now + 1000;
+    second = await b.client.draw('team-dinner', admin);
+  }
+  assert.notEqual(first.poll.decision.index, second.poll.decision.index);
+  await b.client.absorb(await a.client.linkOf('team-dinner'));
+  await a.client.absorb(await b.client.linkOf('team-dinner'));
+  assert.equal((await a.client.load('team-dinner')).poll.decision.index, first.poll.decision.index);
+  assert.equal((await b.client.load('team-dinner')).poll.decision.index, first.poll.decision.index);
 });
 
 test('until the poll closes a phone is told who voted but not how, and then everything', async () => {
@@ -205,7 +236,7 @@ test('a link from before polls of places were ranked opens with its grades turne
   assert.deepEqual(stored(d, 'dinner-place'), stored(b, 'dinner-place'));
 });
 
-test('the deadline closes the poll everywhere; the maker’s phone shows the seed, and may open it again', async () => {
+test('the deadline closes the poll everywhere; the maker spins for the tie, and may open it again', async () => {
   const { a, admin } = await maker({ deadline: '2026-11-25T18:00:00+09:00' });
   const b = phone();
   await b.client.open(await a.client.linkOf('team-dinner'), 'team-dinner', '482915');
@@ -218,8 +249,7 @@ test('the deadline closes the poll everywhere; the maker’s phone shows the see
 
   a.clock.now = b.clock.now;
   await a.client.absorb(await b.client.linkOf('team-dinner'));
-  const shown = await a.client.load('team-dinner', admin);
-  assert.equal(shown.changed, true);
+  const shown = await a.client.draw('team-dinner', admin);
   assert.equal(shown.poll.decision.drawn, true);
   await b.client.absorb(await a.client.linkOf('team-dinner'));
   assert.deepEqual((await b.client.load('team-dinner')).poll.decision, shown.poll.decision);
@@ -228,20 +258,6 @@ test('the deadline closes the poll everywhere; the maker’s phone shows the see
   await b.client.absorb(await a.client.linkOf('team-dinner'));
   assert.equal((await b.client.load('team-dinner')).poll.closedAt, null);
   assert.ok(await b.client.vote('team-dinner', {}, { name: '박지훈', grades: [2, 2, 2] }));
-});
-
-test('a seed that does not match the poll’s hash is not trusted', async () => {
-  const { a } = await maker({ deadline: '2026-11-25T18:00:00+09:00' });
-  const b = phone();
-  await b.client.open(await a.client.linkOf('team-dinner'), 'team-dinner', '482915');
-  await b.client.vote('team-dinner', {}, { name: '김민수', grades: [2, 1, 0] });
-  await b.client.vote('team-dinner', {}, { name: '이영희', grades: [1, 2, 0] });
-  // Someone with the PIN seals the poll again with a seed of their own.
-  const record = b.storage.read()['team-dinner'];
-  const forged = await seal({ ...record.state, seed: 'chosen-to-win' }, await importKey(record.key));
-  const c = phone({ now: Date.parse('2026-11-26T00:00:00Z') });
-  await c.client.open(forged, 'team-dinner', '482915');
-  assert.equal((await c.client.load('team-dinner')).poll.decision.pending, true);
 });
 
 test('a phone enters a poll it keeps by group ID and PIN, and no other', async () => {
@@ -272,14 +288,16 @@ test('merging is the same in any order and however often', async () => {
   const one = { ...base, ballots: [ballot('aa', '갑', '210', 5), ballot('bb', '을', '111', 6)] };
   const closed = { closed: true, at: base.status.at + 50 };
   const two = { ...base, ballots: [ballot('aa', '갑', '012', 9), ballot('cc', '병', '222', 7)], status: closed };
-  const three = { ...base, ballots: [ballot('bb', '', '', 8, 1)], seed: 'x' };
+  const three = { ...base, ballots: [ballot('bb', '', '', 8, 1)], draws: { '0,1': { i: 1, t: 9 } } };
+  two.draws = { '0,1': { i: 0, t: 12 }, '0,1,2': { i: 2, t: 3 } };
   const both = merge(merge(one, two), three);
   assert.deepEqual(both, merge(one, merge(two, three)));
   assert.deepEqual(merge(one, two), merge(two, one));
   assert.deepEqual(merge(both, both), both);
   assert.deepEqual(both.ballots.map((b) => [b.i, b.g ?? 'gone']), [['cc', '222'], ['bb', 'gone'], ['aa', '012']]);
   assert.deepEqual(both.status, closed);
-  assert.equal(both.seed, 'x');
+  // Of two draws for the same options, the first stands.
+  assert.deepEqual(both.draws, { '0,1': { i: 1, t: 9 }, '0,1,2': { i: 2, t: 3 } });
   assert.deepEqual(counted(both, pollRules.nameKey).map((b) => b.n), ['병', '갑']);
   assert.deepEqual(sameNames({ ballots: [ballot('x1', '갑', '0', 1), ballot('x2', '갑 ', '1', 2)] }, pollRules.nameKey), ['갑 ']);
 });
@@ -297,6 +315,10 @@ test('a link’s ballots that do not fit its poll are dropped, and a broken poll
     { i: 'ok', n: '갑', g: '021', t: 1 }, { i: 'twice', n: '을', g: '112', t: 2 }, { i: 'upper', n: '병', g: '0A1', t: 3 },
   ] }, rules);
   assert.deepEqual(places.ballots.map((b) => b.i), ['ok']);
+  const draws = checked({ ...state, draws: {
+    '0,1': { i: 1, t: 5 }, '0,1,2': { i: 3, t: 5 }, '1,0': { i: 1, t: 5 }, '0,3': { i: 0, t: 5 }, '00,1': { i: 1, t: 5 }, 2: { i: 2, t: 5 },
+  } }, rules).draws;
+  assert.deepEqual(draws, { '0,1': { i: 1, t: 5 } });
   assert.throws(() => checked({ ...state, v: 3 }, rules));
   assert.throws(() => checked({ ...state, kind: 'vote' }, rules));
   assert.throws(() => checked({ ...state, options: [{ date: '2026-02-30' }, { date: '2026-12-01' }] }, rules));

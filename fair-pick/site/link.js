@@ -9,12 +9,14 @@
 // own ID, the newer change winning, and a ballot taken out stays out, so
 // it does not matter in what order the links are opened, nor how often.
 //
-// The maker's device draws a seed when the poll is made and puts only its
-// hash in the poll; closing the poll shows the seed, which orders a draw
-// between options level at the top. Every device checks the seed against
-// the hash, so the maker cannot draw again. Until the poll closes the page
-// is told who voted but not how, as the API tells it; the link itself
-// carries every ballot, so that the poll can close anywhere.
+// The maker's device draws the admin code when the poll is made, and the
+// poll keeps only its hash (`seedHash`), by which the maker's devices are
+// told from the others. When the poll closes with options level at the
+// top, the maker spins a roulette of them; what it draws travels in the
+// links like a ballot, and the first draw for a set of options stands on
+// every device. Until the poll closes the page is told who voted but not
+// how, as the API tells it; the link itself carries every ballot, so that
+// the poll can close anywhere.
 //
 // Nothing here imports ../common/, whose path differs in a browser and in
 // Node; the page hands in the poll rules and the decision.
@@ -57,6 +59,14 @@ export function fromBase64Url(text) {
 
 export function randomId(bytes) {
   return toBase64Url(crypto.getRandomValues(new Uint8Array(bytes)));
+}
+
+// A random whole number from 0 to n - 1, without modulo bias.
+function randomBelow(n) {
+  const limit = Math.floor(2 ** 32 / n) * n;
+  const word = new Uint32Array(1);
+  do crypto.getRandomValues(word); while (word[0] >= limit);
+  return word[0] % n;
 }
 
 export async function sha256Hex(text) {
@@ -185,8 +195,9 @@ function pointsFromGrades(id, grades, pointsOf) {
 }
 
 // Two states of one poll as one: its definition as `base` has it, each
-// ballot's latest change, the latest open or close, and the seed if either
-// shows it. The same however many times and in whatever order.
+// ballot's latest change, the latest open or close, and for each set of
+// options a roulette was spun among, the first draw. The same however many
+// times and in whatever order.
 export function merge(base, other) {
   if (base.uid !== other.uid) throw new Error('not the same poll');
   const ballots = new Map(base.ballots.map((ballot) => [ballot.i, ballot]));
@@ -194,10 +205,14 @@ export function merge(base, other) {
     const had = ballots.get(ballot.i);
     if (!had || newer(ballot, had)) ballots.set(ballot.i, ballot);
   }
+  const draws = { ...base.draws };
+  for (const [key, draw] of Object.entries(other.draws || {})) {
+    if (!draws[key] || newer(draws[key], draw)) draws[key] = draw;
+  }
   return {
     ...base,
     status: newer(other.status, base.status, 'at') ? other.status : base.status,
-    seed: base.seed || other.seed || null,
+    draws,
     ballots: [...ballots.values()].sort(byTime),
   };
 }
@@ -235,11 +250,21 @@ export function closedAt(state, now) {
   return null;
 }
 
-// The order a draw takes between options level at the top: the options
-// sorted by the hash of the seed and each option's place.
-export async function tieOrderOf(seed, count) {
-  const keyed = await Promise.all(Array.from({ length: count }, async (_, index) => [await sha256Hex(`${seed}:${index}`), index]));
-  return keyed.sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([, index]) => index);
+// The draws of a state that fit a poll of `count` options: under the key
+// of two or more of them in order ("0,3"), one of them, `i`, and when it
+// was drawn, `t`.
+function drawsIn(draws, count) {
+  const out = {};
+  if (!draws || typeof draws !== 'object' || Array.isArray(draws)) return out;
+  for (const [key, draw] of Object.entries(draws)) {
+    if (!/^\d+(,\d+)+$/.test(key)) continue;
+    const tied = key.split(',').map(Number);
+    if (tied.join(',') !== key) continue;
+    if (tied.some((index, place) => index >= count || (place > 0 && index <= tied[place - 1]))) continue;
+    if (!tied.includes(draw?.i) || !Number.isFinite(draw.t)) continue;
+    out[key] = { i: draw.i, t: draw.t };
+  }
+  return out;
 }
 
 // `state` as it arrived in a link or was kept, checked and brought up to
@@ -287,19 +312,12 @@ export function checked(state, { KINDS, LIMITS, gradesFit, pointsOf, isDate }) {
     createdAt: state.createdAt,
     seedHash: state.seedHash,
     status: { closed: state.status.closed, at: state.status.at },
-    seed: typeof state.seed === 'string' ? state.seed : null,
+    draws: drawsIn(state.draws, options.length),
     ballots: ballots.slice(0, LIMITS.ballots * 3),
   };
 }
 
 const iso = (ms) => new Date(ms).toISOString();
-
-// `state` without a seed that does not match the hash its poll was made
-// with, which only the maker's seed does.
-async function trusted(state) {
-  if (state.seed && await sha256Hex(state.seed) !== state.seedHash) return { ...state, seed: null };
-  return state;
-}
 
 // A client that does what api.js's does, with every poll kept on this
 // device and passed on in links. `rules` is common's poll-rules.js and
@@ -344,10 +362,8 @@ export function createLinkClient({ rules, decide, storage, now = Date.now, itera
     }));
     let decision = null;
     if (shut !== null && all.length > 0) {
-      const order = state.seed ? await tieOrderOf(state.seed, state.options.length) : [];
-      decision = decide(state.kind, all, state.options.length, order);
-      // Level at the top, and the maker has not shown the seed yet.
-      if (decision.drawn && !state.seed) decision = { index: null, tied: decision.tied, drawn: false, pending: true };
+      const drawn = Object.fromEntries(Object.entries(state.draws || {}).map(([key, draw]) => [key, draw.i]));
+      decision = decide(state.kind, all, state.options.length, drawn);
     }
     const { kind, title, note, options, createdAt, deadline } = state;
     return {
@@ -360,7 +376,8 @@ export function createLinkClient({ rules, decide, storage, now = Date.now, itera
   }
 
   // Adds the polls of the payloads in `text` this device keeps: for each,
-  // { id, added }, how many ballots were new or changed.
+  // { id, added, changed }, how many ballots were new or changed, and
+  // whether anything was, a close or a draw included.
   async function absorb(text) {
     const out = [];
     for (const { payload, uid } of payloadsIn(text)) {
@@ -373,11 +390,12 @@ export function createLinkClient({ rules, decide, storage, now = Date.now, itera
       } catch {
         continue;
       }
-      const state = await trusted(merge(record.state, incoming));
+      const state = merge(record.state, incoming);
       const before = new Map(record.state.ballots.map((ballot) => [ballot.i, JSON.stringify(ballot)]));
       const added = state.ballots.filter((ballot) => before.get(ballot.i) !== JSON.stringify(ballot)).length;
+      const news = (one) => JSON.stringify([one.status, one.draws || {}, one.ballots]);
       keep(id, { ...record, state });
-      out.push({ id, added });
+      out.push({ id, added, changed: news(state) !== news(record.state) });
     }
     return out;
   }
@@ -404,14 +422,14 @@ export function createLinkClient({ rules, decide, storage, now = Date.now, itera
         throw new LinkError(409, 'taken', '이 기기에 같은 그룹 ID로 만든 투표가 있어요. 다른 ID를 정해 주세요.', { field: 'id' });
       }
       const uid = randomId(12);
-      const seed = randomId(16);
+      const adminKey = randomId(16);
       const state = {
-        v: STATE_VERSION, uid, id, ...result.poll, createdAt: iso(now()), seedHash: await sha256Hex(seed),
-        status: { closed: false, at: now() }, seed: null, ballots: [],
+        v: STATE_VERSION, uid, id, ...result.poll, createdAt: iso(now()), seedHash: await sha256Hex(adminKey),
+        status: { closed: false, at: now() }, draws: {}, ballots: [],
       };
       const key = await deriveKey(id, input.pin, uid, iterations);
       keep(id, { uid, key: await exportKey(key), state });
-      return { token: 'link', adminKey: seed, ...await view(id) };
+      return { token: 'link', adminKey, ...await view(id) };
     },
 
     // A poll this device keeps, by its group ID and PIN.
@@ -446,22 +464,16 @@ export function createLinkClient({ rules, decide, storage, now = Date.now, itera
       if (record && record.uid !== found.uid) {
         throw new LinkError(409, 'other', '이 기기에 같은 그룹 ID의 다른 투표가 있어요. 그 투표를 이 기기에서 잊은 뒤 다시 열어 주세요.');
       }
-      const state = await trusted(record ? merge(record.state, incoming) : incoming);
+      const state = record ? merge(record.state, incoming) : incoming;
       keep(id, { uid: found.uid, key: record?.key || await exportKey(key), state });
       return { token: 'link', ...await view(id) };
     },
 
-    // The poll as this device has it. The maker's device shows the seed
-    // once the deadline has passed, which the next link carries.
+    // The poll as this device has it.
     async load(id, auth = {}) {
-      const record = kept(id);
-      const { state } = record;
+      const { state } = kept(id);
       if (auth.adminKey && !await isMaker(state, auth.adminKey)) {
         throw new LinkError(401, 'token', '관리 코드가 맞지 않아요.');
-      }
-      if (auth.adminKey && !state.seed && closedAt(state, now()) !== null) {
-        keep(id, { ...record, state: { ...state, seed: auth.adminKey } });
-        return view(id, { changed: true });
       }
       return view(id);
     },
@@ -517,11 +529,29 @@ export function createLinkClient({ rules, decide, storage, now = Date.now, itera
       if (!await isMaker(state, auth.adminKey)) {
         throw new LinkError(403, 'admin', '투표를 만든 사람만 할 수 있어요. 관리 코드를 넣어 주세요.');
       }
-      // Closing shows the seed; a poll its deadline closed keeps that time.
-      let next = state;
-      if (closedAt(state, now()) === null) next = { ...next, status: { closed: true, at: after(state.status.at) } };
-      if (!next.seed) next = { ...next, seed: auth.adminKey };
-      if (next !== state) keep(id, { ...record, state: next });
+      // A poll its deadline closed keeps that time.
+      if (closedAt(state, now()) === null) {
+        keep(id, { ...record, state: { ...state, status: { closed: true, at: after(state.status.at) } } });
+      }
+      return view(id);
+    },
+
+    // The maker's roulette among the options level at the top of the
+    // closed poll: drawn here, once for each set of them, and passed on in
+    // the next link.
+    async draw(id, auth) {
+      const record = kept(id);
+      const { state } = record;
+      if (!await isMaker(state, auth.adminKey)) {
+        throw new LinkError(403, 'admin', '투표를 만든 사람만 할 수 있어요. 관리 코드를 넣어 주세요.');
+      }
+      if (closedAt(state, now()) === null) throw new LinkError(409, 'open', '마감한 뒤에 룰렛을 돌릴 수 있어요.');
+      const { decision } = (await view(id)).poll;
+      if (decision?.pending) {
+        const { tied } = decision;
+        const draws = { ...state.draws, [tied.join(',')]: { i: tied[randomBelow(tied.length)], t: now() } };
+        keep(id, { ...record, state: { ...state, draws } });
+      }
       return view(id);
     },
 

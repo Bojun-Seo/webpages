@@ -12,7 +12,8 @@
 // fares the build fetched: a japan-flights with no fares passes, since the
 // page publishes without them. fair-pick is opened both as it publishes
 // without an API, keeping its polls in links, and with one, its Worker run
-// on memory here answering in place of the one config.js would name.
+// on memory here answering in place of the one config.js would name; both
+// times its maker spins the roulette for a tie.
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -72,6 +73,15 @@ async function rankVote(page, name, order) {
   for (const index of order) await page.locator('#ballot > li').nth(index).locator('button').click();
   await page.click('#vote-submit');
   await page.waitForFunction(() => /투표했어요/.test(document.getElementById('vote-message').textContent));
+}
+
+// Spins the roulette fair-pick shows its maker for options level at the
+// top, stops it, and waits until it lands on the decision.
+async function spinRoulette(page) {
+  await page.click('#wheel-button');
+  await page.waitForFunction(() => document.getElementById('wheel-button')?.textContent === '멈춤');
+  await page.click('#wheel-button');
+  await page.waitForSelector('#decided', { timeout: 20000 });
 }
 
 // What a page needs before it opens, by path.
@@ -221,11 +231,15 @@ const checks = {
     await page.waitForSelector('#poll-body:not([hidden])');
     const voters = await page.locator('#voters li').count();
     if (voters !== 2) problems.push(`fair-pick: the maker sees ${voters} voters after opening the other's link`);
+    // 가 and 나 draw, so the maker spins the roulette, and its pick goes back too.
     await page.locator('#admin').evaluate((details) => { details.open = true; });
     await page.click('#admin-close');
     await page.waitForSelector('#decision:not([hidden])');
+    await spinRoulette(page);
+    const picked = await page.textContent('#decided');
     await second.goto(await linkOf(page));
-    await second.waitForSelector('#decision:not([hidden])');
+    await second.waitForSelector('#decided');
+    if (await second.textContent('#decided') !== picked) problems.push('fair-pick: the roulette\'s pick does not reach the other phone');
     if (!(await second.isHidden('#vote-form'))) problems.push('fair-pick: the closing link leaves the other phone voting');
     const shown = await second.textContent('#results');
     if (!shown.includes('갑') || !shown.includes('을')) problems.push('fair-pick: the closed poll does not show who picked what');
@@ -275,9 +289,11 @@ const checks = {
     await page.locator('#quick-fill button').last().click();
     await page.click('#vote-submit');
     await page.waitForFunction(() => /투표했어요/.test(document.getElementById('vote-message').textContent));
+    // Every date is level, so the maker spins the roulette for one.
     await page.locator('#admin').evaluate((details) => { details.open = true; });
     await page.click('#admin-close');
     await page.waitForSelector('#decision:not([hidden])');
+    await spinRoulette(page);
     const absent = await page.locator('#absent').textContent().catch(() => '');
     if (!absent.includes('못감')) problems.push(`fair-pick: the day picked names no one absent: "${absent}"`);
     if (!(await page.textContent('#results')).includes('점검')) problems.push('fair-pick: the closed poll does not name the voters');

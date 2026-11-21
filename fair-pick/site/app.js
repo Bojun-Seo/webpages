@@ -632,8 +632,6 @@ async function refresh() {
     const data = await api.load(id, authOf(entryOf(id)));
     if (state.route.view !== 'poll' || state.route.id !== id) return;
     take(data);
-    // The maker's phone showed the seed once the deadline passed.
-    if (data.changed) markUnsent(id, 'changed');
     renderPoll();
   } catch (error) {
     if (state.route.view !== 'poll' || state.route.id !== id) return;
@@ -690,6 +688,8 @@ function renderDecision() {
   const box = $('decision');
   box.hidden = !poll.closedAt;
   if (!poll.closedAt) return;
+  // A wheel that is turning is left alone until it rests.
+  if (roulette.turning) return;
   if (!poll.decision) {
     box.className = 'decision none';
     box.replaceChildren(
@@ -699,12 +699,16 @@ function renderDecision() {
   }
   const { index, tied, drawn, pending } = poll.decision;
   if (pending) {
-    // In link mode, level at the top and the maker's seed not shown yet.
+    const maker = Boolean(entryOf(poll.id)?.adminKey);
     box.className = 'decision none';
     box.replaceChildren(
       el('span', { class: 'label' }, `${timeText(poll.closedAt)} 마감 · ${ballots.length}명 투표`),
-      el('strong', null, `공동 1위: ${tied.map((i) => optionOf(poll, i).text).join(', ')}`),
-      el('p', null, '투표를 만든 사람의 기기가 마감 링크를 올리면, 만들 때 봉인해 둔 순서로 하나가 정해져요.'));
+      el('strong', null, `공동 1위 ${tied.length}개`),
+      el('p', null, maker
+        ? '가운데 시작을 누르면 룰렛이 돌고, 멈춤을 누르면 그때 속도에서 서서히 멈추며 하나가 뽑혀요. 한 번 뽑힌 결과는 바뀌지 않아요.'
+        : '투표를 만든 사람이 공동 1위를 룰렛에 올려 돌리면 정해져요.'),
+      wheelOf(tied, { spin: maker }),
+      el('p', { class: 'message', id: 'wheel-message', role: 'alert' }));
     return;
   }
   const { text, holiday } = optionOf(poll, index);
@@ -716,16 +720,305 @@ function renderDecision() {
   box.className = 'decision';
   box.replaceChildren(
     el('span', { class: 'label' }, `${timeText(poll.closedAt)} 마감 · ${ballots.length}명 투표 · 결정`),
-    el('strong', null, holiday ? `${text} · ${holiday}` : text),
+    el('strong', { id: 'decided' }, holiday ? `${text} · ${holiday}` : text),
     el('p', null, drawn
-      ? `공동 1위 ${tied.length}개 가운데, 투표를 만들 때 미리 뽑아 둔 무작위 순서로 골랐어요.`
+      ? `공동 1위 ${tied.length}개를 룰렛에 올려 뽑았어요.`
       : placed && reason(placed, ranked)),
     poll.kind === 'date' && (absent.length > 0
       ? el('div', { class: 'absent', id: 'absent' },
         el('span', { class: 'absent-head' }, `불참 ${absent.length}명`),
         el('span', { class: 'absent-names' }, absent.map((ballot) => ballot.name).join(', ')),
         el('small', null, '이날 ✕ 못 가요로 답한 사람이에요.'))
-      : el('p', { class: 'all-in' }, '투표한 사람 모두 이날 올 수 있어요.')));
+      : el('p', { class: 'all-in' }, '투표한 사람 모두 이날 올 수 있어요.')),
+    drawn && wheelOf(tied, { winner: index }));
+}
+
+// --- The roulette ------------------------------------------------------------
+
+// When a closed poll has several options first, its maker spins a roulette
+// of them. The button in the middle sets the wheel going; pressed again,
+// it asks the API, or in links this phone, to draw one, and the wheel
+// slows from the speed it has at a steady deceleration, as friction would
+// stop it, picked within a natural range so that it comes to rest on the
+// option drawn. The moment it is pressed decides nothing, so nobody can
+// aim. Once drawn, anyone may watch the wheel land on it again.
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const WHEEL = { centre: 150, radius: 138 };
+
+// How the wheel moves, in degrees and seconds: how long it takes to get up
+// to speed, the speeds it turns at, and the shortest it takes to stop.
+const MOTION = { spinUp: 0.8, slowest: 780, fastest: 1000, stopping: 3.6, replayStopping: 2.6 };
+
+const roulette = {
+  // Whether a wheel is turning, which no redraw of the decision stops.
+  turning: false,
+  // Where each wheel last came to rest, by poll and options, so that one
+  // drawn again rests where it stopped.
+  rest: new Map(),
+};
+
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+function svg(tag, attrs, ...children) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [key, value] of Object.entries(attrs || {})) {
+    if (value != null && value !== false) node.setAttribute(key, String(value));
+  }
+  for (const child of children.flat(Infinity)) if (child != null && child !== false) node.append(child);
+  return node;
+}
+
+// The point at `degrees` clockwise from the top, `radius` from the centre.
+function onWheel(degrees, radius) {
+  const angle = (degrees * Math.PI) / 180;
+  const { centre } = WHEEL;
+  return [centre + radius * Math.sin(angle), centre - radius * Math.cos(angle)];
+}
+
+// What a slice says of option `index`: a date short, 12/4 (금), and a label
+// cut to `most` characters.
+function sliceLabel(index, most) {
+  const option = state.poll.options[index];
+  if (state.poll.kind === 'date') {
+    const [, month, day] = option.date.split('-').map(Number);
+    return `${month}/${day} (${WEEKDAYS[new Date(`${option.date}T00:00:00Z`).getUTCDay()]})`;
+  }
+  const chars = [...option.label];
+  return chars.length > most ? `${chars.slice(0, Math.max(1, most - 1)).join('')}…` : option.label;
+}
+
+// The colour of slice `i` of `count`, never the same as the slice beside it.
+function sliceTone(i, count) {
+  const tone = i % 6;
+  return i === count - 1 && tone === 0 && count > 1 ? 2 : tone;
+}
+
+// The slice under the pointer when the wheel is turned `angle` degrees.
+function sliceAt(angle, count) {
+  const under = ((-angle % 360) + 360) % 360;
+  return Math.floor(under / (360 / count)) % count;
+}
+
+// The angle at which the wheel rests with the pointer on slice `slot`,
+// somewhere inside it rather than on its edge.
+function restingAngle(slot, count, inside = 0.18 + Math.random() * 0.64) {
+  const under = (slot + inside) * (360 / count);
+  return ((-under % 360) + 360) % 360;
+}
+
+// A roulette of the options `tied`, with a button for its maker to spin it
+// (`spin`), or one for anyone to watch it land on `winner` again.
+function wheelOf(tied, { spin = false, winner = null }) {
+  const { centre, radius } = WHEEL;
+  const count = tied.length;
+  const slice = 360 / count;
+  const key = `${state.poll.id}:${tied.join(',')}`;
+  const slot = winner === null ? -1 : tied.indexOf(winner);
+  const angle = roulette.rest.get(key) ?? (slot >= 0 ? restingAngle(slot, count, 0.5) : 0);
+  // Labels run round the rim for a few slices and out from the centre for many.
+  const along = count <= 8;
+  const size = along ? (count <= 3 ? 17 : count <= 5 ? 15 : 13) : (count <= 16 ? 12 : 10);
+  const room = along ? (2 * Math.PI * radius * 0.6 * 0.82) / count : radius * 0.62;
+  const most = Math.max(2, Math.floor(room / (size * 0.98)));
+  const slices = tied.map((index, i) => {
+    const from = i * slice;
+    const to = (i + 1) * slice;
+    const mid = from + slice / 2;
+    const [x0, y0] = onWheel(from, radius);
+    const [x1, y1] = onWheel(to, radius);
+    const path = `M ${centre} ${centre} L ${x0.toFixed(2)} ${y0.toFixed(2)} `
+      + `A ${radius} ${radius} 0 ${slice > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)} Z`;
+    const at = along ? radius * 0.62 : radius * 0.6;
+    const turn = along
+      ? `rotate(${mid} ${centre} ${centre})`
+      : `rotate(${mid} ${centre} ${centre}) rotate(-90 ${centre} ${centre - at})`;
+    return svg('g', { class: `slice slice-${sliceTone(i, count)}${i === slot ? ' won' : ''}`, 'data-slot': i },
+      svg('path', { d: path }),
+      svg('text', {
+        x: centre, y: centre - at, 'text-anchor': 'middle', 'dominant-baseline': 'central', transform: turn,
+        'font-size': size,
+      }, sliceLabel(index, most)));
+  });
+  const pegs = tied.map((_, i) => {
+    const [x, y] = onWheel(i * slice, radius + 1);
+    return svg('circle', { class: 'peg', cx: x.toFixed(2), cy: y.toFixed(2), r: 3.2 });
+  });
+  const disc = svg('g', { class: 'wheel-disc', transform: `rotate(${angle} ${centre} ${centre})` }, slices,
+    svg('circle', { class: 'rim', cx: centre, cy: centre, r: radius + 1 }), pegs);
+  const pointer = svg('g', { class: 'wheel-pointer' },
+    svg('path', { d: `M ${centre} ${centre - radius + 18} L ${centre - 12} ${centre - radius - 9} L ${centre + 12} ${centre - radius - 9} Z` }));
+  const names = tied.map((index) => nameOf(index)).join(', ');
+  const picture = svg('svg', { viewBox: '0 0 300 300', class: 'wheel-svg', role: 'img', 'aria-label': `룰렛: ${names}` },
+    disc, svg('circle', { class: 'hub', cx: centre, cy: centre, r: radius * 0.2 }), pointer);
+  const live = el('p', { class: 'sr-only', 'aria-live': 'polite' });
+  let button = el('span', { class: 'wheel-button idle', 'aria-hidden': 'true' }, '?');
+  if (spin || winner !== null) {
+    button = el('button', { type: 'button', class: 'wheel-button', id: 'wheel-button' }, spin ? '시작' : '다시 보기');
+  }
+  const wrap = el('div', { class: `wheel${winner !== null ? ' drawn' : ''}` },
+    el('div', { class: 'wheel-stage' }, picture, button), live);
+  const view = { tied, key, disc, pointer, picture, button, live, angle, count };
+  if (spin) button.addEventListener('click', () => spinWheel(view));
+  else if (winner !== null) button.addEventListener('click', () => replayWheel(view, slot));
+  return wrap;
+}
+
+// Turns the wheel of `view` to `angle`, ticking the pointer as each peg
+// goes by.
+function turnWheel(view, angle) {
+  const before = sliceAt(view.angle, view.count);
+  view.angle = angle;
+  view.disc.setAttribute('transform', `rotate(${angle % 360} ${WHEEL.centre} ${WHEEL.centre})`);
+  if (sliceAt(angle, view.count) !== before) {
+    view.pointer.classList.remove('tick');
+    // Reading a box restarts the tick's animation.
+    view.pointer.getBoundingClientRect();
+    view.pointer.classList.add('tick');
+  }
+}
+
+// Runs `step` on every frame, with the seconds since it started, until it
+// says it is done.
+function frames(step) {
+  return new Promise((done) => {
+    let start = null;
+    const next = (time) => {
+      if (start === null) start = time;
+      if (step((time - start) / 1000)) done();
+      else requestAnimationFrame(next);
+    };
+    requestAnimationFrame(next);
+  });
+}
+
+// Spins the wheel up to `top` degrees a second, easing in as a push would.
+function spinUp(view, top, seconds) {
+  const from = view.angle;
+  return frames((t) => {
+    const done = t >= seconds;
+    const s = Math.min(t, seconds);
+    // The angle is the integral of a speed that grows as the square of time.
+    turnWheel(view, from + (top * s * s * s) / (3 * seconds * seconds));
+    return done;
+  }).then(() => from + (top * seconds) / 3);
+}
+
+// Slows the wheel from `speed` to rest on slice `slot`, at a steady
+// deceleration chosen to stop it there after at least `least` seconds.
+function slowDown(view, speed, slot, least) {
+  const from = view.angle;
+  const target = restingAngle(slot, view.count);
+  let travel = (((target - from) % 360) + 360) % 360;
+  while (travel < (speed * least) / 2) travel += 360;
+  const deceleration = (speed * speed) / (2 * travel);
+  const seconds = (2 * travel) / speed;
+  return frames((t) => {
+    const s = Math.min(t, seconds);
+    turnWheel(view, from + speed * s - (deceleration * s * s) / 2);
+    return t >= seconds;
+  }).then(() => from + travel);
+}
+
+// Shows the slice the wheel came to rest on.
+function landed(view, slot) {
+  for (const node of view.disc.querySelectorAll('.slice')) node.classList.toggle('won', Number(node.dataset.slot) === slot);
+  roulette.rest.set(view.key, view.angle % 360);
+  view.live.textContent = `당첨: ${nameOf(view.tied[slot])}`;
+  navigator.vibrate?.(40);
+}
+
+// The maker's spin: up to speed, round and round until the button is
+// pressed again, then the draw and the slow stop on what it drew.
+async function spinWheel(view) {
+  const { poll } = state;
+  const { button } = view;
+  if (roulette.turning) return;
+  roulette.turning = true;
+  say('wheel-message');
+  const top = MOTION.slowest + Math.random() * (MOTION.fastest - MOTION.slowest);
+  const quick = reducedMotion();
+  let stopRequested = false;
+  let speed = top;
+  if (!quick) {
+    button.disabled = true;
+    button.textContent = '돌리는 중';
+    view.live.textContent = '룰렛이 돌아가요.';
+    await spinUp(view, top, MOTION.spinUp);
+    button.disabled = false;
+    button.textContent = '멈춤';
+    button.onclick = () => {
+      stopRequested = true;
+    };
+    // Round and round at full speed until the button is pressed.
+    const from = view.angle;
+    await frames((t) => {
+      turnWheel(view, from + top * t);
+      return stopRequested;
+    });
+    button.onclick = null;
+    button.disabled = true;
+    button.textContent = '멈추는 중';
+    view.live.textContent = '멈추는 중이에요.';
+  }
+  // The wheel keeps turning while the draw is asked for.
+  let asked = true;
+  const turning = quick ? Promise.resolve() : (() => {
+    const from = view.angle;
+    return frames((t) => {
+      turnWheel(view, from + top * t);
+      return !asked;
+    });
+  })();
+  let data = null;
+  let failure = null;
+  try {
+    data = await api.draw(poll.id, authOf(entryOf(poll.id)));
+  } catch (error) {
+    failure = error;
+  }
+  asked = false;
+  await turning;
+  const index = data?.poll.decision?.drawn ? data.poll.decision.index : null;
+  const slot = index === null ? Math.floor(Math.random() * view.count) : view.tied.indexOf(index);
+  if (quick) {
+    turnWheel(view, view.angle + (((restingAngle(slot, view.count) - view.angle) % 360) + 360) % 360);
+  } else {
+    await slowDown(view, speed, slot, MOTION.stopping);
+  }
+  roulette.turning = false;
+  if (index === null) {
+    // Nothing was drawn: the wheel stops where friction takes it, and may go again.
+    button.disabled = false;
+    button.textContent = '시작';
+    say('wheel-message', failure?.message || '결과를 받지 못했어요. 다시 돌려 주세요.');
+    if (failure?.status === 401) signedOut(failure);
+    else if (failure?.code === 'open' || failure?.code === 'admin') refresh();
+    return;
+  }
+  landed(view, slot);
+  if (!quick) await new Promise((wait) => setTimeout(wait, 900));
+  markUnsent(poll.id, 'changed');
+  state.notice = `룰렛이 ${nameOf(index)}에서 멈췄어요.`;
+  take(data);
+  renderPoll();
+}
+
+// Anyone's look at the wheel landing again on what was drawn.
+async function replayWheel(view, slot) {
+  if (roulette.turning) return;
+  roulette.turning = true;
+  view.button.disabled = true;
+  if (reducedMotion()) {
+    turnWheel(view, view.angle + 360 + (((restingAngle(slot, view.count) - view.angle) % 360) + 360) % 360);
+  } else {
+    const top = MOTION.slowest;
+    await spinUp(view, top, MOTION.spinUp * 0.6);
+    await slowDown(view, top, slot, MOTION.replayStopping);
+  }
+  landed(view, slot);
+  roulette.turning = false;
+  view.button.disabled = false;
 }
 
 // The link to the poll: on the API, its address; in link mode, the link
@@ -1199,7 +1492,7 @@ function reason(t, ranked) {
     case 'tie':
       if (t.rank !== 1) return '앞뒤를 가릴 수 없어 같은 순위예요.';
       if (poll.decision?.drawn && poll.decision.index === t.index) {
-        return '끝까지 같아 공동 1위였고, 투표를 만들 때 미리 뽑아 둔 무작위 순서로 뽑혔어요.';
+        return '끝까지 같아 공동 1위였고, 룰렛으로 뽑혔어요.';
       }
       return '끝까지 같아 공동 1위였어요.';
     default:
@@ -1384,7 +1677,7 @@ function renderHow() {
       '✕(못 가요)가 가장 적은 날만 남겨요. 가장 많은 사람이 올 수 있는 날이에요. 여기서는 누구나 한 사람으로 셉니다.',
       '그중 선호 점수가 가장 높은 날이에요. 선호 점수는 그날에 ○를 준 사람들의 마일리지를 더한 값이에요.',
       `마일리지는 모두 100%에서 시작해 ✕ 하나에 1/${state.poll.options.length}(후보 날짜 수), △ 하나에 그 절반씩 줄고, 남은 만큼이 그 사람 ○ 하나의 무게예요. 여러 날을 열어 둔 사람의 ○는 더 무겁고, 그런 사람이 △를 준 날은 그만큼 점수를 덜 받아요. ✕와 △는 남에게 맞춰 달라는 부탁이라 그만큼 마일리지가 드는 셈이에요.`,
-      '그래도 같으면 공동 순위로 두고, 마감할 때 투표를 만들 때 미리 뽑아 둔 무작위 순서로 하나를 골라요.',
+      '그래도 같으면 공동 1위로 두고, 마감한 뒤 투표를 만든 사람이 공동 1위를 룰렛에 올려 돌려서 하나를 뽑아요.',
       '뽑힌 날에 ✕를 준 사람은 결정 바로 밑에 불참자로 이름이 나와요.',
       '1위를 뺀 나머지로 같은 과정을 되풀이해 2위, 3위를 정해요.',
     ]
@@ -1392,7 +1685,7 @@ function renderHow() {
       '모두가 모든 후보에 순위를 매겨요. 후보가 n개면 누구나 n-1점부터 0점까지를 한 번씩 주는 셈이라, 누구의 표든 무게가 같아요.',
       '맞대결에서 다른 모든 후보를 이기는 후보가 있으면(콩도르세 승자) 그 후보예요. 두 후보 가운데 한쪽을 더 위에 둔 사람이 많으면 그쪽이 이겨요.',
       '서로 물고 물리거나 비겨서 그런 후보가 없으면(콩도르세의 역설), 물고 물린 후보들 가운데 보르다 점수가 가장 높은 후보예요. 한 사람마다 아래에 둔 후보 하나에 1점씩 줘요.',
-      '그래도 같으면 공동 순위로 두고, 마감할 때 투표를 만들 때 미리 뽑아 둔 무작위 순서로 하나를 골라요.',
+      '그래도 같으면 공동 1위로 두고, 마감한 뒤 투표를 만든 사람이 공동 1위를 룰렛에 올려 돌려서 하나를 뽑아요.',
       '1위를 뺀 나머지로 같은 과정을 되풀이해 2위, 3위를 정해요.',
     ];
   steps.push('누가 무엇을 골랐는지와 순위는 마감한 뒤에 공개돼요. 남의 표를 보고 셈을 해서 투표하는 일을 막기 위해서예요.');
@@ -1506,8 +1799,8 @@ function renderAdmin() {
     el('div', { class: 'admin-block' },
       el('h3', null, closed ? '다시 열기' : '마감하기'),
       el('p', { class: 'fine' }, closed
-        ? '다시 열면 투표를 더 받고, 결정은 지워집니다. 지난 마감 시각도 지워집니다. 다시 마감해도 공동 1위를 고르는 무작위 순서는 그대로예요.'
-        : '마감하면 투표를 더 받지 않고, 지금까지의 투표로 하나를 정합니다. 공동 1위면 투표를 만들 때 미리 뽑아 둔 무작위 순서로 고릅니다.'),
+        ? '다시 열면 투표를 더 받고, 결정은 지워집니다. 지난 마감 시각도 지워집니다. 다시 마감했을 때 공동 1위가 같으면 룰렛 결과도 그대로예요.'
+        : '마감하면 투표를 더 받지 않고, 지금까지의 투표로 하나를 정합니다. 공동 1위면 마감한 뒤 룰렛을 돌려 하나를 뽑아요.'),
       LINKS && el('p', { class: 'fine' }, closed
         ? '다시 연 링크를 단톡방에 올려야 다른 사람에게도 열려요.'
         : '마감하기 전에 단톡방에 올라온 링크를 모두 열어 투표를 합쳐 주세요. 마감한 뒤에는 마감 링크를 올려야 다른 사람에게도 마감돼요.'),
@@ -1530,7 +1823,7 @@ function renderAdmin() {
     el('div', { class: 'admin-block' },
       el('h3', null, '관리 코드'),
       el('p', { class: 'fine' }, LINKS
-        ? '다른 기기에서 이 메뉴를 쓰려면 이 코드가 필요해요. 공동 1위를 가를 순서도 이 코드로 봉인되어 있으니, 마감 전에는 아무에게도 알려 주지 마세요.'
+        ? '다른 기기에서 이 메뉴를 쓰려면 이 코드가 필요해요. 이 코드가 있으면 마감하고 룰렛도 돌릴 수 있으니, 아무에게도 알려 주지 마세요.'
         : '다른 기기에서 이 메뉴를 쓰려면 이 코드가 필요해요. 다른 사람에게는 알려 주지 마세요.'),
       el('div', { class: 'key-row' }, el('code', null, entry.adminKey), el('button', {
         type: 'button', class: 'act', onclick: (event) => copyText(entry.adminKey, event.currentTarget),
@@ -1582,7 +1875,7 @@ async function receive(text) {
     state.loadedAt = 0;
     state.notice = result.added
       ? `링크에서 새 투표 ${result.added}개를 합쳤어요.`
-      : '링크의 투표는 이미 이 기기에 다 있어요.';
+      : result.changed ? '링크에서 마감이나 룰렛 결과를 받았어요.' : '링크의 내용은 이미 이 기기에 다 있어요.';
     navigate(`?g=${encodeURIComponent(result.id)}`, { replace: true });
     return true;
   }
@@ -1603,9 +1896,13 @@ async function onMerge() {
     return;
   }
   const added = results.reduce((sum, result) => sum + result.added, 0);
+  const changed = results.some((result) => result.changed);
   $('merge-input').value = '';
   await refresh();
-  say('merge-message', added ? `새 투표 ${added}개를 합쳤어요.` : '이미 이 기기에 다 있는 투표예요.', true);
+  let said = '이미 이 기기에 다 있는 내용이에요.';
+  if (added) said = `새 투표 ${added}개를 합쳤어요.`;
+  else if (changed) said = '마감이나 룰렛 결과를 받았어요.';
+  say('merge-message', said, true);
 }
 
 // --- Start -----------------------------------------------------------------

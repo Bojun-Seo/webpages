@@ -52,6 +52,7 @@ export function createClient(base) {
     unvote: (id, auth, ballotId) => call('DELETE', `${at(id)}/ballots/${encodeURIComponent(ballotId)}`, auth),
     close: (id, auth) => call('POST', `${at(id)}/close`, auth),
     reopen: (id, auth) => call('POST', `${at(id)}/reopen`, auth),
+    draw: (id, auth) => call('POST', `${at(id)}/draw`, auth),
     remove: (id, auth) => call('DELETE', at(id), auth),
   };
 }

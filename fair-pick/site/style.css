@@ -493,6 +493,68 @@ button.cal-wd { color: var(--ink); text-decoration: underline dotted; text-under
 .decision .absent small { font-size: 0.75rem; opacity: 0.9; }
 .decision .all-in { font-weight: 600; }
 
+/* The roulette for options level at the top */
+.wheel {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.9rem 0.75rem;
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.decision.none .wheel { background: var(--bg); }
+.wheel-stage { position: relative; width: min(100%, 18.75rem); aspect-ratio: 1; }
+.wheel-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.slice path { stroke: var(--surface); stroke-width: 2; }
+.slice text { font-family: var(--font-body); font-weight: 700; letter-spacing: -0.01em; }
+.slice-0 path { fill: var(--tone-best-soft); }
+.slice-0 text { fill: var(--tone-best-ink); }
+.slice-1 path { fill: var(--tone-meh-soft); }
+.slice-1 text { fill: var(--tone-meh-ink); }
+.slice-2 path { fill: var(--accent-soft); }
+.slice-2 text { fill: var(--ink); }
+.slice-3 path { fill: var(--tone-no-soft); }
+.slice-3 text { fill: var(--tone-no-ink); }
+.slice-4 path { fill: var(--tone-good-soft); }
+.slice-4 text { fill: var(--tone-good-ink); }
+.slice-5 path { fill: var(--tone-mid-soft); }
+.slice-5 text { fill: var(--tone-mid-ink); }
+.slice.won path { fill: var(--accent); }
+.slice.won text { fill: var(--on-accent); }
+.rim { fill: none; stroke: var(--line); stroke-width: 5; }
+.peg { fill: var(--surface); stroke: var(--muted); stroke-width: 1.2; }
+.hub { fill: var(--surface); stroke: var(--line); stroke-width: 2; }
+.wheel-pointer { transform-box: fill-box; transform-origin: 50% 0; }
+.wheel-pointer path { fill: var(--danger); stroke: var(--surface); stroke-width: 2.5; stroke-linejoin: round; }
+.wheel-pointer.tick { animation: wheel-tick 150ms ease-out; }
+@keyframes wheel-tick {
+  from { transform: rotate(-26deg); }
+  to { transform: rotate(0deg); }
+}
+.wheel-button {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 27%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 3px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 700 0.9375rem/1.2 var(--font-body);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.25);
+  cursor: pointer;
+}
+.wheel-button:disabled { cursor: default; opacity: 0.9; }
+.wheel-button.idle { background: var(--surface); color: var(--muted); border-color: var(--line); box-shadow: none; }
+.wheel.drawn .wheel-button { font-size: 0.8125rem; }
+
 /* Share */
 details.panel > summary { cursor: pointer; font-weight: 600; color: var(--accent); }
 details.panel:not([open]) { gap: 0; }

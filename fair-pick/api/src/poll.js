@@ -12,7 +12,7 @@
 // point, so the constants the tests read live here, not there.
 
 import { LIMITS, checkBallot, checkPoll, nameKey, newPinProblem, pinProblem } from '../../../common/site/poll-rules.js';
-import { decide } from '../../../common/site/social-choice.js';
+import { decide, tieKey } from '../../../common/site/social-choice.js';
 
 const MINUTE = 60e3;
 const HOUR = 60 * MINUTE;
@@ -67,15 +67,6 @@ function randomBelow(n) {
   return word[0] % n;
 }
 
-function shuffle(items) {
-  const out = [...items];
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = randomBelow(i + 1);
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
-}
-
 export async function sha256(text) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -92,9 +83,9 @@ function sameText(a, b) {
 
 const iso = (ms) => new Date(ms).toISOString();
 
-// What the page may see of a poll and its ballots: no PIN hash, no keys
-// and not the order a draw would take, and until the poll closes who voted
-// but not how, so that nobody votes by what the others did.
+// What the page may see of a poll and its ballots: no PIN hash and no
+// keys, and until the poll closes who voted but not how, so that nobody
+// votes by what the others did.
 function view(poll, ballots) {
   const { id, kind, title, note, options, createdAt, deadline, closedAt, decision, expiresAt } = poll;
   return {
@@ -178,7 +169,7 @@ export class Poll {
   }
 
   decisionOf(poll, ballots) {
-    return decide(poll.kind, ballots, poll.options.length, poll.tieOrder);
+    return decide(poll.kind, ballots, poll.options.length, poll.draws || {});
   }
 
   // Closes a poll whose deadline has passed; says whether it did.
@@ -218,6 +209,20 @@ export class Poll {
           await this.save(poll, ballots, now);
         }
         return { status: 200, body: view(poll, ballots) };
+      case 'draw': {
+        // The maker's roulette among the options level at the top: drawn
+        // here, once for each set of them, so that neither the moment the
+        // wheel is stopped nor closing again draws another.
+        if (!admin) return NOT_ADMIN;
+        if (!poll.closedAt) return problem(409, 'open', '마감한 뒤에 룰렛을 돌릴 수 있어요.');
+        if (poll.decision?.pending) {
+          const { tied } = poll.decision;
+          poll.draws = { ...poll.draws, [tieKey(tied)]: tied[randomBelow(tied.length)] };
+          poll.decision = this.decisionOf(poll, ballots);
+          await this.save(poll, ballots, now);
+        }
+        return { status: 200, body: view(poll, ballots) };
+      }
       case 'reopen':
         if (!admin) return NOT_ADMIN;
         if (poll.closedAt) {
@@ -275,9 +280,8 @@ export class Poll {
       pinHash: await sha256(`${salt}:${body.pin}`),
       memberToken: randomKey(),
       adminHash: await sha256(adminKey),
-      // The order a draw takes between options level at the top when the
-      // poll closes, drawn now so that closing again cannot draw again.
-      tieOrder: shuffle(checked.poll.options.map((_, i) => i)),
+      // What the maker's roulette drew, by the options it was spun among.
+      draws: {},
     };
     await this.save(poll, [], now);
     return { status: 201, body: { token: poll.memberToken, adminKey, ...view(poll, []) } };

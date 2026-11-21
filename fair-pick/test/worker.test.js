@@ -49,7 +49,7 @@ test('a poll is made under its group ID, which no second poll can take', async (
   assert.deepEqual(ballots, []);
   assert.ok(token.length >= 20 && adminKey.length >= 20);
   // Nothing secret goes to the page.
-  for (const secret of ['pinHash', 'pinSalt', 'memberToken', 'adminHash', 'tieOrder']) assert.ok(!(secret in poll), secret);
+  for (const secret of ['pinHash', 'pinSalt', 'memberToken', 'adminHash', 'draws']) assert.ok(!(secret in poll), secret);
 
   const again = await call('POST', '/polls', { body: { ...DINNER, id: 'team-dinner' } });
   assert.equal(again.status, 409);
@@ -184,23 +184,40 @@ test('the maker closes the poll and it decides; a member cannot, and nobody vote
   // Neither the maker nor anyone else sees how anyone voted before the close.
   const before = await call('GET', '/polls/team-dinner', { token, admin: adminKey });
   assert.ok(before.body.ballots.every((ballot) => ballot.grades === undefined));
+  assert.equal((await call('POST', '/polls/team-dinner/draw', { token, admin: adminKey })).status, 409);
   const closed = await call('POST', '/polls/team-dinner/close', { token, admin: adminKey });
   assert.equal(closed.status, 200);
   assert.ok(closed.body.poll.closedAt);
   assert.deepEqual(closed.body.ballots.map((ballot) => ballot.grades), [[2, 1, 0], [1, 2, 0]]);
-  // Dates 0 and 1 are level on everything; the draw fixed at the start picks one.
-  assert.deepEqual(closed.body.poll.decision.tied, [0, 1]);
-  assert.equal(closed.body.poll.decision.drawn, true);
+  // Dates 0 and 1 are level on everything, so the decision waits for the maker's roulette.
+  assert.deepEqual(closed.body.poll.decision, { index: null, tied: [0, 1], drawn: false, pending: true });
   const late = await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '박지훈', grades: [2, 2, 2] } });
   assert.equal(late.status, 423);
+  assert.equal((await call('POST', '/polls/team-dinner/draw', { token })).status, 403);
+  const drawn = await call('POST', '/polls/team-dinner/draw', { token, admin: adminKey });
+  const picked = drawn.body.poll.decision.index;
+  assert.deepEqual(drawn.body.poll.decision, { index: picked, tied: [0, 1], drawn: true });
+  assert.ok([0, 1].includes(picked));
 
-  // Reopening and closing again cannot draw again.
-  const picked = closed.body.poll.decision.index;
+  // Spinning again, or reopening and closing again, cannot draw again.
   for (let i = 0; i < 5; i++) {
+    const spun = await call('POST', '/polls/team-dinner/draw', { token, admin: adminKey });
+    assert.equal(spun.body.poll.decision.index, picked);
     await call('POST', '/polls/team-dinner/reopen', { token, admin: adminKey });
     const again = await call('POST', '/polls/team-dinner/close', { token, admin: adminKey });
-    assert.equal(again.body.poll.decision.index, picked);
+    assert.deepEqual(again.body.poll.decision, { index: picked, tied: [0, 1], drawn: true });
   }
+});
+
+test('the roulette picks any of the options level at the top', async () => {
+  const seen = new Set();
+  for (let i = 0; i < 24 && seen.size < 2; i++) {
+    const { call, token, adminKey } = await made();
+    await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '김민수', grades: [2, 2, 0] } });
+    await call('POST', '/polls/team-dinner/close', { token, admin: adminKey });
+    seen.add((await call('POST', '/polls/team-dinner/draw', { token, admin: adminKey })).body.poll.decision.index);
+  }
+  assert.deepEqual([...seen].sort(), [0, 1]);
 });
 
 test('a poll whose deadline passes closes by itself and decides', async () => {

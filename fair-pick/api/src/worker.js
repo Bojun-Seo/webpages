@@ -10,11 +10,13 @@
 //   DELETE /polls/:id/ballots/:ballot  → { poll, ballots }
 //   POST   /polls/:id/close            → { poll, ballots }
 //   POST   /polls/:id/reopen           → { poll, ballots }
+//   POST   /polls/:id/draw             → { poll, ballots }, the roulette's pick of a tie
 //   DELETE /polls/:id                  → { deleted: true }
 //
 // Every call but the first two carries the poll's token, which the PIN
 // unlocks, as `Authorization: Bearer`; closing, reopening and deleting the
-// poll, or another voter's ballot, also need the admin key its maker got
+// poll, spinning its roulette, or another voter's ballot, also need the
+// admin key its maker got
 // (`X-Admin-Key`), and changing a ballot the key its voter got
 // (`X-Ballot-Key`). A ballot's grades are each date's ✕ △ ○ (0 to 2), or
 // each option's points from its place, n - 1 for the first of n; until the
@@ -71,7 +73,7 @@ function actionOf(method, parts) {
   if (parts.length === 1) return method === 'POST' ? 'create' : null;
   if (parts.length === 2) return { GET: 'get', DELETE: 'delete' }[method] || null;
   if (parts.length === 3) {
-    if (method === 'POST') return { enter: 'enter', close: 'close', reopen: 'reopen' }[what] || null;
+    if (method === 'POST') return { enter: 'enter', close: 'close', reopen: 'reopen', draw: 'draw' }[what] || null;
     return method === 'PUT' && what === 'ballot' ? 'vote' : null;
   }
   return parts.length === 4 && method === 'DELETE' && what === 'ballots' ? 'unvote' : null;

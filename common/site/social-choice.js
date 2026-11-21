@@ -32,8 +32,8 @@
 //    a Condorcet winner else Borda's is Black's method (1958).
 //
 // Options level after that share the place. When a poll closes with
-// several first, `decide` takes the one that comes first in an order drawn
-// at random when the poll was made, which no one has seen.
+// several first, its maker spins a roulette of them once, and `decide`
+// goes with the option drawn.
 
 import { MEH, NO, YES } from './poll-rules.js';
 
@@ -232,16 +232,24 @@ export function rank(kind, ballots, count) {
   return kind === 'date' ? rankDates(ballots, count) : rankChoices(ballots, count);
 }
 
+// The key a draw among the options `tied` is kept under: "0,3,4".
+export function tieKey(tied) {
+  return [...tied].sort((a, b) => a - b).join(',');
+}
+
 // The option a closed poll goes with: { index, tied, drawn }, where `tied`
-// lists the options ranked first and `drawn` says whether `tieOrder`, a
-// permutation of the options drawn when the poll was made, picked among
-// them. Null when nobody voted.
-export function decide(kind, ballots, count, tieOrder) {
+// lists the options ranked first. When there are several, `draws` maps
+// the key of each set of options a roulette was spun for to the option
+// drawn: with one for this set, `index` is that option and `drawn` true;
+// without, `index` is null and `pending` true, for the maker to spin. Null
+// when nobody voted.
+export function decide(kind, ballots, count, draws = {}) {
   if (ballots.length === 0) return null;
-  const first = rank(kind, ballots, count).filter((t) => t.rank === 1).map((t) => t.index);
-  if (first.length === 1) return { index: first[0], tied: first, drawn: false };
-  const index = tieOrder.find((i) => first.includes(i)) ?? Math.min(...first);
-  return { index, tied: [...first].sort((a, b) => a - b), drawn: true };
+  const tied = rank(kind, ballots, count).filter((t) => t.rank === 1).map((t) => t.index).sort((a, b) => a - b);
+  if (tied.length === 1) return { index: tied[0], tied, drawn: false };
+  const index = draws[tieKey(tied)];
+  if (tied.includes(index)) return { index, tied, drawn: true };
+  return { index: null, tied, drawn: false, pending: true };
 }
 
 // The options of `all` with the highest `value`.

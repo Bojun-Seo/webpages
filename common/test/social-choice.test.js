@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { pointsOf } from '../site/poll-rules.js';
 import {
   bordaIn, cycleIn, decide, mileage, mileageHalves, otherRules, pairwise, rankChoices, rankDates, scoreOf, smithSet,
+  tieKey,
 } from '../site/social-choice.js';
 
 const [X, T, O] = [0, 1, 2];
@@ -64,11 +65,16 @@ test('a voter who gives △ to all but a favourite pushes it less than one who i
   assert.deepEqual(otherRules('date', ballots, 4).flat, [0, 1, 2, 3]);
 });
 
-test('a closed date poll draws among the dates level at the top in the order fixed when it was made', () => {
+test('a closed poll level at the top waits for the roulette, and goes with what it drew for those very options', () => {
   const ballots = dates([O, O, X], [O, O, T]);
-  assert.deepEqual(decide('date', ballots, 3, [2, 1, 0]), { index: 1, tied: [0, 1], drawn: true });
-  assert.deepEqual(decide('date', dates([O, T]), 2, [1, 0]), { index: 0, tied: [0], drawn: false });
-  assert.equal(decide('date', [], 2, [1, 0]), null);
+  assert.deepEqual(decide('date', ballots, 3), { index: null, tied: [0, 1], drawn: false, pending: true });
+  assert.deepEqual(decide('date', ballots, 3, { '0,1': 1 }), { index: 1, tied: [0, 1], drawn: true });
+  // A draw among other options, or of an option not level at the top, does not count.
+  assert.equal(decide('date', ballots, 3, { '0,1,2': 1 }).pending, true);
+  assert.equal(decide('date', ballots, 3, { '0,1': 2 }).pending, true);
+  assert.deepEqual(decide('date', dates([O, T]), 2), { index: 0, tied: [0], drawn: false });
+  assert.equal(decide('date', [], 2), null);
+  assert.equal(tieKey([4, 0, 3]), '0,3,4');
 });
 
 test('the option that beats every other head to head wins, though Borda and leximin would take another', () => {
@@ -88,9 +94,8 @@ test('the Condorcet paradox leaves every option of the circle level when it is p
   assert.deepEqual(ranked[0].smith, [0, 1, 2]);
   assert.deepEqual(ranked[0].cycle, [0, 1, 2]);
   assert.deepEqual(ranked[0].borda, { 0: 3, 1: 3, 2: 3 });
-  // Closing draws in the order fixed when the poll was made, the same way every time.
-  assert.deepEqual(decide('choice', PARADOX, 3, [2, 0, 1]), { index: 2, tied: [0, 1, 2], drawn: true });
-  assert.deepEqual(decide('choice', PARADOX, 3, [1, 2, 0]), { index: 1, tied: [0, 1, 2], drawn: true });
+  // Closing leaves the three for the roulette.
+  assert.deepEqual(decide('choice', PARADOX, 3), { index: null, tied: [0, 1, 2], drawn: false, pending: true });
 });
 
 test('a circle of unequal majorities is settled by Borda points, and the rest by head to head', () => {
@@ -98,7 +103,7 @@ test('a circle of unequal majorities is settled by Borda points, and the rest by
   assert.deepEqual(placesOf(ranked), [[1, 1, 'borda'], [2, 2, 'condorcet'], [0, 3, 'last']]);
   assert.deepEqual(ranked[0].borda, { 0: 5, 1: 6, 2: 4 });
   assert.deepEqual(ranked[0].cycle, [0, 1, 2]);
-  assert.deepEqual(decide('choice', UNEVEN, 3, [0, 2, 1]), { index: 1, tied: [1], drawn: false });
+  assert.deepEqual(decide('choice', UNEVEN, 3), { index: 1, tied: [1], drawn: false });
 });
 
 test('a draw at the top with no circle is settled by Borda points against every option left', () => {

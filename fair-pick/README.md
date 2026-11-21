@@ -62,9 +62,10 @@ live](#where-the-polls-live) changes how a poll gets from one phone to another.
    its Borda points and the circle, when majorities go round in one. Beside them, what other
    well-known rules would pick from the same ballots.
 5. **Closing.** The poll closes at its deadline, or when its maker closes it, and the decision
-   shows at the top; for a date, with the names of those who said they cannot come that day. The
-   maker's menu also reopens the poll, takes out any ballot, and deletes the poll. It opens on the
-   device that made the poll; another needs the admin code it shows.
+   shows at the top; for a date, with the names of those who said they cannot come that day. When
+   options are level at the top, the maker spins a roulette of them there first. The maker's menu
+   also reopens the poll, takes out any ballot, and deletes the poll. It opens on the device that
+   made the poll; another needs the admin code it shows.
 6. **Sharing.** 함께할 사람 부르기 copies the link, or an invitation with the link, the group ID and,
    where the device knows it, the PIN, or hands it to the phone's share sheet.
 
@@ -112,11 +113,15 @@ to 0 for the last, so no ballot weighs more than another and nobody can rule an 
 
 ### Either way
 
-Options still level share the place. When a poll closes with several first, it goes with the one
-that comes first in an order drawn at random when the poll was made, by the API or, in links, by
-the maker's phone. Nobody sees the order, and since it was drawn once, closing again cannot draw
-again. In a perfectly even circle, three voters each preferring a different option, that order
-decides.
+Options still level share the place. When a poll closes with several first, as in a perfectly
+even circle of three voters each preferring a different option, the decision puts them on a
+roulette, which the maker spins. 시작 sets the wheel going; 멈춤 asks the API, or in links the
+maker's phone, to draw one of them at random, and the wheel slows from the speed it has at a
+steady deceleration, as friction would stop it, picked within a natural range so that it comes to
+rest on the option drawn. The moment 멈춤 is pressed decides nothing, so nobody can aim. One option
+is drawn for each set of options level at the top: spinning again, or reopening the poll and
+closing it on the same tie, keeps it. Anyone can then watch the wheel land on it again with 다시
+보기; with reduced motion asked for, the wheel turns straight to it.
 
 Until the poll closes the page shows who voted but not how, the maker included: whoever could see
 the others' ballots could work out the one false ✕ or the one option put last that tips the result.
@@ -151,11 +156,12 @@ Until the repository variable `FAIR_PICK_API` names an API, the page keeps its p
    taken out stays out, so neither the order the links are opened in nor opening one twice changes
    anything; two people who voted from the same older link both count once someone opens both
    their links. The results say they count the ballots this phone has.
-4. **Closing.** The maker's phone draws a seed when the poll is made and puts only its SHA-256 in the
-   poll. Closing shows the seed in the closing link; every phone checks it against the hash, and a
-   draw between options level at the top follows the order the seed gives, so the maker cannot draw
-   again. A deadline closes the poll on every phone by itself; if options are level then, the
-   decision waits for the maker's phone, which shows the seed the next time it opens the poll.
+4. **Closing.** The maker's phone draws the admin code when the poll is made and puts only its
+   SHA-256 in the poll, which tells the maker's phones from the others. A deadline closes the poll
+   on every phone by itself. When options are level at the top, the maker's phone spins the
+   roulette and keeps what it drew in the poll, which the next link carries like a ballot; if two
+   of the maker's phones draw before either sees the other's, the first draw stands on every
+   phone.
 
 A link for thirty voters on a whole month of dates stays under 4,000 characters, which the tests
 check; a usual poll's is a few hundred. A link from before places were put in order, which graded
@@ -178,9 +184,9 @@ In links:
   eight-digit PIN falls in hours to whoever has both the link and the group ID. So the links stay
   in the group chat, the group ID is best hard to guess, and the page recommends eight digits.
 - **A voter** changes or takes back their own ballots from the phone that cast them, and **the
-  maker** closes, reopens and takes out any ballot with the admin code, which is the seed.
+  maker** closes, reopens, spins the roulette and takes out any ballot with the admin code.
 - **Nothing stops a member who has the group ID and the PIN** from writing a link of their own with
-  the ballots changed, since no server checks a change. The ballots are named and a change shows
+  the ballots or the roulette's draw changed, since no server checks a change. The ballots are named and a change shows
   under its voter's name, so the page suits people who trust each other; the API gives the stronger
   guarantee.
 - **No server stores anything.** Each phone keeps the polls it has opened in its local storage,
@@ -198,10 +204,11 @@ On the API:
   a year, so the page asks for six.
 - **A voter** changes or takes back only their own ballots: the API gives a key with each
   ballot, which their browser keeps, and keeps only its hash.
-- **The maker** closes, reopens and deletes the poll and takes out any ballot, with the admin
-  code the API gave when the poll was made, also kept as a hash.
-- **Nobody** can see the order a draw would take. A poll is deleted 60 days after it last
-  changed, and at once when its maker deletes it.
+- **The maker** closes, reopens and deletes the poll, spins its roulette and takes out any ballot,
+  with the admin code the API gave when the poll was made, also kept as a hash. The roulette's
+  draw is made on the API, once for each tie.
+- **Nobody** keeps a poll for long: it is deleted 60 days after it last changed, and at once when
+  its maker deletes it.
 
 The page talks to the API with `fetch`; the API answers browsers on the page's own site and on
 this machine only (`ALLOWED_ORIGINS` in `api/wrangler.toml`).
@@ -289,7 +296,9 @@ npm test
 - Borda points, which settle a circle or a draw between places, can shift when options much alike
   are added; a Condorcet winner, where there is one, does not.
 - A poll in links that closed before places were put in order and dates weighed by mileage is
-  counted again by the rule now when it is opened, and may come out differently.
+  counted again by the rule now when it is opened, and may come out differently; one left level at
+  the top waits for its maker to spin the roulette, where it once followed an order drawn when it
+  was made.
 - Dates are whole days; a time of day goes in the note.
 - On the API, the results refresh when the page comes back into view and with 새로고침, not by
   themselves.
