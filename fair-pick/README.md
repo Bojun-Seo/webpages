@@ -1,5 +1,7 @@
 # Fair Group Vote
 
+**Open the page: <https://bojun-seo.github.io/webpages/fair-pick/>**
+
 A page for a group that has to settle on one thing together, a date or a place for a team
 dinner (회식), a menu, anything: its maker sets up a poll under a group ID and a PIN of their
 choosing, the others get in with both and vote under their own names, each date ○, △ or ✕ and

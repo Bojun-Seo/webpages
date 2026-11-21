@@ -77,6 +77,8 @@
     </header>
 
     <form class="panel create" id="create-form" novalidate aria-label="새 투표">
+      <p class="fine req-note" aria-hidden="true"><span class="req">*</span> 표시는 꼭 넣어야 하는 칸이에요.</p>
+
       <fieldset>
         <legend>무엇을 정하나요?</legend>
         <div class="seg">
@@ -88,8 +90,8 @@
       <fieldset>
         <legend>제목과 설명</legend>
         <label class="field">
-          <span>제목</span>
-          <input id="title-input" type="text" maxlength="60" placeholder="12월 팀 회식" autocomplete="off">
+          <span>제목<span class="req" aria-hidden="true"> *</span></span>
+          <input id="title-input" type="text" maxlength="60" placeholder="12월 팀 회식" autocomplete="off" aria-required="true">
         </label>
         <label class="field">
           <span>설명 (적지 않아도 돼요)</span>
@@ -98,7 +100,7 @@
       </fieldset>
 
       <fieldset id="dates-fieldset">
-        <legend>후보 날짜</legend>
+        <legend>후보 날짜<span class="req" aria-hidden="true"> *</span><span class="sr-only"> (필수)</span></legend>
         <p class="fine">날짜를 누르면 고르고, 다시 누르면 뺍니다. 요일 이름을 누르면 그 달의 그 요일을 한꺼번에 고릅니다. 빨간 날은 일요일과 공휴일, 파란 날은 토요일입니다.</p>
         <div class="cal" id="picker"></div>
         <p class="fine" id="picked-count" aria-live="polite"></p>
@@ -106,7 +108,7 @@
       </fieldset>
 
       <fieldset id="choices-fieldset" hidden>
-        <legend>후보</legend>
+        <legend>후보<span class="req" aria-hidden="true"> *</span><span class="sr-only"> (필수)</span></legend>
         <ol class="choice-list" id="choice-list"></ol>
         <button type="button" class="ghost" id="add-choice">+ 후보 추가</button>
       </fieldset>
@@ -123,16 +125,16 @@
       <fieldset>
         <legend>그룹 ID와 PIN</legend>
         <label class="field">
-          <span>그룹 ID</span>
-          <input id="id-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="30" placeholder="team-dinner">
+          <span>그룹 ID<span class="req" aria-hidden="true"> *</span></span>
+          <input id="id-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="30" placeholder="team-dinner" aria-required="true">
         </label>
         <p class="fine">영문 소문자·숫자·한글과 -, _로 4~30자.
           <span data-only="server">다른 투표가 쓰는 ID는 쓸 수 없어요.</span>
           <span data-only="links">링크를 연 사람은 이 ID와 PIN을 함께 넣어야 들어올 수 있어요. 남이 짐작하기 어려운 ID일수록 안전해요.</span></p>
         <label class="field">
-          <span>PIN (숫자 4~8자리)</span>
+          <span>PIN (숫자 4~8자리)<span class="req" aria-hidden="true"> *</span></span>
           <span class="pin-row">
-            <input id="pin-input" type="text" inputmode="numeric" autocomplete="off" maxlength="8">
+            <input id="pin-input" type="text" inputmode="numeric" autocomplete="off" maxlength="8" aria-required="true">
             <button type="button" class="ghost" id="random-pin">무작위</button>
           </span>
         </label>
