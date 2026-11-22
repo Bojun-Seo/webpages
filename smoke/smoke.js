@@ -331,8 +331,8 @@ const checks = {
     await page.waitForSelector('#decision:not([hidden])');
     if (!(await page.isVisible('#paradox'))) problems.push('fair-pick: a circle of majorities shows no paradox');
     const first = await page.locator('#results .result').first().textContent();
-    if (!/^1나/.test(first) || !/보르다/.test(first)) {
-      problems.push(`fair-pick: the circle's first place is "${first.slice(0, 60)}"`);
+    if (!/^나결정/.test(first) || !/보르다/.test(first)) {
+      problems.push(`fair-pick: the circle's pick is "${first.slice(0, 60)}"`);
     }
     return problems;
   },

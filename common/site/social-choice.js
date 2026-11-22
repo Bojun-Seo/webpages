@@ -4,11 +4,10 @@
 // maker wrote down, and the two are voted differently.
 //
 // A date: every voter answers each date ○ (would like it), △ (can come but
-// would rather not) or ✕ (cannot come). The rule takes, of the dates not
-// yet placed:
+// would rather not) or ✕ (cannot come). The rule takes:
 //
-// 1. Those the fewest cannot come to, every voter counting one, so that as
-//    many come as can.
+// 1. The dates the fewest cannot come to, every voter counting one, so that
+//    as many come as can.
 // 2. Of those, the one with the highest preference score: the sum of the
 //    mileage of the voters who gave it ○. Every voter starts with a mileage
 //    of 1, which each ✕ they give cuts by 1/n and each △ by half of that,
@@ -19,21 +18,21 @@
 //
 // A choice: every voter puts all the options in order, and so hands out
 // the same points as everyone else, n - 1 for the first down to 0 for the
-// last. The rule takes, of the options not yet placed:
+// last. The rule takes:
 //
-// 1. The one that beats every other head to head, more voters putting it
-//    above than below: the Condorcet winner.
+// 1. The option that beats every other head to head, more voters putting
+//    it above than below: the Condorcet winner.
 // 2. When there is none, because majorities go round in a circle (A beats
 //    B, B beats C and C beats A: the Condorcet paradox) or draw, the one
 //    with the most Borda points among those caught in it, the top cycle
-//    (Smith set): from each voter a point for each other option not yet
-//    placed that they put below it. Borda adds up every head-to-head
-//    contest at once, so what goes round in a circle cancels out (Saari);
-//    a Condorcet winner else Borda's is Black's method (1958).
+//    (Smith set): from each voter a point for each other option they put
+//    below it. Borda adds up every head-to-head contest at once, so what
+//    goes round in a circle cancels out (Saari); a Condorcet winner else
+//    Borda's is Black's method (1958).
 //
-// Options level after that share the place. When a poll closes with
-// several first, its maker spins a roulette of them once, and `decide`
-// goes with the option drawn.
+// The rule picks one option and ranks no others. When several are still
+// level, the poll's maker spins a roulette of them once it closes, and
+// `decide` goes with the option drawn.
 
 import { MEH, NO, YES } from './poll-rules.js';
 
@@ -124,15 +123,15 @@ export function cycleIn(set, wins) {
   return shortest;
 }
 
-// The dates in the rule's order, first place first. Each comes with
-// `counts`, how many gave it ✕, △ and ○; `absent`, how many cannot come;
-// `score`, its preference score in halves of 1/n (scoreOf reads it); its
-// `rank`, dates level sharing one (1, 1, 3); `pool`, the dates left that
-// the fewest could not come to, which it was placed among; and `by`, how
-// its place was settled: 'last' for the one date left, 'absent' for the
-// only one the fewest could not come to, 'score' for the one of those with
-// the highest score, and 'tie' when that was level too.
-export function rankDates(ballots, count) {
+// How the rule picks among the options of a date poll: `tallies`, each
+// date's { index, counts, absent, score } in the poll's order, `counts`
+// being how many gave it ✕, △ and ○, `absent` how many cannot come and
+// `score` its preference score in halves of 1/n (scoreOf reads it);
+// `pool`, the dates the fewest cannot come to; `first`, those of them with
+// the highest score; and `by`, what settled it: 'absent' when one date
+// alone has the fewest who cannot come, 'score' when the score picks one
+// of several, and 'tie' when it leaves several level.
+export function pickDate(ballots, count) {
   const halves = ballots.map((ballot) => mileageHalves(ballot.grades));
   const tallies = Array.from({ length: count }, (_, index) => {
     const counts = [0, 0, 0];
@@ -144,22 +143,14 @@ export function rankDates(ballots, count) {
     });
     return { index, counts, absent: counts[NO], score };
   });
-  const placed = [];
-  let left = tallies.map((t) => t.index);
-  while (left.length > 0) {
-    const fewest = Math.min(...left.map((index) => tallies[index].absent));
-    const pool = left.filter((index) => tallies[index].absent === fewest);
-    const best = Math.max(...pool.map((index) => tallies[index].score));
-    const first = pool.filter((index) => tallies[index].score === best);
-    let by = 'tie';
-    if (left.length === 1) by = 'last';
-    else if (pool.length === 1) by = 'absent';
-    else if (first.length === 1) by = 'score';
-    const place = placed.length + 1;
-    for (const index of first) placed.push({ ...tallies[index], rank: place, by, pool });
-    left = left.filter((index) => !first.includes(index));
-  }
-  return placed;
+  const fewest = Math.min(...tallies.map((t) => t.absent));
+  const pool = tallies.filter((t) => t.absent === fewest).map((t) => t.index);
+  const best = Math.max(...pool.map((index) => tallies[index].score));
+  const first = pool.filter((index) => tallies[index].score === best);
+  let by = 'tie';
+  if (pool.length === 1) by = 'absent';
+  else if (first.length === 1) by = 'score';
+  return { tallies, pool, first, by };
 }
 
 // A date's preference score as the sum of mileages it is: `score` halves
@@ -168,17 +159,17 @@ export function scoreOf(score, count) {
   return count === 0 ? 0 : score / (2 * count);
 }
 
-// The options of a choice poll in the rule's order, first place first. Each
-// comes with `firsts`, how many put it first; `total`, its Borda points
-// against every other option; `record`, its wins, draws and losses head to
-// head against every other option; its `rank`, options level sharing one;
-// `left`, the options not yet placed it was placed among; `smith`, their
-// top cycle; `cycle`, a circle of wins in it, if there is one; `borda`, the
-// Borda points of the top cycle's options when there are several; and
-// `by`: 'last' for the one option left, 'condorcet' for the one that beat
-// every other left head to head, 'borda' for the one of the top cycle with
-// the most points, and 'tie' when that was level too.
-export function rankChoices(ballots, count) {
+// How the rule picks among the options of a choice poll: `tallies`, each
+// option's { index, firsts, total, record } in the poll's order, `firsts`
+// being how many put it first, `total` its Borda points against every
+// other option and `record` its wins, draws and losses head to head
+// against every other option; `smith`, the top cycle; `cycle`, a circle of
+// wins in it, if there is one; `borda`, the Borda points of the top
+// cycle's options when there are several; `first`, the option picked, or
+// those still level; and `by`: 'condorcet' for the one that beats every
+// other head to head, 'borda' for the one of the top cycle with the most
+// points, and 'tie' when that leaves several level.
+export function pickChoice(ballots, count) {
   const wins = pairwise(ballots, count);
   const all = Array.from({ length: count }, (_, index) => index);
   const totals = bordaIn(all, all, wins, ballots.length);
@@ -198,38 +189,21 @@ export function rankChoices(ballots, count) {
     total: totals.get(index),
     record: record(index),
   }));
-  const placed = [];
-  let left = all;
-  while (left.length > 0) {
-    const smith = smithSet(left, wins);
-    let first = smith;
-    let by;
-    let borda = null;
-    let cycle = null;
-    if (left.length === 1) by = 'last';
-    else if (smith.length === 1) by = 'condorcet';
-    else {
-      borda = bordaIn(smith, left, wins, ballots.length);
-      cycle = cycleIn(smith, wins);
-      const most = Math.max(...borda.values());
-      first = smith.filter((index) => borda.get(index) === most);
-      by = first.length === 1 ? 'borda' : 'tie';
-    }
-    const place = placed.length + 1;
-    for (const index of first) {
-      placed.push({
-        ...tallies[index], rank: place, by, left, smith, cycle, borda: borda && Object.fromEntries(borda),
-      });
-    }
-    left = left.filter((index) => !first.includes(index));
-  }
-  return placed;
+  const smith = smithSet(all, wins);
+  if (smith.length === 1) return { tallies, smith, cycle: null, borda: null, first: smith, by: 'condorcet' };
+  const borda = bordaIn(smith, all, wins, ballots.length);
+  const most = Math.max(...borda.values());
+  const first = smith.filter((index) => borda.get(index) === most);
+  return {
+    tallies, smith, cycle: cycleIn(smith, wins), borda: Object.fromEntries(borda), first,
+    by: first.length === 1 ? 'borda' : 'tie',
+  };
 }
 
-// The options of a `kind` poll in the rule's order, as rankDates or
-// rankChoices gives them.
-export function rank(kind, ballots, count) {
-  return kind === 'date' ? rankDates(ballots, count) : rankChoices(ballots, count);
+// How the rule picks among the options of a `kind` poll, as pickDate or
+// pickChoice says.
+export function pick(kind, ballots, count) {
+  return kind === 'date' ? pickDate(ballots, count) : pickChoice(ballots, count);
 }
 
 // The key a draw among the options `tied` is kept under: "0,3,4".
@@ -238,14 +212,14 @@ export function tieKey(tied) {
 }
 
 // The option a closed poll goes with: { index, tied, drawn }, where `tied`
-// lists the options ranked first. When there are several, `draws` maps
+// lists the options the rule picks. When there are several, `draws` maps
 // the key of each set of options a roulette was spun for to the option
 // drawn: with one for this set, `index` is that option and `drawn` true;
 // without, `index` is null and `pending` true, for the maker to spin. Null
 // when nobody voted.
 export function decide(kind, ballots, count, draws = {}) {
   if (ballots.length === 0) return null;
-  const tied = rank(kind, ballots, count).filter((t) => t.rank === 1).map((t) => t.index).sort((a, b) => a - b);
+  const tied = [...pick(kind, ballots, count).first].sort((a, b) => a - b);
   if (tied.length === 1) return { index: tied[0], tied, drawn: false };
   const index = draws[tieKey(tied)];
   if (tied.includes(index)) return { index, tied, drawn: true };

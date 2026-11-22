@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pointsOf } from '../site/poll-rules.js';
 import {
-  bordaIn, cycleIn, decide, mileage, mileageHalves, otherRules, pairwise, rankChoices, rankDates, scoreOf, smithSet,
+  bordaIn, cycleIn, decide, mileage, mileageHalves, otherRules, pairwise, pickChoice, pickDate, scoreOf, smithSet,
   tieKey,
 } from '../site/social-choice.js';
 
@@ -18,7 +18,8 @@ function orders(...voters) {
   return voters.map((order, voter) => ({ name: `v${voter}`, grades: pointsOf(order) }));
 }
 
-const placesOf = (ranked) => ranked.map((t) => [t.index, t.rank, t.by]);
+// What a pick took, and how.
+const firstOf = (picked) => [picked.first, picked.by];
 
 // Three voters whose preferences go round in a circle, the Condorcet
 // paradox at its plainest: A beats B, B beats C and C beats A, two to one.
@@ -39,7 +40,7 @@ test('mileage starts whole and loses 1/n for each ✕ and half that for each △
 
 test('a date more can come to comes first, however much the others like another', () => {
   const ballots = dates([O, T], [O, T], [X, O]);
-  assert.deepEqual(placesOf(rankDates(ballots, 2)), [[1, 1, 'absent'], [0, 2, 'last']]);
+  assert.deepEqual(firstOf(pickDate(ballots, 2)), [[1], 'absent']);
 });
 
 test('among dates as many can come to, the ○ of a voter who leaves more open weighs more', () => {
@@ -48,12 +49,14 @@ test('among dates as many can come to, the ○ of a voter who leaves more open w
   const minsu = [T, O, O, O];
   const younghee = [O, T, X, X];
   const ballots = dates(minsu, younghee);
-  const ranked = rankDates(ballots, 4);
-  assert.deepEqual(placesOf(ranked), [[1, 1, 'score'], [0, 2, 'absent'], [2, 3, 'tie'], [3, 3, 'tie']]);
-  assert.deepEqual(ranked.map((t) => t.score), [7, 3, 7, 7]);
-  assert.equal(scoreOf(ranked[0].score, 4), 7 / 8);
-  assert.deepEqual(ranked[0].pool, [0, 1]);
-  assert.deepEqual(ranked[0].counts, [0, 1, 1]);
+  const picked = pickDate(ballots, 4);
+  assert.deepEqual(firstOf(picked), [[1], 'score']);
+  assert.deepEqual(picked.pool, [0, 1]);
+  // Each date's tally, in the poll's order.
+  assert.deepEqual(picked.tallies.map((t) => t.score), [3, 7, 7, 7]);
+  assert.deepEqual(picked.tallies.map((t) => t.absent), [0, 0, 1, 1]);
+  assert.deepEqual(picked.tallies[1].counts, [0, 1, 1]);
+  assert.equal(scoreOf(picked.tallies[1].score, 4), 7 / 8);
 });
 
 test('a voter who gives △ to all but a favourite pushes it less than one who is open to more', () => {
@@ -61,7 +64,7 @@ test('a voter who gives △ to all but a favourite pushes it less than one who i
   const open = [O, O, O, T];
   const picky = [T, T, T, O];
   const ballots = dates(open, picky);
-  assert.deepEqual(placesOf(rankDates(ballots, 4)), [[0, 1, 'tie'], [1, 1, 'tie'], [2, 1, 'tie'], [3, 4, 'last']]);
+  assert.deepEqual(firstOf(pickDate(ballots, 4)), [[0, 1, 2], 'tie']);
   assert.deepEqual(otherRules('date', ballots, 4).flat, [0, 1, 2, 3]);
 });
 
@@ -81,41 +84,40 @@ test('the option that beats every other head to head wins, though Borda and lexi
   // Three put A, B, C and two B, C, A: A beats both 3-2, B has more points
   // and is nobody's last.
   const ballots = orders([0, 1, 2], [0, 1, 2], [0, 1, 2], [1, 2, 0], [1, 2, 0]);
-  const ranked = rankChoices(ballots, 3);
-  assert.deepEqual(placesOf(ranked), [[0, 1, 'condorcet'], [1, 2, 'condorcet'], [2, 3, 'last']]);
-  assert.deepEqual(ranked[0].record, { won: 2, drew: 0, lost: 0 });
-  assert.deepEqual([ranked[0].firsts, ranked[0].total, ranked[1].total], [3, 6, 7]);
+  const picked = pickChoice(ballots, 3);
+  assert.deepEqual(firstOf(picked), [[0], 'condorcet']);
+  assert.deepEqual(picked.tallies[0].record, { won: 2, drew: 0, lost: 0 });
+  assert.deepEqual(picked.tallies.map((t) => [t.firsts, t.total]), [[3, 6], [2, 7], [0, 2]]);
   assert.deepEqual(otherRules('choice', ballots, 3), { plurality: [0], borda: [1], copeland: [0], rawls: [1] });
 });
 
 test('the Condorcet paradox leaves every option of the circle level when it is perfectly even', () => {
-  const ranked = rankChoices(PARADOX, 3);
-  assert.deepEqual(placesOf(ranked), [[0, 1, 'tie'], [1, 1, 'tie'], [2, 1, 'tie']]);
-  assert.deepEqual(ranked[0].smith, [0, 1, 2]);
-  assert.deepEqual(ranked[0].cycle, [0, 1, 2]);
-  assert.deepEqual(ranked[0].borda, { 0: 3, 1: 3, 2: 3 });
+  const picked = pickChoice(PARADOX, 3);
+  assert.deepEqual(firstOf(picked), [[0, 1, 2], 'tie']);
+  assert.deepEqual(picked.smith, [0, 1, 2]);
+  assert.deepEqual(picked.cycle, [0, 1, 2]);
+  assert.deepEqual(picked.borda, { 0: 3, 1: 3, 2: 3 });
   // Closing leaves the three for the roulette.
   assert.deepEqual(decide('choice', PARADOX, 3), { index: null, tied: [0, 1, 2], drawn: false, pending: true });
 });
 
-test('a circle of unequal majorities is settled by Borda points, and the rest by head to head', () => {
-  const ranked = rankChoices(UNEVEN, 3);
-  assert.deepEqual(placesOf(ranked), [[1, 1, 'borda'], [2, 2, 'condorcet'], [0, 3, 'last']]);
-  assert.deepEqual(ranked[0].borda, { 0: 5, 1: 6, 2: 4 });
-  assert.deepEqual(ranked[0].cycle, [0, 1, 2]);
+test('a circle of unequal majorities is settled by Borda points', () => {
+  const picked = pickChoice(UNEVEN, 3);
+  assert.deepEqual(firstOf(picked), [[1], 'borda']);
+  assert.deepEqual(picked.borda, { 0: 5, 1: 6, 2: 4 });
+  assert.deepEqual(picked.cycle, [0, 1, 2]);
   assert.deepEqual(decide('choice', UNEVEN, 3), { index: 1, tied: [1], drawn: false });
 });
 
-test('a draw at the top with no circle is settled by Borda points against every option left', () => {
+test('a draw at the top with no circle is settled by Borda points against every option', () => {
   // A and B draw 2-2; both beat C, B by more.
   const ballots = orders([0, 1, 2], [0, 1, 2], [1, 2, 0], [1, 0, 2]);
-  const [first] = rankChoices(ballots, 3);
-  assert.deepEqual(first.smith, [0, 1]);
-  assert.equal(first.cycle, null);
-  assert.deepEqual([first.index, first.by, first.borda], [1, 'borda', { 0: 5, 1: 6 }]);
+  const picked = pickChoice(ballots, 3);
+  assert.deepEqual(picked.smith, [0, 1]);
+  assert.equal(picked.cycle, null);
+  assert.deepEqual([...firstOf(picked), picked.borda], [[1], 'borda', { 0: 5, 1: 6 }]);
   // Two voters who swap the first two leave them level all the way.
-  const swapped = rankChoices(orders([0, 1, 2], [1, 0, 2]), 3);
-  assert.deepEqual(placesOf(swapped), [[0, 1, 'tie'], [1, 1, 'tie'], [2, 3, 'last']]);
+  assert.deepEqual(firstOf(pickChoice(orders([0, 1, 2], [1, 0, 2]), 3)), [[0, 1], 'tie']);
 });
 
 // A random number from 0 to n - 1, the same run after run.
@@ -135,7 +137,7 @@ function shuffled(count, random) {
   return order;
 }
 
-test('an option every voter puts above another is never placed below it', () => {
+test('an option every voter puts below another is never picked', () => {
   const random = generator(7);
   for (let round = 0; round < 400; round++) {
     const voters = 1 + random(8);
@@ -149,9 +151,7 @@ test('an option every voter puts above another is never placed below it', () => 
         list.splice(b, 0, 0);
       }
     }
-    const ranked = rankChoices(orders(...lists), count);
-    const rankOf = (index) => ranked.find((t) => t.index === index).rank;
-    assert.ok(rankOf(0) < rankOf(1), `round ${round}`);
+    assert.ok(!pickChoice(orders(...lists), count).first.includes(1), `round ${round}`);
   }
 });
 
@@ -165,12 +165,11 @@ test('an option that beats every other head to head always comes first', () => {
     const all = [...Array(count).keys()];
     const winner = all.find((a) => all.every((b) => a === b || wins[a][b] > wins[b][a]));
     if (winner === undefined) continue;
-    const [first] = rankChoices(ballots, count);
-    assert.deepEqual([first.index, first.rank, first.by], [winner, 1, 'condorcet'], `round ${round}`);
+    assert.deepEqual(firstOf(pickChoice(ballots, count)), [[winner], 'condorcet'], `round ${round}`);
   }
 });
 
-test('a date everyone answers at least as well as another, and as many can come to, never ranks below it', () => {
+test('a date answered worse than another by one voter, and better by none, is never picked', () => {
   const random = generator(5);
   for (let round = 0; round < 400; round++) {
     const voters = 1 + random(8);
@@ -180,9 +179,7 @@ test('a date everyone answers at least as well as another, and as many can come 
     const raise = ballots.findIndex((ballot) => ballot.grades[0] === T);
     if (raise < 0) continue;
     for (const [voter, ballot] of ballots.entries()) ballot.grades.push(voter === raise ? O : ballot.grades[0]);
-    const ranked = rankDates(ballots, count + 1);
-    const rankOf = (index) => ranked.find((t) => t.index === index).rank;
-    assert.ok(rankOf(count) < rankOf(0), `round ${round}`);
+    assert.ok(!pickDate(ballots, count + 1).first.includes(0), `round ${round}`);
   }
 });
 

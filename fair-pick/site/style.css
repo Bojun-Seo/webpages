@@ -580,20 +580,7 @@ details.panel:not([open]) { gap: 0; }
 }
 .result:first-child { border-top: 0; }
 .result.first { background: var(--accent-soft); }
-.rank-badge {
-  flex: 0 0 2.25rem;
-  display: grid;
-  align-content: start;
-  justify-items: center;
-  font-weight: 700;
-  font-size: 1.25rem;
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-}
 .result-body { flex: 1; min-width: 0; display: grid; gap: 0.35rem; }
-.result.first .rank-badge { color: var(--accent); }
-.rank-badge small { font-size: 0.625rem; font-weight: 600; }
 .result-label { display: flex; flex-wrap: wrap; gap: 0.15rem 0.5rem; align-items: baseline; }
 .bar {
   display: flex;

@@ -56,11 +56,12 @@ live](#where-the-polls-live) changes how a poll gets from one phone to another.
    ballot until the poll closes; a second ballot under a name already taken is turned down. One
    phone can vote for several people with 다른 사람으로 새로 투표.
 4. **Results, once the poll closes.** Until then everyone sees who voted but not how, the maker
-   too, so that nobody votes by what the others did. Then the options show in the order of the
-   rule below, each with who answered what or put it where, and why it is where it is: for a date
-   its score and each voter's mileage, and on a calendar; for an option its head-to-head record,
-   its Borda points and the circle, when majorities go round in one. Beside them, what other
-   well-known rules would pick from the same ballots.
+   too, so that nobody votes by what the others did. Then the option decided on shows first, with
+   why the rule picked it, and the others after it in the poll's order, with no places: each with
+   who answered what or put it where; for a date its score and each voter's mileage, and on a
+   calendar; for an option its head-to-head record, its Borda points and the circle, when
+   majorities go round in one. Beside them, what other well-known rules would pick from the same
+   ballots.
 5. **Closing.** The poll closes at its deadline, or when its maker closes it, and the decision
    shows at the top; for a date, with the names of those who said they cannot come that day. When
    options are level at the top, the maker spins a roulette of them there first. The maker's menu
@@ -76,8 +77,8 @@ matching (Gale, Shapley and Roth), which pairs people with different things. Arr
 says no rule satisfies every fairness property at once, so the page fixes its rule before anyone
 votes, says it on the page, and shows beside the result what other rules would have picked. A
 date and a place are asked differently, since a date is first a question of who can come and a
-place only of who likes what. `common/site/social-choice.js` places the options one place at a
-time, first place first, each time among the options not yet placed.
+place only of who likes what. `common/site/social-choice.js` picks one option, the first, and
+ranks no others: a group that settles on one thing has no use for a second or third place.
 
 ### Dates: ○, △ or ✕, and mileage
 
@@ -102,7 +103,7 @@ A voter puts every option in order. Each ballot hands out the same points, n - 1
 to 0 for the last, so no ballot weighs more than another and nobody can rule an option out alone.
 
 1. **The Condorcet winner.** The option that beats every other head to head, more voters putting it
-   above, is placed: what a majority prefers to anything else.
+   above, is picked: what a majority prefers to anything else.
 2. **The Condorcet paradox, settled by Borda.** Majorities can go round in a circle, as in
    rock-paper-scissors: A beats B, B beats C and C beats A, and no option beats every other. The
    rule then takes the options caught in the circle, the top cycle (Smith set), and of them the one
@@ -113,9 +114,8 @@ to 0 for the last, so no ballot weighs more than another and nobody can rule an 
 
 ### Either way
 
-Options still level share the place. When a poll closes with several first, as in a perfectly
-even circle of three voters each preferring a different option, the decision puts them on a
-roulette, which the maker spins. 시작 sets the wheel going; 멈춤 asks the API, or in links the
+When the rule leaves several options level, as in a perfectly even circle of three voters each
+preferring a different option, the decision puts them on a roulette, which the maker spins. 시작 sets the wheel going; 멈춤 asks the API, or in links the
 maker's phone, to draw one of them at random, and the wheel slows from the speed it has at a
 steady deceleration, as friction would stop it, picked within a natural range so that it comes to
 rest on the option drawn. The moment 멈춤 is pressed decides nothing, so nobody can aim. One option
@@ -128,9 +128,9 @@ the others' ballots could work out the one false ✕ or the one option put last 
 The API sends no ballot's answers before the close. In links every ballot travels in the link all
 along, so that any phone can close the poll, and a member set on it could unseal a link and look.
 
-The tests check, on random ballots, that an option every voter puts above another always ranks
-above it, that a Condorcet winner always comes first, and that a date answered better by one voter
-and no worse by anyone ranks above. Beside the result the page shows, for dates, the rule without
+The tests check, on random ballots, that an option every voter puts below another is never
+picked, that a Condorcet winner always is, and that a date answered worse than another by one voter
+and better by none never is. Beside the result the page shows, for dates, the rule without
 mileage (every ○ one vote), the most ○ whoever cannot come, and the largest sum (utilitarian; ○ 2,
 △ 1); for options, the most first places (plurality), Borda alone, the most head-to-head wins
 (Copeland) and the best lowest place (Rawls's leximin).

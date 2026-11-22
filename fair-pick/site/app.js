@@ -3,7 +3,7 @@
 // calendar for dates; and a poll, with the voter's ballot, the results and
 // the maker's menu. With an API address in config.js the polls live on the
 // API, which api.js calls; without one they live in links, which link.js
-// seals and merges. What a poll may hold, how the group's choice is ranked
+// seals and merges. What a poll may hold, how the group's choice is picked
 // and the calendar are in ../common/, which the API shares.
 
 import { API_BASE } from './config.js';
@@ -15,7 +15,7 @@ import {
 } from '../common/calendar.js';
 import { $, el } from '../common/dom.js';
 import * as pollRules from '../common/poll-rules.js';
-import { decide, mileage, otherRules, pairwise, rank, scoreOf } from '../common/social-choice.js';
+import { decide, mileage, otherRules, pairwise, pick, scoreOf } from '../common/social-choice.js';
 
 const {
   DATE_GRADES, LIMITS, MEH, NO, YES, checkBallot, checkPoll, idProblem, newPinProblem, normalizeId, orderOf, pinProblem,
@@ -712,9 +712,8 @@ function renderDecision() {
     return;
   }
   const { text, holiday } = optionOf(poll, index);
-  // How the rule put it first, from the ballots it was decided by.
-  const ranked = rank(poll.kind, ballots, poll.options.length);
-  const placed = ranked.find((t) => t.index === index);
+  // How the rule picked it, from the ballots it was decided by.
+  const picked = pick(poll.kind, ballots, poll.options.length);
   // Who said they cannot come on the day picked, named for all to see.
   const absent = poll.kind === 'date' ? ballots.filter((ballot) => ballot.grades?.[index] === NO) : [];
   box.className = 'decision';
@@ -723,7 +722,7 @@ function renderDecision() {
     el('strong', { id: 'decided' }, holiday ? `${text} · ${holiday}` : text),
     el('p', null, drawn
       ? `공동 1위 ${tied.length}개를 룰렛에 올려 뽑았어요.`
-      : placed && reason(placed, ranked)),
+      : reason(picked, index)),
     poll.kind === 'date' && (absent.length > 0
       ? el('div', { class: 'absent', id: 'absent' },
         el('span', { class: 'absent-head' }, `불참 ${absent.length}명`),
@@ -1466,49 +1465,36 @@ function scoreText(score) {
   return String(Number(scoreOf(score, state.poll.options.length).toFixed(2)));
 }
 
-// Why option `t` is where it is, from how the rule settled its place.
-function reason(t, ranked) {
+// Why option `index` was picked, from `picked`, what pick() said.
+function reason(picked, index) {
   const { poll } = state;
-  const date = poll.kind === 'date';
-  // Below first place, the rule chose among the options not yet placed.
-  const after = t.rank > 1 ? '위 순위를 빼면, ' : '';
-  switch (t.by) {
+  const t = picked.tallies[index];
+  switch (picked.by) {
     case 'absent':
       return t.absent === 0
-        ? `${after}투표한 사람이 모두 올 수 있는 날은 이것뿐이에요.`
-        : `${after}못 오는 사람이 ${t.absent}명으로 가장 적어요.`;
+        ? '투표한 사람이 모두 올 수 있는 날은 이것뿐이에요.'
+        : `못 오는 사람이 ${t.absent}명으로 가장 적어요.`;
     case 'score': {
-      const left = ranked.filter((u) => u.rank >= t.rank).length;
       const who = t.absent === 0 ? '모두 올 수 있는' : `못 오는 사람이 가장 적은(${t.absent}명)`;
-      const among = t.pool.length === left ? '' : `${who} 날 ${t.pool.length}개 가운데 `;
-      return `${after}${among}선호 점수가 ${withRo(scoreText(t.score))} 가장 높아요.`;
+      const among = picked.pool.length === poll.options.length ? '' : `${who} 날 ${picked.pool.length}개 가운데 `;
+      return `${among}선호 점수가 ${withRo(scoreText(t.score))} 가장 높아요.`;
     }
     case 'condorcet':
-      return `${after}맞대결에서 다른 모든 후보를 이겨요 (콩도르세 승자).`;
+      return '맞대결에서 다른 모든 후보를 이겨요 (콩도르세 승자).';
     case 'borda': {
-      const split = t.cycle ? '맞대결이 서로 물고 물려(콩도르세의 역설)' : '맞대결에서 비겨';
-      return `${after}${split} 모두를 이기는 후보가 없어, 보르다 점수로 정했어요. ${points(t.borda[t.index])}으로 가장 높아요.`;
+      const split = picked.cycle ? '맞대결이 서로 물고 물려(콩도르세의 역설)' : '맞대결에서 비겨';
+      return `${split} 모두를 이기는 후보가 없어, 보르다 점수로 정했어요. ${points(picked.borda[index])}으로 가장 높아요.`;
     }
-    case 'tie':
-      if (t.rank !== 1) return '앞뒤를 가릴 수 없어 같은 순위예요.';
-      if (poll.decision?.drawn && poll.decision.index === t.index) {
-        return '끝까지 같아 공동 1위였고, 룰렛으로 뽑혔어요.';
-      }
-      return '끝까지 같아 공동 1위였어요.';
     default:
-      return ranked.length > 1 ? `남은 ${josa(date ? '날' : '후보', '이/가')} 이것뿐이에요.` : '';
+      return poll.decision?.drawn && poll.decision.index === index
+        ? '끝까지 같아 공동 1위였고, 룰렛으로 뽑혔어요.'
+        : '끝까지 같아 공동 1위예요.';
   }
 }
 
 // "2승 1무 1패" for a head-to-head record.
 function recordText({ won, drew, lost }) {
   return [`${won}승`, drew > 0 && `${drew}무`, `${lost}패`].filter(Boolean).join(' ');
-}
-
-function rankBadge(t, ranked) {
-  const sharing = ranked.filter((u) => u.rank === t.rank).length > 1;
-  return el('div', { class: 'rank-badge', 'aria-label': `${sharing ? '공동 ' : ''}${t.rank}위` },
-    sharing && el('small', null, '공동'), String(t.rank));
 }
 
 // A bar of `parts`, { tone, n, label }, each as long as its count.
@@ -1521,26 +1507,28 @@ function barOf(parts) {
     }));
 }
 
-function resultRow(t, ranked, body, who) {
+// An option's row of the results, with no place: the option decided on,
+// with why, or one of those the roulette is to pick from, or any other.
+function resultRow(t, picked, body, who) {
   const { poll } = state;
-  const first = t.rank === 1;
-  return el('li', { class: `result${first ? ' first' : ''}` },
-    rankBadge(t, ranked),
+  const decided = poll.decision?.index === t.index;
+  const spinning = poll.decision?.pending && picked.first.includes(t.index);
+  return el('li', { class: `result${decided ? ' first' : ''}` },
     el('div', { class: 'result-body' },
       el('div', { class: 'result-label' }, optionNode(poll, t.index, 'strong'),
-        poll.decision?.index === t.index && el('span', { class: 'tag decided' }, '결정')),
+        decided && el('span', { class: 'tag decided' }, '결정'),
+        spinning && el('span', { class: 'tag' }, '룰렛 후보')),
       body,
-      first && el('p', { class: 'why' }, reason(t, ranked)),
-      el('details', { class: 'who' }, el('summary', null, who.title), !first && el('p', { class: 'why' }, reason(t, ranked)),
-        who.body)));
+      decided && el('p', { class: 'why' }, reason(picked, t.index)),
+      el('details', { class: 'who' }, el('summary', null, who.title), who.body)));
 }
 
-function dateResult(t, ranked) {
+function dateResult(t, picked) {
   const { ballots } = state;
   const parts = DATE_ORDER.map((grade) => ({ grade, tone: DATE_GRADES[grade].tone, label: DATE_GRADES[grade].label, n: t.counts[grade] }));
   const names = (grade) => ballots.filter((ballot) => ballot.grades[t.index] === grade)
     .map((ballot) => (grade === YES ? `${ballot.name} ${percent(mileage(ballot.grades))}` : ballot.name)).join(', ');
-  return resultRow(t, ranked, [
+  return resultRow(t, picked, [
     barOf(parts),
     el('p', { class: 'stats' }, `${parts.map(({ grade, n }) => `${DATE_GRADES[grade].short} ${n}`).join(' · ')} · 선호 점수 ${scoreText(t.score)}`),
   ], {
@@ -1562,24 +1550,24 @@ function placeTone(place, count) {
   return place / (count - 1) < 0.5 ? 'good' : 'mid';
 }
 
-function choiceResult(t, ranked, wins) {
+function choiceResult(t, picked, wins) {
   const { poll, ballots } = state;
   const count = poll.options.length;
   const places = Array.from({ length: count }, (_, place) => ({
     place,
     tone: placeTone(place, count),
-    label: `${place + 1}위`,
+    label: `${place + 1}순위`,
     voters: ballots.filter((ballot) => ballot.grades[t.index] === count - 1 - place).map((ballot) => ballot.name),
   })).map((part) => ({ ...part, n: part.voters.length }));
-  const duels = ranked.filter((u) => u.index !== t.index).map((u) => {
+  const duels = picked.tallies.filter((u) => u.index !== t.index).map((u) => {
     const [mine, theirs] = [wins[t.index][u.index], wins[u.index][t.index]];
     const outcome = mine > theirs ? 'won' : mine < theirs ? 'lost' : 'drew';
     return el('li', { class: `duel duel-${outcome}` },
       el('span', null, nameOf(u.index)), ` ${mine} 대 ${theirs} ${{ won: '승', lost: '패', drew: '무' }[outcome]}`);
   });
-  const stats = [`1위 ${t.firsts}명`, ranked.length > 1 && `맞대결 ${recordText(t.record)}`, `보르다 ${points(t.total)}`];
-  return resultRow(t, ranked, [barOf(places), el('p', { class: 'stats' }, stats.filter(Boolean).join(' · '))], {
-    title: '누가 몇 위로 골랐나요',
+  const stats = [`1순위 ${t.firsts}명`, `맞대결 ${recordText(t.record)}`, `보르다 ${points(t.total)}`];
+  return resultRow(t, picked, [barOf(places), el('p', { class: 'stats' }, stats.join(' · '))], {
+    title: '누가 몇 순위로 골랐나요',
     body: [
       el('dl', null, places.filter(({ n }) => n > 0).map(({ label, tone, voters }) => [
         el('dt', { class: `tone-${tone}` }, label),
@@ -1593,10 +1581,9 @@ function choiceResult(t, ranked, wins) {
 
 // What the page says when majorities give no Condorcet winner at the top:
 // the circle they go round, or the draw, and how the rule settles it.
-function renderParadox(ranked, wins) {
+function renderParadox(first, wins) {
   const box = $('paradox');
-  const [first] = ranked;
-  box.hidden = !first || first.smith.length < 2;
+  box.hidden = first.smith.length < 2;
   if (box.hidden) return;
   if (first.cycle) {
     const circle = [...first.cycle, first.cycle[0]];
@@ -1616,9 +1603,9 @@ function renderParadox(ranked, wins) {
     el('p', null, `맞대결에서 비긴 후보가 있어 모두를 이기는 후보가 없어요. 그래서 맨 위에서 비긴 후보들(${first.smith.length}개) 가운데 보르다 점수가 가장 높은 후보를 골라요.`));
 }
 
-function renderResultCalendar(ranked) {
+function renderResultCalendar(picked) {
   const { poll, ballots } = state;
-  const byDate = new Map(poll.options.map((option, index) => [option.date, ranked.find((t) => t.index === index)]));
+  const byDate = new Map(poll.options.map((option, index) => [option.date, picked.tallies[index]]));
   const months = [...new Set(poll.options.map((option) => option.date.slice(0, 7)))];
   const voters = ballots.length;
   $('result-cal').replaceChildren(...months.map((ym) => {
@@ -1637,12 +1624,12 @@ function renderResultCalendar(ranked) {
           const can = voters - t.absent;
           const heat = t.counts[YES] === voters ? 3 : t.absent === 0 ? 2 : can * 2 >= voters ? 1 : 0;
           return el('span', {
-            class: `rc-day candidate ${kind}${t.rank === 1 ? ' top' : ''}`,
+            class: `rc-day candidate ${kind}${poll.decision?.index === t.index ? ' top' : ''}`,
             'data-heat': heat,
-            title: `${dateLabel(iso, 0)} · ${t.rank}위 · ${voters}명 중 ${can}명 가능`,
+            title: `${dateLabel(iso, 0)} · ${voters}명 중 ${can}명 가능`,
           }, el('span', null, String(Number(iso.slice(8)))), el('span', { class: 'rc-count' }, `${can}/${voters}`));
         })));
-  }), el('p', { class: 'rc-legend' }, '칸의 숫자는 올 수 있는 사람(○ 또는 △)/투표한 사람입니다. 진할수록 모두가 되고, 테두리가 진한 날이 1위입니다.'));
+  }), el('p', { class: 'rc-legend' }, '칸의 숫자는 올 수 있는 사람(○ 또는 △)/투표한 사람입니다. 진할수록 모두가 되고, 테두리가 진한 날이 결정된 날입니다.'));
 }
 
 const OTHER_RULES = {
@@ -1659,10 +1646,10 @@ const OTHER_RULES = {
   ],
 };
 
-function renderOthers(ranked) {
+function renderOthers(picked) {
   const { poll, ballots } = state;
   const picks = otherRules(poll.kind, ballots, poll.options.length);
-  const fair = ranked.filter((t) => t.rank === 1).map((t) => t.index);
+  const fair = picked.first;
   const same = (list) => list.length === fair.length && list.every((index) => fair.includes(index));
   $('others').replaceChildren(...OTHER_RULES[poll.kind].map(([key, name, what]) => el('li', null,
     el('span', { class: 'rule-name' }, name),
@@ -1679,16 +1666,15 @@ function renderHow() {
       `마일리지는 모두 100%에서 시작해 ✕ 하나에 1/${state.poll.options.length}(후보 날짜 수), △ 하나에 그 절반씩 줄고, 남은 만큼이 그 사람 ○ 하나의 무게예요. 여러 날을 열어 둔 사람의 ○는 더 무겁고, 그런 사람이 △를 준 날은 그만큼 점수를 덜 받아요. ✕와 △는 남에게 맞춰 달라는 부탁이라 그만큼 마일리지가 드는 셈이에요.`,
       '그래도 같으면 공동 1위로 두고, 마감한 뒤 투표를 만든 사람이 공동 1위를 룰렛에 올려 돌려서 하나를 뽑아요.',
       '뽑힌 날에 ✕를 준 사람은 결정 바로 밑에 불참자로 이름이 나와요.',
-      '1위를 뺀 나머지로 같은 과정을 되풀이해 2위, 3위를 정해요.',
     ]
     : [
       '모두가 모든 후보에 순위를 매겨요. 후보가 n개면 누구나 n-1점부터 0점까지를 한 번씩 주는 셈이라, 누구의 표든 무게가 같아요.',
       '맞대결에서 다른 모든 후보를 이기는 후보가 있으면(콩도르세 승자) 그 후보예요. 두 후보 가운데 한쪽을 더 위에 둔 사람이 많으면 그쪽이 이겨요.',
       '서로 물고 물리거나 비겨서 그런 후보가 없으면(콩도르세의 역설), 물고 물린 후보들 가운데 보르다 점수가 가장 높은 후보예요. 한 사람마다 아래에 둔 후보 하나에 1점씩 줘요.',
       '그래도 같으면 공동 1위로 두고, 마감한 뒤 투표를 만든 사람이 공동 1위를 룰렛에 올려 돌려서 하나를 뽑아요.',
-      '1위를 뺀 나머지로 같은 과정을 되풀이해 2위, 3위를 정해요.',
     ];
-  steps.push('누가 무엇을 골랐는지와 순위는 마감한 뒤에 공개돼요. 남의 표를 보고 셈을 해서 투표하는 일을 막기 위해서예요.');
+  steps.push('1위 하나만 고르고, 나머지 후보에는 순위를 매기지 않아요. 결과에는 후보마다 누가 무엇을 골랐는지만 보여요.',
+    '누가 무엇을 골랐는지는 마감한 뒤에 공개돼요. 남의 표를 보고 셈을 해서 투표하는 일을 막기 위해서예요.');
   $('how-steps').replaceChildren(...steps.map((step) => el('li', null, step)));
 }
 
@@ -1704,21 +1690,24 @@ function renderResults() {
     $('results-summary').textContent = closed ? '' : `${ballots.length}명 투표 · 마감 뒤 공개`;
     $('results').replaceChildren(el('li', { class: 'empty' }, closed
       ? '아무도 투표하지 않았어요.'
-      : `${ballots.length ? '' : '아직 아무도 투표하지 않았어요. '}누가 무엇을 골랐는지와 순위는 마감한 뒤에 모두에게 공개돼요. 그 전에는 누가 투표했는지만 보여요.`));
+      : `${ballots.length ? '' : '아직 아무도 투표하지 않았어요. '}누가 무엇을 골랐는지와 결과는 마감한 뒤에 모두에게 공개돼요. 그 전에는 누가 투표했는지만 보여요.`));
     return;
   }
   const count = poll.options.length;
-  const ranked = rank(poll.kind, ballots, count);
+  const picked = pick(poll.kind, ballots, count);
+  // The option decided on first, then the others as the poll lists them.
+  const decided = poll.decision?.index ?? null;
+  const order = picked.tallies.filter((t) => t.index === decided).concat(picked.tallies.filter((t) => t.index !== decided));
   $('results-summary').textContent = `${ballots.length}명 · 마감 결과${LINKS ? ' · 이 기기가 받은 투표' : ''}`;
   if (poll.kind === 'date') {
-    $('results').replaceChildren(...ranked.map((t) => dateResult(t, ranked)));
-    renderResultCalendar(ranked);
+    $('results').replaceChildren(...order.map((t) => dateResult(t, picked)));
+    renderResultCalendar(picked);
   } else {
     const wins = pairwise(ballots, count);
-    renderParadox(ranked, wins);
-    $('results').replaceChildren(...ranked.map((t) => choiceResult(t, ranked, wins)));
+    renderParadox(picked, wins);
+    $('results').replaceChildren(...order.map((t) => choiceResult(t, picked, wins)));
   }
-  renderOthers(ranked);
+  renderOthers(picked);
 }
 
 function renderVoters() {
