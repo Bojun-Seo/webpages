@@ -21,6 +21,12 @@ function memoryStorage() {
     async delete(key) {
       return data.delete(key);
     },
+    // The entries whose keys start with `prefix`, in the order of their
+    // keys, after `startAfter`, at most `limit`, as a Durable Object's list.
+    async list({ prefix = '', startAfter, limit = Infinity } = {}) {
+      const keys = [...data.keys()].filter((key) => key.startsWith(prefix) && (startAfter === undefined || key > startAfter)).sort();
+      return new Map(keys.slice(0, limit).map((key) => [key, structuredClone(data.get(key))]));
+    },
     async deleteAll() {
       data.clear();
       alarm = null;
@@ -39,7 +45,7 @@ function memoryStorage() {
 
 // The env a Worker gets: POLLS, whose `objects` holds each poll's Poll and
 // storage by name, ALLOWED_ORIGINS, and whatever `vars` add, such as a
-// `clock`.
+// `clock` or a RESEARCH_TOKEN.
 export function memoryEnv(vars = {}) {
   const objects = new Map();
   const env = { ALLOWED_ORIGINS: '', ...vars };

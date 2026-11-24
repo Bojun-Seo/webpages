@@ -13,6 +13,10 @@
 //   POST   /polls/:id/draw             → { poll, ballots }, the roulette's pick of a tie
 //   DELETE /polls/:id                  → { deleted: true }
 //
+//   POST   /donations                  { id, key, record } → 201 or 200 { kept: true }
+//   DELETE /donations/:id              → { deleted: true }
+//   GET    /donations?after=:id        → { donations: [{ id, month, record }], next }
+//
 // Every call but the first two carries the poll's token, which the PIN
 // unlocks, as `Authorization: Bearer`; closing, reopening and deleting the
 // poll, spinning its roulette, or another voter's ballot, also need the
@@ -23,11 +27,18 @@
 // poll closes, the ballots answered carry no grades. An error answers
 // { error, message }, the message in Korean for the page to show.
 //
+// A record for research is what a closed date poll gives when its maker
+// asked and every voter went along (common/site/research.js): its maker's
+// phone sends it under a random ID and key, and may send it again or take
+// it back (`X-Donation-Key`) with that key. Only whoever holds the
+// RESEARCH_TOKEN secret reads the records, as `Authorization: Bearer`;
+// without the secret nobody does.
+//
 // poll.js keeps each poll and decides who may do what; this module routes
 // a call to its poll and answers browsers on the page's site.
 
 import { idProblem, normalizeId } from '../../../common/site/poll-rules.js';
-import { GATE, Poll, SIGNED_OUT, WRONG, json, sha256 } from './poll.js';
+import { GATE, Poll, RESEARCH, SIGNED_OUT, WRONG, json, sameText, sha256 } from './poll.js';
 
 // workerd needs the Durable Object's class among the main module's exports.
 export { Poll };
@@ -45,7 +56,7 @@ function corsFor(origin, allowed = '') {
   return {
     'access-control-allow-origin': origin,
     'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'access-control-allow-headers': 'authorization, content-type, x-admin-key, x-ballot-key',
+    'access-control-allow-headers': 'authorization, content-type, x-admin-key, x-ballot-key, x-donation-key',
     'access-control-max-age': '86400',
   };
 }
@@ -98,8 +109,36 @@ function decode(part) {
   }
 }
 
+// The records for research: sent by a poll's maker's phone, at most as
+// many an hour from one address as polls; taken back with their key; and
+// read with the RESEARCH_TOKEN secret.
+async function donations(request, env, parts) {
+  const { method } = request;
+  if (parts.length === 1 && method === 'GET') {
+    if (!env.RESEARCH_TOKEN) return json(404, { error: 'route', message: '없는 요청이에요.' });
+    if (!sameText(request.headers.get('authorization') || '', `Bearer ${env.RESEARCH_TOKEN}`)) {
+      return json(401, { error: 'token', message: '읽을 권한이 없어요.' });
+    }
+    return call(env, RESEARCH, 'donations', { after: new URL(request.url).searchParams.get('after') || '' });
+  }
+  if (parts.length === 1 && method === 'POST') {
+    const body = await readBody(request);
+    if (body === TOO_BIG) return json(413, { error: 'invalid', message: '보낸 내용이 너무 커요.' });
+    if (body === NOT_JSON) return json(400, { error: 'invalid', message: '보낸 내용을 읽지 못했어요.' });
+    const address = request.headers.get('cf-connecting-ip') || 'local';
+    const gate = await call(env, GATE, 'gate', { key: await sha256(`donate|${address}`), what: 'donate' });
+    if (gate.status !== 200) return gate;
+    return call(env, RESEARCH, 'donate', { body });
+  }
+  if (parts.length === 2 && method === 'DELETE') {
+    return call(env, RESEARCH, 'withdraw', { id: decode(parts[1]), key: request.headers.get('x-donation-key') || '' });
+  }
+  return json(parts.length > 2 ? 404 : 405, { error: 'route', message: '없는 요청이에요.' });
+}
+
 async function route(request, env) {
   const parts = new URL(request.url).pathname.split('/').filter(Boolean);
+  if (parts[0] === 'donations') return donations(request, env, parts);
   if (parts[0] !== 'polls' || parts.length > 4) return json(404, { error: 'route', message: '없는 요청이에요.' });
   const action = actionOf(request.method, parts);
   if (!action) return json(405, { error: 'route', message: '없는 요청이에요.' });

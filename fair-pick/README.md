@@ -14,8 +14,11 @@ Sundays and public holidays in red and Saturdays in blue; the holidays are those
 GitHub Pages serves the page, and it needs nothing else: each poll travels in its links, sealed
 with the group ID and the PIN, and the votes add up as the links go round a group chat. A small API
 of its own, a Cloudflare Worker with a Durable Object for each poll ([`api/`](api/)), can keep the
-polls in one place instead once it is set up. What the page and the API both use, the voting rule,
-what a poll may hold and the calendar, is in [`common/`](../common/).
+polls in one place instead once it is set up. The same Worker can also keep, on its own, what a
+date poll gives to research once it closes, when its maker asked and every voter went along:
+the answers without names ([research donations](#research-donations)). What the page and the API
+both use, the voting rule, what a poll may hold, what it gives to research and the calendar, is in
+[`common/`](../common/).
 
 The page is in Korean.
 
@@ -25,6 +28,7 @@ The page is in Korean.
 - [How the group's choice is made](#how-the-groups-choice-is-made)
 - [Where the polls live](#where-the-polls-live)
 - [Who can see and change what](#who-can-see-and-change-what)
+- [Research donations](#research-donations)
 - [Set up the API](#set-up-the-api)
 - [Publish on GitHub Pages](#publish-on-github-pages)
 - [Run and test locally](#run-and-test-locally)
@@ -69,6 +73,11 @@ live](#where-the-polls-live) changes how a poll gets from one phone to another.
    made the poll; another needs the admin code it shows.
 6. **Sharing.** 함께할 사람 부르기 copies the link, or an invitation with the link, the group ID and,
    where the device knows it, the PIN, or hands it to the phone's share sheet.
+7. **Research, when the maker asks.** Where the page has somewhere to send them, the maker of a
+   date poll may tick 마감한 뒤 이름을 뺀 답을 연구용으로 보내기. Every voter is then told so above
+   their answers and may tick 내 답이 들어간 이 투표는 보내지 말아 주세요; once the poll closes,
+   the maker's device sends the answers without names, or says why it does not. [Research
+   donations](#research-donations) says what goes and who sees it.
 
 ## How the group's choice is made
 
@@ -189,8 +198,10 @@ In links:
   the ballots or the roulette's draw changed, since no server checks a change. The ballots are named and a change shows
   under its voter's name, so the page suits people who trust each other; the API gives the stronger
   guarantee.
-- **No server stores anything.** Each phone keeps the polls it has opened in its local storage,
-  under `fair-pick.links`, until 이 기기에서 이 투표 잊기 forgets one there.
+- **No server stores the polls.** Each phone keeps the polls it has opened in its local storage,
+  under `fair-pick.links`, until 이 기기에서 이 투표 잊기 forgets one there. All that ever leaves the
+  phones is what a closed date poll gives to research, when its maker asked and every voter went
+  along, without names ([research donations](#research-donations)).
 
 On the API:
 
@@ -217,6 +228,41 @@ Either way, the browser keeps for each poll it has been in the PIN, any admin co
 the ballots cast from it with what they were cast with, in its local storage under
 `fair-pick.polls`.
 
+## Research donations
+
+The page is also a source of data for research on how groups pick a date, such as how often a
+rule leaves a tie or picks a date with fewer ○ than another. It gives nothing unless a poll's
+maker asks and every voter goes along, and then nothing that names anyone.
+
+- **What goes.** A record of the closed poll ([`common/site/research.js`](../common/site/research.js)):
+  each voter's ✕ △ ○ for each date, the rows sorted so that the order the voters came in is lost,
+  and of each date only its weekday and whether it is a public holiday. The API adds the month it
+  arrived. No name, title, note, date, group ID, PIN, link or address goes, and only date polls
+  give records.
+- **Who agrees.** The maker ticks the question when making the poll; it cannot be added later.
+  Each voter then sees it above their answers and may ask to keep the poll out, and can change that
+  until the close like the rest of their ballot. Nothing is sent when any voter asks, when a ballot
+  was cast from a page from before the question, or when fewer than two voted. Nobody is told who
+  asked: each phone shows only whether the poll goes.
+- **Who sends it, and when.** The maker's device, once the poll has closed, with a random ID and
+  key it keeps; again, under the same ID, when a link brings a later ballot. The maker sees what
+  went (보낸 내용 보기) and can take it back with 보낸 기록 지우기, after which it is not sent again;
+  forgetting the poll on that device forgets the key too.
+- **Who reads it.** Only whoever holds the Worker's `RESEARCH_TOKEN` secret, with
+  `GET /donations` (below); without the secret nobody can. Records are kept until taken back or
+  deleted by whoever runs the Worker; they do not expire like polls.
+- **Limits.** An address may send at most as many records an hour as it may make polls, twenty.
+
+To read them, five hundred at a time:
+
+```
+curl -H "Authorization: Bearer $FAIR_PICK_RESEARCH_TOKEN" https://fair-pick.<subdomain>.workers.dev/donations
+curl -H "Authorization: Bearer $FAIR_PICK_RESEARCH_TOKEN" "https://fair-pick.<subdomain>.workers.dev/donations?after=<next>"
+```
+
+Each answer is `{ donations: [{ id, month, record }], next }`, `next` the ID to go on after, or null
+at the end.
+
 ## Set up the API
 
 The API is optional: the page works without it, in links. The Worker runs on Cloudflare's free
@@ -232,13 +278,19 @@ place. [`fair-pick-api.yml`](../.github/workflows/fair-pick-api.yml) deploys it.
    (**Settings → Secrets and variables → Actions**).
 4. Run **Actions → fair-pick api → Run workflow** on the default branch. Its summary gives the
    Worker's address, `https://fair-pick.<subdomain>.workers.dev`.
-5. Add that address as the repository **variable** `FAIR_PICK_API` (the **Variables** tab), then
-   run **Actions → pages → Run workflow**.
+5. Add that address as a repository **variable** (the **Variables** tab), then run **Actions →
+   pages → Run workflow**: as `FAIR_PICK_RESEARCH_API` to keep the polls in links and send only
+   [research donations](#research-donations) there, or as `FAIR_PICK_API` to keep the polls there
+   too, which sends the records there as well.
+6. To read the records, add a long random repository **secret** `FAIR_PICK_RESEARCH_TOKEN`
+   (`openssl rand -hex 32` makes one) and run **Actions → fair-pick api → Run workflow** again;
+   each deploy hands it to the Worker as `RESEARCH_TOKEN`.
 
 After that, a push to the default branch that changes `api/` or `common/site/` deploys the Worker
 again; a push to another branch runs the tests and bundles it without
-deploying. Until the secrets are set the workflow warns and deploys nothing, and until
-`FAIR_PICK_API` is set the page keeps its polls in links.
+deploying. Until the secrets are set the workflow warns and deploys nothing, until
+`FAIR_PICK_API` is set the page keeps its polls in links, and until it or
+`FAIR_PICK_RESEARCH_API` is set the page offers to send nothing to research.
 
 The Worker's name, `fair-pick`, and the sites allowed to call it are in `api/wrangler.toml`; a
 fork serves its page from another site, so it changes `ALLOWED_ORIGINS`. The free plan allows
@@ -251,7 +303,7 @@ of each, and making a poll one more of the second.
 every push that touches `fair-pick/` or `common/`: once as published without an API, two phones
 passing a poll in links, and once with the API answered by its Worker on memory. On the default
 branch it publishes `site/` to <https://bojun-seo.github.io/webpages/fair-pick/>, writing
-`FAIR_PICK_API`, if it is set, into `config.js`. The [top-level README](../README.md#publishing) says how the
+`FAIR_PICK_API` and `FAIR_PICK_RESEARCH_API`, else `FAIR_PICK_API`, into `config.js`. The [top-level README](../README.md#publishing) says how the
 site is put together.
 
 ## Run and test locally
@@ -260,8 +312,9 @@ To try the page as it is published, polls in links:
 
 ```
 cd fair-pick
-npm run serve        # http://localhost:8000/fair-pick/
-npm run serve:api    # the same, with an API on memory that forgets the polls when it stops
+npm run serve              # http://localhost:8000/fair-pick/
+npm run serve:api          # the same, with an API on memory that forgets the polls when it stops
+LINKS=1 npm run serve:api  # polls in links, and records for research on memory
 ```
 
 To run the Worker in workerd, Cloudflare's runtime, instead: `cd api && npm ci && npm run dev`

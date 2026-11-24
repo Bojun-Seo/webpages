@@ -98,9 +98,11 @@ jobs:
         # run a script from before it. The script and style URLs carry the commit (?v=...) so a
         # deploy always loads its own; the grep fails the build if a file stops matching.
         # fair-pick calls the API at the repository variable FAIR_PICK_API, its Worker's https://
-        # address; without it the page keeps its polls in links.
+        # address; without it the page keeps its polls in links. It sends what closed polls give to
+        # research to FAIR_PICK_RESEARCH_API, else FAIR_PICK_API; without either it offers none.
         env:
           FAIR_PICK_API: ${{ vars.FAIR_PICK_API }}
+          FAIR_PICK_RESEARCH_API: ${{ vars.FAIR_PICK_RESEARCH_API }}
         run: |
           mkdir _site
           cp index.html _site/
@@ -128,15 +130,23 @@ jobs:
           sed -i "s|from './gen.js'|from './gen.js?v=$v'|" _site/sparemine/app.js
           grep -q "gen.js?v=$v" _site/sparemine/app.js
           sed -i -E "s#from '\./(api|config|link)\.js'#from './\1.js?v=$v'#" _site/fair-pick/app.js
-          test "$(grep -c "\.js?v=$v'" _site/fair-pick/app.js)" -eq 7
+          test "$(grep -c "\.js?v=$v'" _site/fair-pick/app.js)" -eq 8
+          https='^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$'
+          research="${FAIR_PICK_RESEARCH_API:-$FAIR_PICK_API}"
+          for name in FAIR_PICK_API FAIR_PICK_RESEARCH_API; do
+            if [ -n "${!name}" ] && ! [[ "${!name}" =~ $https ]]; then
+              echo "::error::$name must be an https:// address, such as https://fair-pick.example.workers.dev"
+              exit 1
+            fi
+          done
           if [ -z "$FAIR_PICK_API" ]; then
             echo "::notice::FAIR_PICK_API is not set, so fair-pick keeps its polls in links. See fair-pick/README.md."
-          elif [[ "$FAIR_PICK_API" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$ ]]; then
-            printf "export const API_BASE = '%s';\n" "${FAIR_PICK_API%/}" > _site/fair-pick/config.js
-          else
-            echo "::error::FAIR_PICK_API must be an https:// address, such as https://fair-pick.example.workers.dev"
-            exit 1
           fi
+          if [ -z "$research" ]; then
+            echo "::notice::Neither FAIR_PICK_RESEARCH_API nor FAIR_PICK_API is set, so fair-pick offers to send nothing to research."
+          fi
+          printf "export const API_BASE = '%s';\nexport const RESEARCH_BASE = '%s';\n" \
+            "${FAIR_PICK_API%/}" "${research%/}" > _site/fair-pick/config.js
       - name: Download the fares the site has now
         # The fetcher keeps them for the queries the API does not answer, all of them if it answers
         # none, and a push keeps them all. Nothing to download before the first deploy.

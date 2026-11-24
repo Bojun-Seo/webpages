@@ -3,30 +3,34 @@
 // calendar for dates; and a poll, with the voter's ballot, the results and
 // the maker's menu. With an API address in config.js the polls live on the
 // API, which api.js calls; without one they live in links, which link.js
-// seals and merges. What a poll may hold, how the group's choice is picked
-// and the calendar are in ../common/, which the API shares.
+// seals and merges. What a poll may hold, how the group's choice is picked,
+// what a poll gives to research and the calendar are in ../common/, which
+// the API shares.
 
-import { API_BASE } from './config.js';
+import { API_BASE, RESEARCH_BASE } from './config.js';
 import { createClient } from './api.js';
-import { createLinkClient, payloadsIn } from './link.js';
+import { createLinkClient, payloadsIn, randomId } from './link.js';
 import {
   WEEKDAYS, dateLabel, dayKind, holidaysThrough, isDate, koreaDate, monthOf, monthWeeks, monthsBetween, shiftMonth,
   toggleAll, weekdayDates,
 } from '../common/calendar.js';
 import { $, el } from '../common/dom.js';
 import * as pollRules from '../common/poll-rules.js';
+import { donationOf } from '../common/research.js';
 import { decide, mileage, otherRules, pairwise, pick, scoreOf } from '../common/social-choice.js';
 
 const {
-  DATE_GRADES, LIMITS, MEH, NO, YES, checkBallot, checkPoll, idProblem, newPinProblem, normalizeId, orderOf, pinProblem,
-  pointsOf, weakPin,
+  DATE_GRADES, LIMITS, MEH, NO, RESEARCH_IN, RESEARCH_OUT, YES, checkBallot, checkPoll, idProblem, newPinProblem,
+  normalizeId, orderOf, pinProblem, pointsOf, weakPin,
 } = pollRules;
 
 // Where this browser keeps, for each poll it has been in, the token the
 // PIN unlocked, the PIN, the maker's admin key, the keys of the ballots
 // cast from it and the grades they were last sent with, which no one is
-// told until the poll closes:
-// { [id]: { token, pin, adminKey, keys, mine, current, title, kind, seen } }.
+// told until the poll closes, whether each asked to keep the poll out of
+// research, and on the maker's device what went to research:
+// { [id]: { token, pin, adminKey, keys, mine, optOut, current, title, kind, seen, donation } },
+// `donation` { id, key, sent, failed, withdrawn }.
 const STORE_KEY = 'fair-pick.polls';
 
 // Where this browser keeps, when polls live in links, each poll it has by
@@ -313,6 +317,8 @@ function renderKind() {
   for (const radio of document.querySelectorAll('input[name="kind"]')) radio.checked = radio.value === state.kind;
   $('dates-fieldset').hidden = state.kind !== 'date';
   $('choices-fieldset').hidden = state.kind === 'date';
+  // Only a date poll may go to research, and only when the page has somewhere to send it.
+  $('research-fieldset').hidden = !RESEARCH_BASE || state.kind !== 'date';
 }
 
 function moveMonth(step) {
@@ -475,6 +481,7 @@ async function onCreate(event) {
     note: $('note-input').value,
     options: state.kind === 'date' ? [...state.picked].sort() : state.choices,
     deadline: deadline ? `${deadline.length === 16 ? `${deadline}:00` : deadline}+09:00` : null,
+    research: Boolean(RESEARCH_BASE) && state.kind === 'date' && $('research-input').checked,
   };
   const id = normalizeId($('id-input').value);
   const pin = $('pin-input').value.trim();
@@ -660,6 +667,7 @@ function renderPoll({ quiet = false } = {}) {
   updateEntry(state.poll.id, { title: state.poll.title, kind: state.poll.kind });
   renderHeader();
   renderDecision();
+  renderResearch();
   renderSend();
   renderShare();
   renderBallot();
@@ -667,6 +675,7 @@ function renderPoll({ quiet = false } = {}) {
   renderVoters();
   renderAdmin();
   if (LINKS) updateLink();
+  if (state.poll.closedAt) syncResearch();
 }
 
 function renderHeader() {
@@ -730,6 +739,100 @@ function renderDecision() {
         el('small', null, '이날 ✕ 못 가요로 답한 사람이에요.'))
       : el('p', { class: 'all-in' }, '투표한 사람 모두 이날 올 수 있어요.')),
     drawn && wheelOf(tied, { winner: index }));
+}
+
+// --- Research ----------------------------------------------------------------
+
+// A closed date poll whose maker asked, and whose every voter went along,
+// goes to research from its maker's device, without names
+// (../common/research.js): once, again when a link brings a later ballot,
+// and not after the maker takes it back. The page says which, and on the
+// other devices only whether it goes.
+
+let sendingResearch = false;
+
+// The record the poll gives, or null when it gives none yet.
+function researchRecord() {
+  const { poll, ballots } = state;
+  if (!poll.closedAt || poll.kind !== 'date' || poll.research !== 'ok') return null;
+  if (!ballots.every((ballot) => Array.isArray(ballot.grades))) return null;
+  return donationOf({ options: poll.options, ballots }, state.holidaysLoaded ? state.holidays : null);
+}
+
+async function syncResearch({ retry = false } = {}) {
+  const { poll } = state;
+  const entry = entryOf(poll.id);
+  if (!RESEARCH_BASE || !entry?.adminKey || !state.holidaysTried || sendingResearch) return;
+  const record = researchRecord();
+  const donation = entry.donation || { id: randomId(18), key: randomId(18) };
+  const text = record && JSON.stringify(record);
+  if (!record || donation.withdrawn || donation.sent === text || (donation.failed && !retry)) return;
+  sendingResearch = true;
+  let failed = false;
+  try {
+    const res = await fetch(`${RESEARCH_BASE}/donations`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: donation.id, key: donation.key, record }),
+    });
+    failed = !res.ok;
+  } catch {
+    failed = true;
+  }
+  sendingResearch = false;
+  updateEntry(poll.id, { donation: failed ? { ...donation, failed: true } : { ...donation, sent: text, failed: false } });
+  if (state.poll?.id === poll.id) renderResearch();
+}
+
+async function withdrawResearch(button) {
+  const { poll } = state;
+  const donation = entryOf(poll.id)?.donation;
+  if (!donation?.sent) return;
+  await withBusy(button, async () => {
+    try {
+      const res = await fetch(`${RESEARCH_BASE}/donations/${encodeURIComponent(donation.id)}`, {
+        method: 'DELETE', headers: { 'x-donation-key': donation.key },
+      });
+      if (!res.ok && res.status !== 404) throw new Error(`${res.status}`);
+      updateEntry(poll.id, { donation: { ...donation, sent: null, withdrawn: true } });
+      renderResearch();
+    } catch {
+      say('research-message', '지우지 못했어요. 잠시 뒤에 다시 해 주세요.');
+    }
+  });
+}
+
+function renderResearch() {
+  const { poll } = state;
+  const box = $('research-status');
+  box.hidden = !RESEARCH_BASE || !poll.research || !poll.closedAt;
+  if (box.hidden) return;
+  const entry = entryOf(poll.id) || {};
+  const donation = entry.donation || {};
+  const line = (text) => el('p', null, text);
+  let parts;
+  if (poll.research === 'declined') parts = [line('원하지 않은 사람이 있어서 이 투표의 답은 연구용으로 보내지 않아요.')];
+  else if (poll.research === 'unasked') parts = [line('연구 안내가 없던 화면에서 한 투표가 있어서, 이 투표의 답은 연구용으로 보내지 않아요.')];
+  else if (poll.research === 'few') parts = [line('투표한 사람이 두 명이 안 되어 연구용으로 보내지 않아요.')];
+  else if (!entry.adminKey) parts = [line('투표를 만든 사람의 기기가 이름을 뺀 답(○ △ ✕)만 연구용으로 보내요.')];
+  else if (donation.withdrawn) parts = [line('연구용으로 보낸 답을 지웠어요. 이 투표는 다시 보내지 않아요.')];
+  else if (donation.sent) {
+    parts = [
+      line('이름을 뺀 답을 연구용으로 보냈어요. 고마워요!'),
+      el('details', null, el('summary', null, '보낸 내용 보기'), el('pre', null, donation.sent)),
+      el('div', { class: 'actions' }, el('button', {
+        type: 'button', class: 'act', onclick: (event) => withdrawResearch(event.currentTarget),
+      }, '보낸 기록 지우기')),
+    ];
+  } else if (donation.failed) {
+    parts = [
+      line('연구용으로 보내지 못했어요.'),
+      el('div', { class: 'actions' }, el('button', {
+        type: 'button', class: 'act', onclick: () => syncResearch({ retry: true }),
+      }, '다시 보내기')),
+    ];
+  } else parts = [line('이름을 뺀 답을 연구용으로 보내고 있어요…')];
+  box.replaceChildren(...parts, el('p', { class: 'message', id: 'research-message', role: 'alert' }));
 }
 
 // --- The roulette ------------------------------------------------------------
@@ -1149,6 +1252,8 @@ function ensureDraft() {
     // order so far, best first.
     grades: poll.kind === 'date' ? (fits ? [...had] : Array(count).fill(null)) : null,
     order: poll.kind === 'choice' ? (fits ? orderOf(had) : []) : null,
+    // Whether the voter asks to keep the poll out of research.
+    researchOut: Boolean(mine && entryOf(poll.id)?.optOut?.[mine.id]),
     showMissing: false,
   };
   return state.draft;
@@ -1297,6 +1402,9 @@ function renderBallot() {
     quick = [el('button', { type: 'button', class: 'ghost', onclick: resetOrder }, '처음부터 다시 고르기')];
   }
   $('quick-fill').replaceChildren(...quick);
+  $('research-note').hidden = closed || !poll.research;
+  $('research-out').checked = draft.researchOut;
+  $('research-out').disabled = closed;
   renderBallotRows();
   $('vote-submit').textContent = mine ? '고치기' : '투표하기';
   $('vote-submit').disabled = closed;
@@ -1335,7 +1443,8 @@ async function onVote(event) {
   draft.name = $('voter-name').value;
   const grades = draftGrades();
   if (!grades) return;
-  const checked = checkBallot({ name: draft.name, grades }, poll);
+  const research = poll.research ? (draft.researchOut ? RESEARCH_OUT : RESEARCH_IN) : undefined;
+  const checked = checkBallot({ name: draft.name, grades, research }, poll);
   if (checked.problem) {
     say('vote-message', checked.problem);
     $('voter-name').focus();
@@ -1353,7 +1462,8 @@ async function onVote(event) {
       );
       if (data.ballotKey) keys[data.ballotId] = data.ballotKey;
       const mine = { ...(entry.mine || {}), [data.ballotId]: [...checked.ballot.grades] };
-      updateEntry(poll.id, { keys, mine, current: data.ballotId });
+      const optOut = { ...(entry.optOut || {}), [data.ballotId]: checked.ballot.research === RESEARCH_OUT };
+      updateEntry(poll.id, { keys, mine, optOut, current: data.ballotId });
       markUnsent(poll.id, 'changed');
       state.draft = null;
       take(data);
@@ -1903,8 +2013,12 @@ async function loadHolidays() {
     const doc = await res.json();
     state.holidays = doc.dates || {};
     state.through = holidaysThrough(state.holidays);
+    state.holidaysLoaded = true;
   } catch {
     // The calendar shows weekends without the holidays.
+  } finally {
+    // What goes to research waits for them, and says when they did not come.
+    state.holidaysTried = true;
   }
 }
 
@@ -1937,6 +2051,9 @@ function wire() {
   $('vote-form').addEventListener('submit', onVote);
   $('voter-name').addEventListener('input', () => {
     if (state.draft) state.draft.name = $('voter-name').value;
+  });
+  $('research-out').addEventListener('change', () => {
+    if (state.draft) state.draft.researchOut = $('research-out').checked;
   });
   $('vote-other').addEventListener('click', voteAsSomeoneElse);
   $('vote-remove').addEventListener('click', onRemoveMine);
@@ -1981,6 +2098,7 @@ function wire() {
 
 async function main() {
   document.body.dataset.mode = LINKS ? 'links' : 'server';
+  $('research-foot').hidden = !RESEARCH_BASE;
   wire();
   if (!await receive(location.hash)) show();
   await loadHolidays();

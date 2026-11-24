@@ -3,18 +3,22 @@
 //
 //   npm run serve:api          # http://localhost:8000/fair-pick/
 //   PORT=9000 npm run serve:api
+//   LINKS=1 npm run serve:api  # polls in links, records for research here
 //
 // npm run serve serves the page as it is published, polls in links.
 //
-// The page asks config.js where its API is; this answers that it is here,
-// under /api. Polls last until the server stops. `cd api && npm run dev`
-// runs the real Worker in workerd instead, on port 8787.
+// The page asks config.js where its API is, and where to send records for
+// research; this answers that both are here, under /api, or with LINKS=1
+// that polls stay in links and only the records come here. Everything
+// lasts until the server stops. `cd api && npm run dev` runs the real
+// Worker in workerd instead, on port 8787.
 
 import { serve } from '../../common/tools/serve.js';
 import worker from '../api/src/worker.js';
 import { memoryEnv } from '../api/memory.js';
 
 const env = memoryEnv();
+const links = process.env.LINKS === '1';
 
 async function api(req, res, path) {
   const chunks = [];
@@ -36,7 +40,7 @@ const server = await serve({
     }
     if (path === '/fair-pick/config.js') {
       res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' });
-      res.end("export const API_BASE = '/api';\n");
+      res.end(`export const API_BASE = '${links ? '' : '/api'}';\nexport const RESEARCH_BASE = '/api';\n`);
       return true;
     }
     return false;

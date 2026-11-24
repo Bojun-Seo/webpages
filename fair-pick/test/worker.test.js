@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../api/src/worker.js';
-import { CREATES, IP_LOCK, IP_TRIES, KEEP, POLL_TRIES } from '../api/src/poll.js';
+import { CREATES, EXPORT_PAGE, IP_LOCK, IP_TRIES, KEEP, POLL_TRIES } from '../api/src/poll.js';
+import { RESEARCH_IN, RESEARCH_OUT } from '../../common/site/poll-rules.js';
 import { memoryEnv } from '../api/memory.js';
 
 const ORIGIN = 'https://bojun-seo.github.io';
@@ -9,15 +10,16 @@ const START = Date.parse('2026-11-20T01:00:00Z');
 
 // A Worker on memory whose clock the test moves, and a way to call it as
 // the page would.
-function setup() {
+function setup(vars = {}) {
   const clock = { now: START };
-  const env = memoryEnv({ ALLOWED_ORIGINS: ORIGIN, clock: () => clock.now });
-  async function call(method, path, { body, token, admin, ballotKey, ip = '203.0.113.7', origin = ORIGIN } = {}) {
+  const env = memoryEnv({ ALLOWED_ORIGINS: ORIGIN, clock: () => clock.now, ...vars });
+  async function call(method, path, { body, token, admin, ballotKey, donationKey, ip = '203.0.113.7', origin = ORIGIN } = {}) {
     const headers = { origin, 'cf-connecting-ip': ip };
     if (body !== undefined) headers['content-type'] = 'application/json';
     if (token) headers.authorization = `Bearer ${token}`;
     if (admin) headers['x-admin-key'] = admin;
     if (ballotKey) headers['x-ballot-key'] = ballotKey;
+    if (donationKey) headers['x-donation-key'] = donationKey;
     const res = await worker.fetch(new Request(`https://api.test${path}`, {
       method, headers, body: body === undefined ? undefined : JSON.stringify(body),
     }), env);
@@ -305,4 +307,96 @@ test('a path that is no route says so', async () => {
   assert.equal((await call('GET', '/')).status, 404);
   assert.equal((await call('PATCH', '/polls/team-dinner')).status, 405);
   assert.equal((await call('GET', '/polls/%E0%A4%A')).status, 401);
+});
+
+// What a phone sends for research: a random ID and key, and the record.
+const RECORD = { v: 1, weekdays: [4, 5, 4], holidays: [0, 0, 0], answers: [[0, 2, 2], [2, 1, 0]] };
+const ID = 'donation-id-0123456789';
+const KEY = 'donation-key-0123456789';
+
+test('a date poll that asks for research says only whether it may go, not who said what', async () => {
+  const { call, token, adminKey } = await made({ research: true });
+  const vote = (name, grades, research, extra = {}) => call('PUT', '/polls/team-dinner/ballot', {
+    token, ...extra, body: { name, grades, research, ...extra.body },
+  });
+  assert.equal((await vote('김민수', [2, 1, 0], RESEARCH_IN)).body.poll.research, 'few');
+  const second = await vote('이영희', [1, 2, 2], RESEARCH_IN);
+  assert.equal(second.body.poll.research, 'ok');
+  const closed = await call('POST', '/polls/team-dinner/close', { token, admin: adminKey });
+  assert.equal(closed.body.poll.research, 'ok');
+  for (const ballot of closed.body.ballots) assert.deepEqual(Object.keys(ballot).sort(), ['at', 'grades', 'id', 'name']);
+  await call('POST', '/polls/team-dinner/reopen', { token, admin: adminKey });
+  const { ballotId, ballotKey } = second.body;
+  const out = await vote('이영희', [1, 2, 2], RESEARCH_OUT, { ballotKey, body: { ballotId } });
+  assert.equal(out.body.poll.research, 'declined');
+
+  // A poll that does not ask, and a choice poll, which cannot.
+  const plain = await made({ id: 'plain-dinner' });
+  const cast = await plain.call('PUT', '/polls/plain-dinner/ballot', {
+    token: plain.token, body: { name: '김민수', grades: [2, 1, 0], research: RESEARCH_IN },
+  });
+  assert.equal(cast.body.poll.research, null);
+  const choice = await made({ id: 'choice-dinner', kind: 'choice', options: ['횟집', '고깃집'], research: true });
+  assert.equal(choice.poll.research, null);
+});
+
+test('a record is kept once under its ID, replaced with its key, and taken back with it', async () => {
+  const { call } = setup();
+  const sent = await call('POST', '/donations', { body: { id: ID, key: KEY, record: RECORD } });
+  assert.equal(sent.status, 201);
+  const again = await call('POST', '/donations', { body: { id: ID, key: KEY, record: { ...RECORD, holidays: null } } });
+  assert.equal(again.status, 200);
+  const other = await call('POST', '/donations', { body: { id: ID, key: 'another-key-0123456789', record: RECORD } });
+  assert.equal(other.status, 409);
+  assert.equal((await call('DELETE', `/donations/${ID}`)).status, 403);
+  assert.equal((await call('DELETE', `/donations/${ID}`, { donationKey: 'another-key-0123456789' })).status, 403);
+  assert.equal((await call('DELETE', `/donations/${ID}`, { donationKey: KEY })).status, 200);
+  assert.equal((await call('DELETE', `/donations/${ID}`, { donationKey: KEY })).status, 404);
+});
+
+test('a record that does not fit is turned down, and one address sends only so many an hour', async () => {
+  const { call, clock } = setup();
+  const bad = (body) => call('POST', '/donations', { body, ip: '192.0.2.9' });
+  assert.equal((await bad({ id: ID, key: KEY, record: { ...RECORD, title: '송년회' } })).status, 400);
+  assert.equal((await bad({ id: 'short', key: KEY, record: RECORD })).status, 400);
+  assert.equal((await bad({ id: ID, key: KEY, record: { ...RECORD, answers: [[0, 2, 2]] } })).status, 400);
+  for (let i = 3; i < CREATES; i++) {
+    assert.equal((await bad({ id: `${ID}-${i}`, key: KEY, record: RECORD })).status, 201);
+  }
+  const busy = await bad({ id: `${ID}-busy`, key: KEY, record: RECORD });
+  assert.equal(busy.status, 429);
+  assert.match(busy.body.message, /연구용 기록/);
+  clock.now += 3600e3;
+  assert.equal((await bad({ id: `${ID}-later`, key: KEY, record: RECORD })).status, 201);
+});
+
+test('only the research token reads the records, a page at a time, without their keys', async () => {
+  const closed = setup();
+  await closed.call('POST', '/donations', { body: { id: ID, key: KEY, record: RECORD } });
+  assert.equal((await closed.call('GET', '/donations', { token: 'anything' })).status, 404);
+
+  const { call } = setup({ RESEARCH_TOKEN: 'research-token-0123456789' });
+  const total = EXPORT_PAGE + 2;
+  for (let i = 0; i < total; i++) {
+    const id = `donation-${String(i).padStart(4, '0')}-0123456789`;
+    const res = await call('POST', '/donations', { body: { id, key: KEY, record: RECORD }, ip: `198.51.100.${i % 200}` });
+    assert.equal(res.status, 201);
+  }
+  assert.equal((await call('GET', '/donations')).status, 401);
+  assert.equal((await call('GET', '/donations', { token: 'research-token-0123456780' })).status, 401);
+  const first = await call('GET', '/donations', { token: 'research-token-0123456789' });
+  assert.equal(first.status, 200);
+  assert.equal(first.body.donations.length, EXPORT_PAGE);
+  assert.deepEqual(first.body.donations[0], { id: 'donation-0000-0123456789', month: '2026-11', record: RECORD });
+  const rest = await call('GET', `/donations?after=${first.body.next}`, { token: 'research-token-0123456789' });
+  assert.equal(rest.body.donations.length, 2);
+  assert.equal(rest.body.next, null);
+});
+
+test('a browser on the page’s site may send the key that takes a record back', async () => {
+  const { call } = setup();
+  const preflight = await call('OPTIONS', '/donations', {});
+  assert.match(preflight.headers.get('access-control-allow-headers'), /x-donation-key/);
+  assert.equal((await call('PATCH', '/donations')).status, 405);
+  assert.equal((await call('GET', '/donations/a/b')).status, 404);
 });

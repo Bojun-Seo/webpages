@@ -1,6 +1,8 @@
 // A poll, kept by a Durable Object of its own: what it holds, who may
 // read and change it, and when it closes and goes. The Worker in worker.js
-// routes each call here; see there for the calls.
+// routes each call here; see there for the calls. Two objects are not
+// polls: GATE counts what each address makes, and RESEARCH keeps the
+// records closed polls give to research (common/site/research.js).
 //
 // The PIN is kept as a salted hash, and the admin and ballot keys as
 // hashes. Each address may get a poll's PIN wrong five times before it
@@ -11,7 +13,10 @@
 // workerd takes every name the Worker's main module exports for an entry
 // point, so the constants the tests read live here, not there.
 
-import { LIMITS, checkBallot, checkPoll, nameKey, newPinProblem, pinProblem } from '../../../common/site/poll-rules.js';
+import {
+  LIMITS, checkBallot, checkPoll, nameKey, newPinProblem, pinProblem, researchStatus,
+} from '../../../common/site/poll-rules.js';
+import { donationProblem, isToken } from '../../../common/site/research.js';
 import { decide, tieKey } from '../../../common/site/social-choice.js';
 
 const MINUTE = 60e3;
@@ -30,8 +35,15 @@ export const POLL_TRIES = 50;
 // Polls one address may try to make in an hour.
 export const CREATES = 20;
 
-// The object that counts new polls. No group ID can be this.
+// The object that counts new polls and records. No group ID can be this.
 export const GATE = '~gate';
+
+// The object that keeps the records given to research. No group ID can be
+// this either.
+export const RESEARCH = '~research';
+
+// Records one export answers with at most.
+export const EXPORT_PAGE = 500;
 
 export function json(status, body) {
   return new Response(JSON.stringify(body), {
@@ -74,7 +86,7 @@ export async function sha256(text) {
 
 // Whether two strings are equal, taking as long whichever character
 // differs.
-function sameText(a, b) {
+export function sameText(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
@@ -88,8 +100,10 @@ const iso = (ms) => new Date(ms).toISOString();
 // votes by what the others did.
 function view(poll, ballots) {
   const { id, kind, title, note, options, createdAt, deadline, closedAt, decision, expiresAt } = poll;
+  // Whether it may go to research, and not which voter said what.
+  const research = researchStatus(Boolean(poll.research), ballots.map((ballot) => ballot.research));
   return {
-    poll: { id, kind, title, note, options, createdAt, deadline, closedAt, decision, expiresAt },
+    poll: { id, kind, title, note, options, createdAt, deadline, closedAt, decision, expiresAt, research },
     ballots: ballots.map(({ id: ballotId, name, grades, at }) => ({
       id: ballotId, name, at, ...(closedAt && { grades }),
     })),
@@ -184,6 +198,9 @@ export class Poll {
     const now = this.now();
     if (action === 'gate') return this.gate(input, now);
     if (action === 'create') return this.create(input, now);
+    if (action === 'donate') return this.donate(input, now);
+    if (action === 'withdraw') return this.withdraw(input);
+    if (action === 'donations') return this.donations(input);
     const poll = await this.storage.get('poll');
     if (!poll) return action === 'enter' ? problem(401, 'wrong', WRONG) : SIGNED_OUT;
     if (action === 'enter') return this.enter(poll, input, now);
@@ -242,14 +259,17 @@ export class Poll {
     }
   }
 
-  async gate({ key }, now) {
+  async gate({ key, what = 'create' }, now) {
     const counts = (await this.storage.get('gate')) || {};
     for (const [other, entry] of Object.entries(counts)) {
       if (now - entry.start >= HOUR) delete counts[other];
     }
     const entry = counts[key] || { start: now, count: 0 };
     if (entry.count >= CREATES) {
-      return problem(429, 'busy', '여기서 투표를 너무 많이 만들었어요. 한 시간쯤 뒤에 다시 해 주세요.', {
+      const message = what === 'donate'
+        ? '여기서 연구용 기록을 너무 많이 보냈어요. 한 시간쯤 뒤에 다시 해 주세요.'
+        : '여기서 투표를 너무 많이 만들었어요. 한 시간쯤 뒤에 다시 해 주세요.';
+      return problem(429, 'busy', message, {
         retryAfter: Math.ceil((entry.start + HOUR - now) / 1000),
       });
     }
@@ -312,7 +332,7 @@ export class Poll {
     if (poll.closedAt) return CLOSED;
     const checked = checkBallot(body, poll);
     if (checked.problem) return problem(400, 'invalid', checked.problem);
-    const { name, grades } = checked.ballot;
+    const { name, grades, research } = checked.ballot;
     let mine = null;
     if (typeof body.ballotId === 'string' && body.ballotId !== '') {
       mine = ballots.find((ballot) => ballot.id === body.ballotId);
@@ -327,13 +347,13 @@ export class Poll {
     }
     let ballotKey;
     if (mine) {
-      Object.assign(mine, { name, grades, at: iso(now) });
+      Object.assign(mine, { name, grades, research, at: iso(now) });
     } else {
       if (ballots.length >= LIMITS.ballots) {
         return problem(409, 'full', `한 투표에는 ${LIMITS.ballots}명까지 참여할 수 있어요.`);
       }
       ballotKey = randomKey();
-      mine = { id: randomKey(9), name, grades, keyHash: await sha256(ballotKey), at: iso(now) };
+      mine = { id: randomKey(9), name, grades, research, keyHash: await sha256(ballotKey), at: iso(now) };
       ballots.push(mine);
     }
     await this.save(poll, ballots, now);
@@ -349,5 +369,44 @@ export class Poll {
     ballots.splice(index, 1);
     await this.save(poll, ballots, now);
     return { status: 200, body: view(poll, ballots) };
+  }
+
+  // A closed poll's record for research, kept under the random ID its
+  // maker's phone sent it under with the hash of its key, and the month it
+  // came: sent again under the same ID and key, it replaces what was kept.
+  async donate({ body }, now) {
+    const { id, key, record } = body;
+    if (!isToken(id) || !isToken(key) || donationProblem(record)) {
+      return problem(400, 'invalid', '연구용 기록을 읽지 못했어요.');
+    }
+    const name = `d:${id}`;
+    const had = await this.storage.get(name);
+    if (had && !sameText(await sha256(key), had.keyHash)) {
+      return problem(409, 'taken', '같은 이름의 연구용 기록이 이미 있어요.');
+    }
+    const month = had?.month || iso(now).slice(0, 7);
+    await this.storage.put(name, { keyHash: had?.keyHash || await sha256(key), month, record });
+    return { status: had ? 200 : 201, body: { kept: true } };
+  }
+
+  // Takes back a record, with the key it was sent with.
+  async withdraw({ id, key }) {
+    const name = `d:${id}`;
+    const had = isToken(id) ? await this.storage.get(name) : null;
+    if (!had) return problem(404, 'gone', '이미 지워진 연구용 기록이에요.');
+    if (!sameText(await sha256(key || ''), had.keyHash)) return problem(403, 'key', '이 기기에서 보낸 기록이 아니라서 지울 수 없어요.');
+    await this.storage.delete(name);
+    return { status: 200, body: { deleted: true } };
+  }
+
+  // The records, EXPORT_PAGE at a time in the order of their IDs, each
+  // without its key's hash; `after` is the ID the last page ended with.
+  async donations({ after }) {
+    const start = isToken(after) ? { startAfter: `d:${after}` } : {};
+    const found = await this.storage.list({ prefix: 'd:', limit: EXPORT_PAGE + 1, ...start });
+    const records = [...found].map(([name, { month, record }]) => ({ id: name.slice(2), month, record }));
+    const more = records.length > EXPORT_PAGE;
+    const page = records.slice(0, EXPORT_PAGE);
+    return { status: 200, body: { donations: page, next: more ? page[page.length - 1].id : null } };
   }
 }

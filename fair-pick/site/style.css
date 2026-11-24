@@ -168,6 +168,22 @@ h1 { font-weight: 700; font-size: clamp(1.75rem, 6vw, 2.5rem); line-height: 1.2;
 body[data-mode="links"] [data-only="server"],
 body[data-mode="server"] [data-only="links"] { display: none !important; }
 
+/* Research: the maker's question, each voter's answer, and what was sent */
+.check { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.875rem; cursor: pointer; }
+.check input { flex: none; inline-size: 1rem; block-size: 1rem; margin: 0.2rem 0 0; accent-color: var(--accent); }
+.research-note, .research-status { display: grid; gap: 0.5rem; background: var(--accent-soft); color: var(--ink); }
+.research-status pre {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--font-data);
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.research-status summary { cursor: pointer; font-size: 0.8125rem; color: var(--accent); font-weight: 600; }
+
 /* After a change kept in links: the link to send on */
 .send { display: grid; gap: 0.5rem; background: var(--caution-soft); color: var(--ink); border: 1px solid var(--caution); }
 .send strong { color: var(--caution); }

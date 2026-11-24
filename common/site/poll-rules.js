@@ -22,6 +22,26 @@ export const NO = 0;
 export const MEH = 1;
 export const YES = 2;
 
+// A date poll's maker may ask, when making it, that once it closes the
+// voters' answers go to research without names (research.js). Each ballot
+// cast then says what its voter chose after the page told them: IN, to
+// go along, or OUT, to keep the poll out of it. A ballot with neither was
+// cast without the question, from a page from before it.
+export const RESEARCH_IN = 1;
+export const RESEARCH_OUT = 2;
+
+// Whether a poll's answers may go to research: null when its maker did
+// not ask; 'ok' when every ballot that counts, two or more, says IN;
+// 'declined' when one says OUT; 'unasked' when one was cast without the
+// question; 'few' with fewer than two ballots. `consents` are the ballots'
+// answers to the question.
+export function researchStatus(asked, consents) {
+  if (!asked) return null;
+  if (consents.some((consent) => consent === RESEARCH_OUT)) return 'declined';
+  if (consents.some((consent) => consent !== RESEARCH_IN)) return 'unasked';
+  return consents.length < 2 ? 'few' : 'ok';
+}
+
 // A choice poll is answered by putting every option in order, best first.
 // A ballot carries the order as points, one for each option in the poll's
 // order: n - 1 for the first of n options, n - 2 for the next and 0 for
@@ -164,8 +184,9 @@ function checkOptions(kind, options, today) {
 }
 
 // A new poll from what its maker entered, { kind, title, note, options,
-// deadline }, as { poll } or { problem }: candidate dates sorted, text
-// cleaned, the deadline an ISO time or null. `now` is the time in ms.
+// deadline, research }, as { poll } or { problem }: candidate dates sorted,
+// text cleaned, the deadline an ISO time or null, and `research: true` only
+// for a date poll whose maker asked. `now` is the time in ms.
 export function checkPoll(input, now = Date.now()) {
   const kind = KINDS.includes(input?.kind) ? input.kind : null;
   if (!kind) return { problem: '무엇을 정할지 골라 주세요.' };
@@ -184,12 +205,14 @@ export function checkPoll(input, now = Date.now()) {
     if (at > now + LIMITS.deadlineAhead * DAY) return { problem: '마감 시각은 1년 안으로 정해 주세요.' };
     deadline = new Date(at).toISOString();
   }
-  return { poll: { kind, title, note, options: options.options, deadline } };
+  const research = kind === 'date' && input.research === true;
+  return { poll: { kind, title, note, options: options.options, deadline, ...(research && { research }) } };
 }
 
-// A ballot for `poll` from what the voter entered, { name, grades }, as
-// { ballot } or { problem }: for every option in its order, its grade or,
-// for a choice, its points.
+// A ballot for `poll` from what the voter entered, { name, grades,
+// research }, as { ballot } or { problem }: for every option in its order,
+// its grade or, for a choice, its points, and when the poll asks, the
+// voter's RESEARCH_IN or RESEARCH_OUT.
 export function checkBallot(input, poll) {
   const name = cleanText(input?.name);
   if (!name) return { problem: '이름을 넣어 주세요. 이 투표는 기명 투표예요.' };
@@ -197,5 +220,6 @@ export function checkBallot(input, poll) {
   if (!gradesFit(poll.kind, poll.options.length, input.grades)) {
     return { problem: poll.kind === 'date' ? '모든 후보에 답해 주세요.' : '모든 후보에 순위를 매겨 주세요.' };
   }
-  return { ballot: { name, grades: [...input.grades] } };
+  const research = poll.research && [RESEARCH_IN, RESEARCH_OUT].includes(input.research) ? input.research : null;
+  return { ballot: { name, grades: [...input.grades], ...(research && { research }) } };
 }

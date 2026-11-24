@@ -66,6 +66,38 @@ function workdayAhead(holidays) {
   }
 }
 
+// The link fair-pick in links shows on `page` to share, once it carries
+// the poll.
+async function shareLinkOf(page) {
+  await page.waitForFunction(() => document.getElementById('share-link').href.includes('#1.'));
+  return page.getAttribute('#share-link', 'href');
+}
+
+// Another phone, which reaches only the site, opens `link` with the group
+// ID and PIN; its script errors go to `problems`.
+async function secondPhone(page, base, link, id, pin, problems) {
+  const other = await page.context().browser().newContext({ viewport: { width: 375, height: 800 }, hasTouch: true });
+  await other.route('**', (route) => (route.request().url().startsWith(base) ? route.continue() : route.abort()));
+  const second = await other.newPage();
+  second.on('pageerror', (error) => problems.push(`fair-pick, second phone: ${error.message}`));
+  await second.goto(link);
+  await second.waitForSelector('#gate-id-field:not([hidden])');
+  await second.fill('#gate-id', id);
+  await second.fill('#gate-pin', pin);
+  await second.click('#gate-submit');
+  await second.waitForSelector('#poll-body:not([hidden])');
+  return { other, second };
+}
+
+// Votes on fair-pick's date ballot shown on `page` as `name`, every date
+// answered by the quick-fill button at `button`: 0 for ○, 1 for △, 2 for ✕.
+async function dateVote(page, name, button) {
+  await page.fill('#voter-name', name);
+  await page.locator('#quick-fill button').nth(button).click();
+  await page.click('#vote-submit');
+  await page.waitForFunction(() => /투표했어요/.test(document.getElementById('vote-message').textContent));
+}
+
 // Votes on fair-pick's choice ballot shown on `page` as `name`, tapping the
 // options at `order`, best first; the one left goes last by itself.
 async function rankVote(page, name, order) {
@@ -84,28 +116,43 @@ async function spinRoulette(page) {
   await page.waitForSelector('#decided', { timeout: 20000 });
 }
 
+// The records fair-pick's API on memory keeps for research in the check
+// that sends some.
+let researchEnv = null;
+
+// Has `context` find fair-pick's API, and research's, where config.js says,
+// and answers them with the Worker on memory in `env`.
+async function answerFairPick(context, env, { api, research }) {
+  await context.route((url) => url.pathname.endsWith('/fair-pick/config.js'), (route) => route.fulfill({
+    contentType: 'text/javascript; charset=utf-8',
+    body: `export const API_BASE = '${api}';\nexport const RESEARCH_BASE = '${research}';\n`,
+  }));
+  await context.route(`${FAIR_PICK_API}/**`, async (route) => {
+    const request = route.request();
+    const answer = await fairPickWorker.fetch(new Request(request.url(), {
+      method: request.method(), headers: request.headers(), body: request.postData() ?? undefined,
+    }), env);
+    await route.fulfill({
+      status: answer.status,
+      headers: Object.fromEntries(answer.headers),
+      body: Buffer.from(await answer.arrayBuffer()),
+    });
+  });
+}
+
 // What a page needs before it opens, by path.
 const setups = {
   // fair-pick with an API, which config.js names when the build has the
   // repository variable for it: the check names one of its own and answers
   // it with the Worker on memory.
   async '/fair-pick/?server'(context) {
-    const env = memoryEnv();
-    await context.route((url) => url.pathname.endsWith('/fair-pick/config.js'), (route) => route.fulfill({
-      contentType: 'text/javascript; charset=utf-8',
-      body: `export const API_BASE = '${FAIR_PICK_API}';\n`,
-    }));
-    await context.route(`${FAIR_PICK_API}/**`, async (route) => {
-      const request = route.request();
-      const answer = await fairPickWorker.fetch(new Request(request.url(), {
-        method: request.method(), headers: request.headers(), body: request.postData() ?? undefined,
-      }), env);
-      await route.fulfill({
-        status: answer.status,
-        headers: Object.fromEntries(answer.headers),
-        body: Buffer.from(await answer.arrayBuffer()),
-      });
-    });
+    await answerFairPick(context, memoryEnv(), { api: FAIR_PICK_API, research: FAIR_PICK_API });
+  },
+  // fair-pick with its polls in links and only research's records sent to
+  // the API, as with the repository variable for research alone.
+  async '/fair-pick/?research'(context) {
+    researchEnv = memoryEnv();
+    await answerFairPick(context, researchEnv, { api: '', research: FAIR_PICK_API });
   },
 };
 
@@ -243,6 +290,46 @@ const checks = {
     if (!(await second.isHidden('#vote-form'))) problems.push('fair-pick: the closing link leaves the other phone voting');
     const shown = await second.textContent('#results');
     if (!shown.includes('갑') || !shown.includes('을')) problems.push('fair-pick: the closed poll does not show who picked what');
+    await other.close();
+    return problems;
+  },
+
+  // fair-pick in links, whose maker asks that the answers go to research:
+  // every voter is told, the maker's phone sends them without names once
+  // the poll closes, and takes them back.
+  async '/fair-pick/?research'(page, { base }) {
+    const problems = [];
+    await page.click('#new-link');
+    await page.waitForSelector('#picker .cal-day');
+    if (!(await page.isVisible('#research-fieldset'))) problems.push('fair-pick does not ask the maker about research');
+    await page.click('#picker [data-focus="next"]');
+    await page.click('#picker [data-focus="wd:5"]');
+    await page.fill('#title-input', '점검 연구');
+    await page.check('#research-input');
+    await page.fill('#id-input', 'smoke-research');
+    await page.fill('#pin-input', '48291573');
+    await page.click('#create-submit');
+    await page.waitForSelector('#poll-body:not([hidden])');
+    if (!(await page.isVisible('#research-note'))) problems.push('fair-pick does not tell the voters about research');
+    await dateVote(page, '갑', 0);
+
+    const { other, second } = await secondPhone(page, base, await shareLinkOf(page), 'smoke-research', '48291573', problems);
+    if (!(await second.isVisible('#research-note'))) problems.push('fair-pick does not tell the other phone about research');
+    await dateVote(second, '을', 1);
+    await page.goto(await shareLinkOf(second));
+    await page.waitForSelector('#poll-body:not([hidden])');
+    await page.locator('#admin').evaluate((details) => { details.open = true; });
+    await page.click('#admin-close');
+    await page.waitForFunction(() => /보냈어요/.test(document.getElementById('research-status').textContent), null, { timeout: 10000 });
+    const kept = () => [...researchEnv.POLLS.objects.get('~research').storage.data].filter(([name]) => name.startsWith('d:'));
+    const [record] = kept().map(([, entry]) => entry.record);
+    if (kept().length !== 1) problems.push(`fair-pick sent ${kept().length} records to research`);
+    else if (/갑|을|점검|smoke/.test(JSON.stringify(record)) || record.answers.length !== 2) {
+      problems.push(`fair-pick sent ${JSON.stringify(record)} to research`);
+    }
+    await page.click('#research-status button');
+    await page.waitForFunction(() => /지웠어요/.test(document.getElementById('research-status').textContent));
+    if (kept().length !== 0) problems.push('fair-pick leaves the record with research after taking it back');
     await other.close();
     return problems;
   },

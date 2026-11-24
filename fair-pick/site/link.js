@@ -298,7 +298,9 @@ export function checked(state, { KINDS, LIMITS, gradesFit, pointsOf, isDate }) {
       grades = pointsFromGrades(ballot.i, grades, pointsOf);
     }
     if (!gradesFit(state.kind, options.length, grades)) return [];
-    return [{ i: ballot.i, n: ballot.n, g: textOf(grades), t: ballot.t }];
+    // A ballot's answer to whether the poll may go to research, when it asks.
+    const r = [1, 2].includes(ballot.r) ? { r: ballot.r } : {};
+    return [{ i: ballot.i, n: ballot.n, g: textOf(grades), t: ballot.t, ...r }];
   });
   return {
     v: STATE_VERSION,
@@ -309,6 +311,7 @@ export function checked(state, { KINDS, LIMITS, gradesFit, pointsOf, isDate }) {
     note: typeof state.note === 'string' ? state.note : '',
     options: options.map((option) => (state.kind === 'date' ? { date: option.date } : { label: option.label })),
     deadline: state.deadline,
+    ...(state.kind === 'date' && state.research === true && { research: true }),
     createdAt: state.createdAt,
     seedHash: state.seedHash,
     status: { closed: state.status.closed, at: state.status.at },
@@ -366,8 +369,13 @@ export function createLinkClient({ rules, decide, storage, now = Date.now, itera
       decision = decide(state.kind, all, state.options.length, drawn);
     }
     const { kind, title, note, options, createdAt, deadline } = state;
+    // Whether it may go to research, from every ballot that counts; which
+    // voter said what stays out of the view.
+    const research = rules.researchStatus(Boolean(state.research), counted(state, rules.nameKey).map((ballot) => ballot.r));
     return {
-      poll: { id, kind, title, note, options, createdAt, deadline, closedAt: shut === null ? null : iso(shut), decision },
+      poll: {
+        id, kind, title, note, options, createdAt, deadline, closedAt: shut === null ? null : iso(shut), decision, research,
+      },
       // Until the poll closes, who voted but not how.
       ballots: shut === null ? all.map(({ id: ballotId, name, at }) => ({ id: ballotId, name, at })) : all,
       sameNames: sameNames(state, rules.nameKey),
@@ -484,7 +492,7 @@ export function createLinkClient({ rules, decide, storage, now = Date.now, itera
       if (closedAt(state, now()) !== null) throw new LinkError(423, 'closed', '마감된 투표예요.');
       const result = rules.checkBallot(input, state);
       if (result.problem) throw new LinkError(400, 'invalid', result.problem);
-      const { name, grades } = result.ballot;
+      const { name, grades, research } = result.ballot;
       const live = counted(state, rules.nameKey);
       let mine = null;
       if (input.ballotId) {
@@ -502,7 +510,9 @@ export function createLinkClient({ rules, decide, storage, now = Date.now, itera
       if (!mine && live.length >= rules.LIMITS.ballots) {
         throw new LinkError(409, 'full', `한 투표에는 ${rules.LIMITS.ballots}명까지 참여할 수 있어요.`);
       }
-      const ballot = { i: mine ? mine.i : randomId(6), n: name, g: textOf(grades), t: after(mine ? mine.t : 0) };
+      const ballot = {
+        i: mine ? mine.i : randomId(6), n: name, g: textOf(grades), t: after(mine ? mine.t : 0), ...(research && { r: research }),
+      };
       const ballots = [...state.ballots.filter((one) => one.i !== ballot.i), ballot].sort(byTime);
       keep(id, { ...record, state: { ...state, ballots } });
       return { ballotId: ballot.i, ...(mine ? {} : { ballotKey: 'own' }), ...await view(id) };

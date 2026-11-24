@@ -352,3 +352,51 @@ test('pasted text gives up each payload once', async () => {
   assert.deepEqual(payloadsIn('https://x.test/fair-pick/?g=team-dinner'), []);
   assert.equal((await sha256Hex('a')).length, 64);
 });
+
+test('a poll that asks for research says so on every phone, and only whether, not who', async () => {
+  const { a, admin } = await maker({ research: true });
+  const b = phone();
+  const c = phone();
+  const link = await a.client.linkOf('team-dinner');
+  await b.client.open(link, 'team-dinner', '482915');
+  await c.client.open(link, 'team-dinner', '482915');
+  assert.equal((await b.client.load('team-dinner')).poll.research, 'few');
+  await b.client.vote('team-dinner', {}, { name: '이영희', grades: [1, 2, 2], research: pollRules.RESEARCH_IN });
+  await c.client.vote('team-dinner', {}, { name: '박지훈', grades: [2, 2, 1], research: pollRules.RESEARCH_IN });
+  await a.client.absorb(`${await b.client.linkOf('team-dinner')}\n${await c.client.linkOf('team-dinner')}`);
+  const open = await a.client.load('team-dinner');
+  assert.equal(open.poll.research, 'ok');
+  const closed = await a.client.close('team-dinner', admin);
+  assert.equal(closed.poll.research, 'ok');
+  for (const ballot of closed.ballots) assert.deepEqual(Object.keys(ballot).sort(), ['at', 'grades', 'id', 'name']);
+
+  // One voter changes their mind before the close, on another poll the same way.
+  const other = await maker({ id: 'second-dinner', research: true });
+  const d = phone();
+  await d.client.open(await other.a.client.linkOf('second-dinner'), 'second-dinner', '482915');
+  await d.client.vote('second-dinner', {}, { name: '이영희', grades: [1, 2, 2], research: pollRules.RESEARCH_IN });
+  const cast = await other.a.client.vote('second-dinner', {}, { name: '김민수', grades: [2, 1, 0], research: pollRules.RESEARCH_IN });
+  await other.a.client.vote('second-dinner', { ballotKey: 'own' }, {
+    name: '김민수', grades: [2, 1, 0], research: pollRules.RESEARCH_OUT, ballotId: cast.ballotId,
+  });
+  await other.a.client.absorb(await d.client.linkOf('second-dinner'));
+  assert.equal((await other.a.client.load('second-dinner')).poll.research, 'declined');
+});
+
+test('a poll that does not ask keeps no answers to the question, and a ballot cast without it holds the poll back', async () => {
+  const { a } = await maker();
+  const plain = await a.client.vote('team-dinner', {}, { name: '김민수', grades: [2, 1, 0], research: pollRules.RESEARCH_IN });
+  assert.equal(plain.poll.research, null);
+  assert.equal('r' in a.storage.read()['team-dinner'].state.ballots[0], false);
+
+  // A phone with a page from before the question sends a ballot without it.
+  const asking = await maker({ id: 'asking-dinner', research: true });
+  const record = asking.a.storage.read()['asking-dinner'];
+  const ballot = { i: 'oldpage1', n: '박지훈', g: '221', t: NOW + 1 };
+  const state = checked({ ...record.state, ballots: [ballot] }, rules);
+  const link = await seal(state, await importKey(record.key));
+  await asking.a.client.vote('asking-dinner', {}, { name: '김민수', grades: [2, 1, 0], research: pollRules.RESEARCH_IN });
+  await asking.a.client.absorb(link);
+  assert.equal((await asking.a.client.load('asking-dinner')).poll.research, 'unasked');
+  assert.equal(checked({ ...record.state, research: 'yes' }, rules).research, undefined);
+});

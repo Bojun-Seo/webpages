@@ -7,7 +7,9 @@
 #
 # Deploying needs two repository secrets: CLOUDFLARE_API_TOKEN, a token made from Cloudflare's
 # "Edit Cloudflare Workers" template, and CLOUDFLARE_ACCOUNT_ID. Until both are set the run says
-# so and deploys nothing. fair-pick/README.md says how to set them up.
+# so and deploys nothing. A third, FAIR_PICK_RESEARCH_TOKEN, is the key that reads the records
+# polls give to research; each deploy hands it to the Worker, and without it nobody can read them.
+# fair-pick/README.md says how to set them up.
 name: fair-pick api
 
 on:
@@ -55,15 +57,22 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FAIR_PICK_RESEARCH_TOKEN: ${{ secrets.FAIR_PICK_RESEARCH_TOKEN }}
           FAIR_PICK_API: ${{ vars.FAIR_PICK_API }}
+          FAIR_PICK_RESEARCH_API: ${{ vars.FAIR_PICK_RESEARCH_API }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "::warning::CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are not both set, so the fair-pick API was not deployed. See fair-pick/README.md."
             exit 0
           fi
           npx wrangler deploy | tee deploy.log
-          # The page finds the Worker at FAIR_PICK_API; say so if that is not where it went.
+          # The key that reads the records for research, kept as a secret of the Worker.
+          if [ -n "$FAIR_PICK_RESEARCH_TOKEN" ]; then
+            printf '%s' "$FAIR_PICK_RESEARCH_TOKEN" | npx wrangler secret put RESEARCH_TOKEN
+          fi
+          # The page finds the Worker at FAIR_PICK_API, or for records for research only at
+          # FAIR_PICK_RESEARCH_API; say so if neither is where it went.
           url=$(grep -oE 'https://[A-Za-z0-9.-]+\.workers\.dev' deploy.log | head -n 1 || true)
-          if [ -n "$url" ] && [ "${FAIR_PICK_API%/}" != "$url" ]; then
-            echo "::notice::The fair-pick API is at $url. Set the repository variable FAIR_PICK_API to it (Settings → Secrets and variables → Actions → Variables) and run the pages workflow, so that the page calls it."
+          if [ -n "$url" ] && [ "${FAIR_PICK_API%/}" != "$url" ] && [ "${FAIR_PICK_RESEARCH_API%/}" != "$url" ]; then
+            echo "::notice::The fair-pick API is at $url. Set the repository variable FAIR_PICK_RESEARCH_API to it to keep the polls in links and send only records for research there, or FAIR_PICK_API to keep the polls there too (Settings → Secrets and variables → Actions → Variables), and run the pages workflow."
           fi
