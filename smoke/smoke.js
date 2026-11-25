@@ -149,6 +149,11 @@ async function answerFairPick(context, env, where) {
 
 // What a page needs before it opens, by path.
 const setups = {
+  // fair-pick with no API, as the build makes it without the repository
+  // variables, whatever config.js the build at hand wrote.
+  async '/fair-pick/'(context) {
+    await answerFairPick(context, memoryEnv(), { api: '', research: '' });
+  },
   // fair-pick with an API, which config.js names when the build has the
   // repository variable for it: the check names one of its own and answers
   // it with the Worker on memory.
@@ -245,8 +250,8 @@ const checks = {
     return problems;
   },
 
-  // fair-pick with no API, as it is published until one is set up: a poll
-  // goes from one phone to another in links, and their votes add up.
+  // fair-pick with no API, as it publishes until one is set up: a poll goes
+  // from one phone to another in links, and their votes add up.
   async '/fair-pick/'(page, { base }) {
     const problems = [];
     if (await page.evaluate(() => document.body.dataset.mode) !== 'links') return ['fair-pick does not keep its polls in links'];
