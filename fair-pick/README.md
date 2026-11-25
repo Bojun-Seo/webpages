@@ -149,7 +149,7 @@ mileage (every ○ one vote), the most ○ whoever cannot come, and the largest 
 ### In links, with no server
 
 Until the repository variable `FAIR_PICK_API` names an API, the page keeps its polls in links
-(`site/link.js`), and that is how it is published now.
+(`site/link.js`).
 
 1. **Sealing.** A link carries the poll and every ballot the phone has seen, as JSON, compressed and
    encrypted with AES-GCM under a key drawn from the group ID and the PIN by PBKDF2-SHA256, 600,000
@@ -182,6 +182,12 @@ in an order drawn from the ballot's ID, the same on every phone; its dates keep 
 Once `FAIR_PICK_API` names the Worker in [`api/`](api/), [set up below](#set-up-the-api), the page
 keeps its polls there instead. The link to a poll is then its address, `?g=<group ID>`, and anyone
 with the group ID and PIN sees the same poll at once from any phone, with no links to pass on.
+
+A site that gets the API while polls are going round in links leaves those polls there, so they
+carry on as before. A link from before opens in links, and so does a poll a phone keeps in links,
+from 이 기기에서 들어간 투표 or its group ID and PIN on the home page; each of their pages loads on
+its own, and home and every new poll go to the API. A phone does not make a poll on the API under
+a group ID it keeps in links, whose pages would open the poll in links.
 
 ## Who can see and change what
 
@@ -281,7 +287,8 @@ place. [`fair-pick-api.yml`](../.github/workflows/fair-pick-api.yml) deploys it.
 5. Add that address as a repository **variable** (the **Variables** tab), then run **Actions →
    pages → Run workflow**: as `FAIR_PICK_RESEARCH_API` to keep the polls in links and send only
    [research donations](#research-donations) there, or as `FAIR_PICK_API` to keep the polls there
-   too, which sends the records there as well.
+   too, which sends the records there as well. Polls already in links keep going there
+   ([on the API](#on-the-api)).
 6. To read the records, add a long random repository **secret** `FAIR_PICK_RESEARCH_TOKEN`
    (`openssl rand -hex 32` makes one) and run **Actions → fair-pick api → Run workflow** again;
    each deploy hands it to the Worker as `RESEARCH_TOKEN`.
@@ -301,7 +308,8 @@ of each, and making a poll one more of the second.
 
 [`pages.yml`](../.github/workflows/pages.yml) runs the tests and opens the page in a browser on
 every push that touches `fair-pick/` or `common/`: once as published without an API, two phones
-passing a poll in links, and once with the API answered by its Worker on memory. On the default
+passing a poll in links, once with the API answered by its Worker on memory, and once given the
+API while a poll goes round in links. On the default
 branch it publishes `site/` to <https://bojun-seo.github.io/webpages/fair-pick/>, writing
 `FAIR_PICK_API` and `FAIR_PICK_RESEARCH_API`, else `FAIR_PICK_API`, into `config.js`. The [top-level README](../README.md#publishing) says how the
 site is put together.
@@ -332,6 +340,8 @@ npm test
 - In links, each phone counts the ballots it has received. Until everyone's links have been opened
   the results differ from phone to phone, so the maker opens every link in the chat before closing.
 - In links, taking a poll away takes it off one phone only; the links in the chat still open it.
+- A phone that keeps a poll in links from before the API opens that poll for its group ID, not one
+  on the API under the same ID, until 이 기기에서 이 투표 잊기 forgets it there.
 
 - Options cannot be changed once a poll is made, since ballots already cast answer the old ones;
   the maker makes the poll again.

@@ -13,7 +13,8 @@
 // page publishes without them. fair-pick is opened both as it publishes
 // without an API, keeping its polls in links, and with one, its Worker run
 // on memory here answering in place of the one config.js would name; both
-// times its maker spins the roulette for a tie.
+// times its maker spins the roulette for a tie. It is also given the API
+// while a poll goes round in links, which keeps going there.
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -120,12 +121,18 @@ async function spinRoulette(page) {
 // that sends some.
 let researchEnv = null;
 
+// Where config.js names fair-pick's API in the check whose site gets one
+// while a poll goes round in links, and the Worker on memory answering it.
+const switching = { api: '', research: '' };
+let switchEnv = null;
+
 // Has `context` find fair-pick's API, and research's, where config.js says,
-// and answers them with the Worker on memory in `env`.
-async function answerFairPick(context, env, { api, research }) {
+// which is what `where` holds each time a page asks for it, and answers
+// them with the Worker on memory in `env`.
+async function answerFairPick(context, env, where) {
   await context.route((url) => url.pathname.endsWith('/fair-pick/config.js'), (route) => route.fulfill({
     contentType: 'text/javascript; charset=utf-8',
-    body: `export const API_BASE = '${api}';\nexport const RESEARCH_BASE = '${research}';\n`,
+    body: `export const API_BASE = '${where.api}';\nexport const RESEARCH_BASE = '${where.research}';\n`,
   }));
   await context.route(`${FAIR_PICK_API}/**`, async (route) => {
     const request = route.request();
@@ -153,6 +160,12 @@ const setups = {
   async '/fair-pick/?research'(context) {
     researchEnv = memoryEnv();
     await answerFairPick(context, researchEnv, { api: '', research: FAIR_PICK_API });
+  },
+  // fair-pick published without an API, which the check then gives one.
+  async '/fair-pick/?switch'(context) {
+    switchEnv = memoryEnv();
+    Object.assign(switching, { api: '', research: '' });
+    await answerFairPick(context, switchEnv, switching);
   },
 };
 
@@ -330,6 +343,99 @@ const checks = {
     await page.click('#research-status button');
     await page.waitForFunction(() => /지웠어요/.test(document.getElementById('research-status').textContent));
     if (kept().length !== 0) problems.push('fair-pick leaves the record with research after taking it back');
+    await other.close();
+    return problems;
+  },
+
+  // fair-pick whose site gets an API while a poll goes round in links: that
+  // poll and its links keep going in links, on the phone that keeps it and
+  // on one that opens its link, while a new poll goes to the API, and the
+  // group ID and PIN open it from another phone.
+  async '/fair-pick/?switch'(page, { base }) {
+    const problems = [];
+    const modeOf = (on) => on.evaluate(() => document.body.dataset.mode);
+    const home = async (on) => {
+      await on.click('#view-poll .eyebrow a');
+      await on.waitForSelector('#view-home:not([hidden])');
+    };
+    const fridays = async (title, id, pin) => {
+      await page.click('#new-link');
+      await page.waitForSelector('#picker .cal-day');
+      await page.click('#picker [data-focus="next"]');
+      await page.click('#picker [data-focus="wd:5"]');
+      await page.fill('#title-input', title);
+      await page.fill('#id-input', id);
+      await page.fill('#pin-input', pin);
+      await page.click('#create-submit');
+    };
+    await fridays('점검 전환 전', 'smoke-before', '48291573');
+    await page.waitForSelector('#poll-body:not([hidden])');
+    await dateVote(page, '갑', 0);
+    const link = await shareLinkOf(page);
+
+    // The site gets its API; the poll in links stays there.
+    switching.api = FAIR_PICK_API;
+    await page.reload();
+    await page.waitForSelector('#poll-body:not([hidden])');
+    if (await modeOf(page) !== 'links') problems.push('fair-pick: the poll kept in links goes to the API once there is one');
+    if (await page.locator('#voters li').count() !== 1) problems.push('fair-pick: the poll kept in links loses its vote');
+    await home(page);
+    if (await modeOf(page) !== 'server') problems.push('fair-pick: home keeps to links though there is an API');
+    if (!(await page.textContent('#recent')).includes('smoke-before')) problems.push('fair-pick: home forgets the poll kept in links');
+
+    // Another phone opens its link, in links, and votes.
+    const other = await page.context().browser().newContext({ viewport: { width: 375, height: 800 }, hasTouch: true });
+    await other.route('**', (route) => (route.request().url().startsWith(base) ? route.continue() : route.abort()));
+    await answerFairPick(other, switchEnv, switching);
+    const second = await other.newPage();
+    second.on('pageerror', (error) => problems.push(`fair-pick, second phone: ${error.message}`));
+    await second.goto(link);
+    await second.waitForSelector('#gate-id-field:not([hidden])');
+    if (await modeOf(second) !== 'links') problems.push('fair-pick: a link from before the API does not open in links');
+    await second.fill('#gate-id', 'smoke-before');
+    await second.fill('#gate-pin', '48291573');
+    await second.click('#gate-submit');
+    await second.waitForSelector('#poll-body:not([hidden])');
+    await dateVote(second, '을', 1);
+    const back = await shareLinkOf(second);
+
+    // Its link, put into the maker's home on the API, adds the vote.
+    await page.goto(back);
+    await page.waitForSelector('#poll-body:not([hidden])');
+    if (await page.locator('#voters li').count() !== 2) problems.push('fair-pick: a link from before the API no longer adds its vote');
+
+    // The group ID and PIN of the poll in links open it from home.
+    await home(page);
+    await page.fill('#enter-id', 'smoke-before');
+    await page.fill('#enter-pin', '48291573');
+    await page.click('#enter-submit');
+    await page.waitForSelector('#poll-body:not([hidden])');
+    if (await modeOf(page) !== 'links') problems.push('fair-pick: the group ID and PIN of a poll in links look for it on the API');
+
+    // A new poll goes to the API, though not under the poll in links' group ID.
+    await home(page);
+    await fridays('점검 전환 후', 'smoke-before', '59302684');
+    await page.waitForFunction(() => document.getElementById('create-message').textContent !== '');
+    if (!/같은 그룹 ID/.test(await page.textContent('#create-message'))) {
+      problems.push('fair-pick makes a poll on the API under the group ID of one it keeps in links');
+    }
+    await page.fill('#id-input', 'smoke-after');
+    await page.click('#create-submit');
+    await page.waitForSelector('#poll-body:not([hidden])');
+    if (await modeOf(page) !== 'server') problems.push('fair-pick: a new poll goes to links though there is an API');
+    await page.waitForFunction(() => document.getElementById('share-link').href.includes('?g=smoke-after'));
+    if ((await page.getAttribute('#share-link', 'href')).includes('#')) problems.push('fair-pick: the new poll\'s link carries the poll');
+    await dateVote(page, '갑', 0);
+
+    // The other phone gets into it from home with the group ID and PIN.
+    await second.goto(`${base}/fair-pick/`);
+    await second.waitForSelector('#view-home:not([hidden])');
+    await second.fill('#enter-id', 'smoke-after');
+    await second.fill('#enter-pin', '59302684');
+    await second.click('#enter-submit');
+    await second.waitForSelector('#poll-body:not([hidden])');
+    if (await modeOf(second) !== 'server') problems.push('fair-pick: the other phone does not find the new poll on the API');
+    if (await second.locator('#voters li').count() !== 1) problems.push('fair-pick: the other phone does not see the vote on the API');
     await other.close();
     return problems;
   },

@@ -3,7 +3,8 @@
 // calendar for dates; and a poll, with the voter's ballot, the results and
 // the maker's menu. With an API address in config.js the polls live on the
 // API, which api.js calls; without one they live in links, which link.js
-// seals and merges. What a poll may hold, how the group's choice is picked,
+// seals and merges, and those that went round in links before the API came
+// keep going there. What a poll may hold, how the group's choice is picked,
 // what a poll gives to research and the calendar are in ../common/, which
 // the API shares.
 
@@ -43,9 +44,6 @@ const MONTHS_AHEAD = 12;
 const KIND_NAMES = { date: '날짜 투표', choice: '장소·메뉴 투표' };
 const CHOICE_EXAMPLES = ['예: 삼겹살집', '예: 횟집', '예: 중식당'];
 
-// Polls live on the API when config.js names one, and in links otherwise.
-const LINKS = !API_BASE;
-
 let linkMemory = null;
 const linkStorage = {
   read() {
@@ -66,9 +64,30 @@ const linkStorage = {
   },
 };
 
-const api = LINKS
-  ? createLinkClient({ rules: { ...pollRules, isDate }, decide, storage: linkStorage })
-  : createClient(API_BASE);
+// Whether this device keeps the poll `id` in links.
+function keptInLinks(id) {
+  return Boolean(linkStorage.read()?.[id]);
+}
+
+// Whether the page at `url` keeps its poll in links though there is an
+// API: one a link brings, one waiting for its group ID and PIN, or one
+// this device keeps in links. So the polls that went round in links before
+// the API keep going there, each page of theirs loading on its own, while
+// home and every new poll go to the API.
+function linksFor({ search, hash }) {
+  if (payloadsIn(hash).length > 0) return true;
+  const params = new URLSearchParams(search);
+  if (params.has('new')) return false;
+  if (params.has('join')) return true;
+  return params.has('g') && keptInLinks(normalizeId(params.get('g')));
+}
+
+// Polls live on the API when config.js names one, and in links otherwise,
+// as do those of the pages linksFor names.
+const LINKS = !API_BASE || linksFor(location);
+
+const linkClient = () => createLinkClient({ rules: { ...pollRules, isDate }, decide, storage: linkStorage });
+const api = LINKS ? linkClient() : createClient(API_BASE);
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -243,7 +262,13 @@ function readRoute() {
 }
 
 function navigate(search, { replace = false } = {}) {
-  history[replace ? 'replaceState' : 'pushState'](null, '', search || location.pathname);
+  const url = search || location.pathname;
+  // A page that keeps its poll the other way loads on its own.
+  if (API_BASE && linksFor(new URL(url, location.href)) !== LINKS) {
+    location[replace ? 'replace' : 'assign'](url);
+    return;
+  }
+  history[replace ? 'replaceState' : 'pushState'](null, '', url);
   show();
 }
 
@@ -286,7 +311,8 @@ async function onEnter(event) {
   say('enter-message');
   await withBusy($('enter-submit'), async () => {
     try {
-      const data = await api.enter(id, pin);
+      // A poll this device keeps in links from before the API opens there.
+      const data = await (!LINKS && keptInLinks(id) ? linkClient() : api).enter(id, pin);
       updateEntry(id, { token: data.token, pin, title: data.poll.title, kind: data.poll.kind });
       $('enter-pin').value = '';
       take(data);
@@ -485,7 +511,9 @@ async function onCreate(event) {
   };
   const id = normalizeId($('id-input').value);
   const pin = $('pin-input').value.trim();
-  const problem = checkPoll(input).problem || idProblem(id) || newPinProblem(pin);
+  const problem = checkPoll(input).problem || idProblem(id) || newPinProblem(pin)
+    // Its pages would open the poll this device keeps in links.
+    || (!LINKS && keptInLinks(id) && '이 기기에 같은 그룹 ID의 투표가 있어요. 다른 ID를 정해 주세요.');
   if (problem) {
     say('create-message', problem);
     return;
@@ -1966,7 +1994,12 @@ function leave() {
 // whether there was a link.
 async function receive(text) {
   const [found] = payloadsIn(text);
-  if (!LINKS || !found) return false;
+  if (!found) return false;
+  // A link put into a page that keeps its poll on the API loads in links.
+  if (!LINKS) {
+    location.reload();
+    return true;
+  }
   history.replaceState(null, '', location.pathname + location.search);
   const [result] = await api.absorb(found.payload);
   if (result) {
@@ -2029,7 +2062,7 @@ function wire() {
     event.preventDefault();
     navigate(new URL(link.href).search);
   });
-  window.addEventListener('popstate', show);
+  window.addEventListener('popstate', () => (API_BASE && linksFor(location) !== LINKS ? location.reload() : show()));
   window.addEventListener('hashchange', () => receive(location.hash));
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible' || state.route.view !== 'poll' || !state.poll) return;

@@ -38,7 +38,8 @@ instead, a Cloudflare Worker that [`fair-pick-api.yml`](.github/workflows/fair-p
 deploys when a push to the default branch changes it. That needs the secrets `CLOUDFLARE_API_TOKEN`
 and `CLOUDFLARE_ACCOUNT_ID`, and the page finds the Worker at the repository variable
 `FAIR_PICK_API`, which the build writes into it; [its README](fair-pick/README.md#set-up-the-api)
-says how to set them up. The same Worker can keep, while the polls stay in links, what closed date
+says how to set them up. Polls that went round in links before then keep going there, and only new
+ones go to the API. The same Worker can keep, while the polls stay in links, what closed date
 polls give to research with the consent of their maker and every voter, without names: the page
 sends it to the repository variable `FAIR_PICK_RESEARCH_API`, else `FAIR_PICK_API`, and the secret
 `FAIR_PICK_RESEARCH_TOKEN` reads it ([research donations](fair-pick/README.md#research-donations)).
