@@ -23,10 +23,12 @@ export const MEH = 1;
 export const YES = 2;
 
 // A date poll's maker may ask, when making it, that once it closes the
-// voters' answers go to research without names (research.js). Each ballot
-// cast then says what its voter chose after the page told them: IN, to
-// go along, or OUT, to keep the poll out of it. A ballot with neither was
-// cast without the question, from a page from before it.
+// voters' answers go to research without names (research.js). The page
+// tells each voter so above their answers, and that whoever does not want
+// it should not vote, so a ballot cast then says IN: its voter went along.
+// OUT keeps the poll out of research; voters could ask for it until the
+// page told them instead, and a ballot that did still does. A ballot with
+// neither was cast without the question, from a page from before it.
 export const RESEARCH_IN = 1;
 export const RESEARCH_OUT = 2;
 

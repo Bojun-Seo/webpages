@@ -313,8 +313,9 @@ const checks = {
   },
 
   // fair-pick in links, whose maker asks that the answers go to research:
-  // every voter is told, the maker's phone sends them without names once
-  // the poll closes, and takes them back.
+  // every voter is told, and that whoever does not want it should not vote,
+  // the maker's phone sends them without names once the poll closes, and
+  // takes them back.
   async '/fair-pick/?research'(page, { base }) {
     const problems = [];
     await page.click('#new-link');
@@ -329,6 +330,10 @@ const checks = {
     await page.click('#create-submit');
     await page.waitForSelector('#poll-body:not([hidden])');
     if (!(await page.isVisible('#research-note'))) problems.push('fair-pick does not tell the voters about research');
+    if (!/참여하지 마세요/.test(await page.textContent('#research-note'))) {
+      problems.push('fair-pick does not tell the voters to stay out of a poll they do not want in research');
+    }
+    if (await page.locator('#research-note input').count()) problems.push('fair-pick still offers to keep the poll out of research');
     await dateVote(page, '갑', 0);
 
     const { other, second } = await secondPhone(page, base, await shareLinkOf(page), 'smoke-research', '48291573', problems);

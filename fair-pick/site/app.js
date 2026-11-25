@@ -28,8 +28,9 @@ const {
 // Where this browser keeps, for each poll it has been in, the token the
 // PIN unlocked, the PIN, the maker's admin key, the keys of the ballots
 // cast from it and the grades they were last sent with, which no one is
-// told until the poll closes, whether each asked to keep the poll out of
-// research, and on the maker's device what went to research:
+// told until the poll closes, whether each kept the poll out of research,
+// as voters could until the page told them that voting goes along, and on
+// the maker's device what went to research:
 // { [id]: { token, pin, adminKey, keys, mine, optOut, current, title, kind, seen, donation } },
 // `donation` { id, key, sent, failed, withdrawn }.
 const STORE_KEY = 'fair-pick.polls';
@@ -771,8 +772,8 @@ function renderDecision() {
 
 // --- Research ----------------------------------------------------------------
 
-// A closed date poll whose maker asked, and whose every voter went along,
-// goes to research from its maker's device, without names
+// A closed date poll whose maker asked, and whose voters went along by
+// voting once told so, goes to research from its maker's device, without names
 // (../common/research.js): once, again when a link brings a later ballot,
 // and not after the maker takes it back. The page says which, and on the
 // other devices only whether it goes.
@@ -1280,8 +1281,6 @@ function ensureDraft() {
     // order so far, best first.
     grades: poll.kind === 'date' ? (fits ? [...had] : Array(count).fill(null)) : null,
     order: poll.kind === 'choice' ? (fits ? orderOf(had) : []) : null,
-    // Whether the voter asks to keep the poll out of research.
-    researchOut: Boolean(mine && entryOf(poll.id)?.optOut?.[mine.id]),
     showMissing: false,
   };
   return state.draft;
@@ -1431,8 +1430,6 @@ function renderBallot() {
   }
   $('quick-fill').replaceChildren(...quick);
   $('research-note').hidden = closed || !poll.research;
-  $('research-out').checked = draft.researchOut;
-  $('research-out').disabled = closed;
   renderBallotRows();
   $('vote-submit').textContent = mine ? '고치기' : '투표하기';
   $('vote-submit').disabled = closed;
@@ -1471,16 +1468,19 @@ async function onVote(event) {
   draft.name = $('voter-name').value;
   const grades = draftGrades();
   if (!grades) return;
-  const research = poll.research ? (draft.researchOut ? RESEARCH_OUT : RESEARCH_IN) : undefined;
+  const entry = entryOf(poll.id) || {};
+  const changing = draft.ballotId;
+  // Voting goes along with research, which the page told the voter of
+  // above the ballot; a ballot whose voter kept the poll out, while the
+  // page still let them, keeps it out.
+  const research = poll.research ? (changing && entry.optOut?.[changing] ? RESEARCH_OUT : RESEARCH_IN) : undefined;
   const checked = checkBallot({ name: draft.name, grades, research }, poll);
   if (checked.problem) {
     say('vote-message', checked.problem);
     $('voter-name').focus();
     return;
   }
-  const entry = entryOf(poll.id) || {};
   const keys = { ...(entry.keys || {}) };
-  const changing = draft.ballotId;
   await withBusy($('vote-submit'), async () => {
     try {
       const data = await api.vote(
@@ -2084,9 +2084,6 @@ function wire() {
   $('vote-form').addEventListener('submit', onVote);
   $('voter-name').addEventListener('input', () => {
     if (state.draft) state.draft.name = $('voter-name').value;
-  });
-  $('research-out').addEventListener('change', () => {
-    if (state.draft) state.draft.researchOut = $('research-out').checked;
   });
   $('vote-other').addEventListener('click', voteAsSomeoneElse);
   $('vote-remove').addEventListener('click', onRemoveMine);

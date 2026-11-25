@@ -15,8 +15,8 @@ GitHub Pages serves the page, and a small API of its own, a Cloudflare Worker wi
 for each poll ([`api/`](api/)), keeps the polls, so the group ID and the PIN open a poll from any
 phone. Without the API the page needs nothing else: each poll travels in its links, sealed with
 the group ID and the PIN, and the votes add up as the links go round a group chat. The same Worker
-also keeps what a date poll gives to research once it closes, when its maker asked and every voter
-went along: the answers without names ([research donations](#research-donations)), which it can
+also keeps what a date poll gives to research once it closes, when its maker asked and its voters
+were told before voting: the answers without names ([research donations](#research-donations)), which it can
 keep on its own while the polls stay in links. What the page and the API
 both use, the voting rule, what a poll may hold, what it gives to research and the calendar, is in
 [`common/`](../common/).
@@ -208,8 +208,8 @@ In links:
   guarantee.
 - **No server stores the polls.** Each phone keeps the polls it has opened in its local storage,
   under `fair-pick.links`, until 이 기기에서 이 투표 잊기 forgets one there. All that ever leaves the
-  phones is what a closed date poll gives to research, when its maker asked and every voter went
-  along, without names ([research donations](#research-donations)).
+  phones is what a closed date poll gives to research, when its maker asked and its voters were
+  told before voting, without names ([research donations](#research-donations)).
 
 On the API:
 
@@ -240,7 +240,7 @@ the ballots cast from it with what they were cast with, in its local storage und
 
 The page is also a source of data for research on how groups pick a date, such as how often a
 rule leaves a tie or picks a date with fewer ○ than another. It gives nothing unless a poll's
-maker asks and every voter goes along, and then nothing that names anyone.
+maker asks and every voter is told before voting, and then nothing that names anyone.
 
 - **What goes.** A record of the closed poll ([`common/site/research.js`](../common/site/research.js)):
   each voter's ✕ △ ○ for each date, the rows sorted so that the order the voters came in is lost,
@@ -248,10 +248,12 @@ maker asks and every voter goes along, and then nothing that names anyone.
   arrived. No name, title, note, date, group ID, PIN, link or address goes, and only date polls
   give records.
 - **Who agrees.** The maker ticks the question when making the poll; it cannot be added later.
-  Each voter then sees it above their answers and may ask to keep the poll out, and can change that
-  until the close like the rest of their ballot. Nothing is sent when any voter asks, when a ballot
+  Each voter then reads, above their answers, that the poll's answers go to research and that
+  whoever does not want that should not vote in it: voting is going along, and a voter who thinks
+  better of it takes their ballot back before the close. The page used to let each voter keep the
+  poll out instead, and a ballot that did still keeps it out. Nothing is sent then, when a ballot
   was cast from a page from before the question, or when fewer than two voted. Nobody is told who
-  asked: each phone shows only whether the poll goes.
+  kept it out: each phone shows only whether the poll goes.
 - **Who sends it, and when.** The maker's device, once the poll has closed, with a random ID and
   key it keeps; again, under the same ID, when a link brings a later ballot. The maker sees what
   went (보낸 내용 보기) and can take it back with 보낸 기록 지우기, after which it is not sent again;
