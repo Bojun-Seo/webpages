@@ -18,9 +18,9 @@
 //   GET    /donations?after=:id        → { donations: [{ id, month, record }], next }
 //
 // Every call but the first two carries the poll's token, which the PIN
-// unlocks, as `Authorization: Bearer`; closing, reopening and deleting the
-// poll, spinning its roulette, or another voter's ballot, also need the
-// admin key its maker got
+// unlocks, as `Authorization: Bearer`, and that is all closing the poll or
+// spinning its roulette needs; reopening and deleting the poll, or another
+// voter's ballot, also need the admin key its maker got
 // (`X-Admin-Key`), and changing a ballot the key its voter got
 // (`X-Ballot-Key`). A ballot's grades are each date's ✕ △ ○ (0 to 2), or
 // each option's points from its place, n - 1 for the first of n; until the

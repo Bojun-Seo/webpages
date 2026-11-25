@@ -219,7 +219,8 @@ export class Poll {
       case 'unvote':
         return this.unvote(poll, ballots, input, now, admin);
       case 'close':
-        if (!admin) return NOT_ADMIN;
+        // Anyone with the PIN may close the poll, so that it decides even
+        // when its maker has lost the admin key; reopening it is the maker's.
         if (!poll.closedAt) {
           poll.closedAt = iso(now);
           poll.decision = this.decisionOf(poll, ballots);
@@ -227,10 +228,10 @@ export class Poll {
         }
         return { status: 200, body: view(poll, ballots) };
       case 'draw': {
-        // The maker's roulette among the options level at the top: drawn
-        // here, once for each set of them, so that neither the moment the
-        // wheel is stopped nor closing again draws another.
-        if (!admin) return NOT_ADMIN;
+        // The roulette among the options level at the top, which anyone with
+        // the PIN may spin: drawn here, once for each set of them, so that
+        // neither who stops the wheel, nor when, nor closing again draws
+        // another.
         if (!poll.closedAt) return problem(409, 'open', '마감한 뒤에 룰렛을 돌릴 수 있어요.');
         if (poll.decision?.pending) {
           const { tied } = poll.decision;

@@ -67,11 +67,13 @@ live](#where-the-polls-live) changes how a poll gets from one phone to another.
    calendar; for an option its head-to-head record, its Borda points and the circle, when
    majorities go round in one. Beside them, what other well-known rules would pick from the same
    ballots.
-5. **Closing.** The poll closes at its deadline, or when its maker closes it, and the decision
-   shows at the top; for a date, with the names of those who said they cannot come that day. When
-   options are level at the top, the maker spins a roulette of them there first. The maker's menu
-   also reopens the poll, takes out any ballot, and deletes the poll. It opens on the device that
-   made the poll; another needs the admin code it shows.
+5. **Closing.** The poll closes at its deadline, or when someone closes it: on the API anyone with
+   the group ID and PIN may, with 지금 마감하기 below the results, so that a poll decides even when
+   its maker has lost the admin code; in links only its maker. The decision shows at the top; for a
+   date, with the names of those who said they cannot come that day. When options are level at the
+   top, a roulette of them is spun there first, again by anyone on the API and by the maker in
+   links. The maker's menu also closes the poll, reopens it, takes out any ballot, and deletes the
+   poll. It opens on the device that made the poll; another needs the admin code it shows.
 6. **Sharing.** 함께할 사람 부르기 copies the link, or an invitation with the link, the group ID and,
    where the device knows it, the PIN, or hands it to the phone's share sheet.
 7. **Research, when the maker asks.** Where the page has somewhere to send them, the maker of a
@@ -125,8 +127,9 @@ to 0 for the last, so no ballot weighs more than another and nobody can rule an 
 ### Either way
 
 When the rule leaves several options level, as in a perfectly even circle of three voters each
-preferring a different option, the decision puts them on a roulette, which the maker spins. 시작 sets the wheel going; 멈춤 asks the API, or in links the
-maker's phone, to draw one of them at random, and the wheel slows from the speed it has at a
+preferring a different option, the decision puts them on a roulette, which anyone with the group
+ID and PIN spins on the API, and the maker in links. 시작 sets the wheel going; 멈춤 asks the API,
+or in links the maker's phone, to draw one of them at random, and the wheel slows from the speed it has at a
 steady deceleration, as friction would stop it, picked within a natural range so that it comes to
 rest on the option drawn. The moment 멈춤 is pressed decides nothing, so nobody can aim. One option
 is drawn for each set of options level at the top: spinning again, or reopening the poll and
@@ -223,9 +226,11 @@ On the API:
   a year, so the page asks for six.
 - **A voter** changes or takes back only their own ballots: the API gives a key with each
   ballot, which their browser keeps, and keeps only its hash.
-- **The maker** closes, reopens and deletes the poll, spins its roulette and takes out any ballot,
-  with the admin code the API gave when the poll was made, also kept as a hash. The roulette's
-  draw is made on the API, once for each tie.
+- **Whoever has the group ID and the PIN** also closes the poll and spins its roulette, so that a
+  poll decides even when its maker has lost the admin code. The roulette's draw is made on the
+  API, once for each tie, whoever spins it.
+- **The maker** reopens and deletes the poll and takes out any ballot, with the admin code the API
+  gave when the poll was made, also kept as a hash.
 - **Nobody** keeps a poll for long: it is deleted 60 days after it last changed, and at once when
   its maker deletes it.
 

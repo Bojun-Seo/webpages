@@ -62,7 +62,7 @@
         <li><strong>맞대결에서 모두 이기는 후보(콩도르세 승자).</strong> 두 후보를 놓고 한쪽을 더 위에 둔 사람이 많으면 그쪽이 이깁니다. 다른 모든 후보를 이기는 후보가 있으면, 다수가 어느 후보보다도 그 후보를 원한다는 뜻입니다.</li>
         <li><strong>콩도르세의 역설이면 보르다 점수.</strong> 가위바위보처럼 A가 B를, B가 C를, C가 A를 이기면 모두를 이기는 후보가 없습니다. 그러면 서로 물고 물린 후보들 가운데 보르다 점수(한 사람마다 아래에 둔 후보 하나에 1점)가 가장 높은 후보를 고릅니다. 보르다 점수는 모든 맞대결을 한꺼번에 더해서 돌고 도는 부분이 서로 지워집니다. 콩도르세 승자가 있으면 그 후보, 없으면 보르다로 고르는 이 방식은 경제학자 덩컨 블랙이 제안했습니다.</li>
       </ol>
-      <p>어느 쪽이든 1위가 끝까지 같으면, 마감한 뒤 투표를 만든 사람이 공동 1위들을 룰렛에 올려 돌려서 하나를 뽑습니다. 한 번 뽑힌 결과는 다시 마감해도 그대로입니다. 고르는 것은 1위 하나뿐이고, 나머지 후보에는 순위를 매기지 않습니다.</p>
+      <p>어느 쪽이든 1위가 끝까지 같으면, 마감한 뒤 <span data-only="server">그룹 ID와 PIN을 아는 사람 누구나</span><span data-only="links">투표를 만든 사람이</span> 공동 1위들을 룰렛에 올려 돌려서 하나를 뽑습니다. 한 번 뽑힌 결과는 다시 마감해도 그대로입니다. 고르는 것은 1위 하나뿐이고, 나머지 후보에는 순위를 매기지 않습니다.</p>
       <p class="fine">여럿이 하나를 고르는 문제는 경제학에서 사회선택이론이 다룹니다. 애로의 불가능성 정리가 보여 주듯 모든 면에서 완벽한 투표 규칙은 없어서, 이 페이지는 규칙을 투표 전에 정해 두고 결과 아래에 다른 이름난 규칙들이 고르는 것도 함께 보여 줍니다.</p>
     </section>
   </main>
@@ -116,7 +116,7 @@
           <span>이때까지 투표 받기 (한국 시각)</span>
           <input id="deadline-input" type="datetime-local">
         </label>
-        <p class="fine">마감 시각이 지나면 투표를 더 받지 않고 결과가 정해집니다. 비워 두면 만든 사람이 직접 마감합니다.</p>
+        <p class="fine">마감 시각이 지나면 투표를 더 받지 않고 결과가 정해집니다. 비워 두면 <span data-only="server">그룹 ID와 PIN을 아는 사람 누구나 직접 마감할 수 있습니다.</span><span data-only="links">만든 사람이 직접 마감합니다.</span></p>
       </fieldset>
 
       <fieldset id="research-fieldset" hidden>
@@ -244,6 +244,11 @@
         <div class="notice paradox" id="paradox" role="note" hidden></div>
         <div class="result-cal" id="result-cal" hidden></div>
         <ol class="board" id="results"></ol>
+        <div class="close-row" id="close-row" hidden>
+          <p class="fine">모두 투표했으면 마감해 주세요. 그룹 ID와 PIN을 아는 사람은 누구나 마감할 수 있고, 마감하면 투표를 더 받지 않고 결과가 정해져요. 다시 여는 건 투표를 만든 사람만 할 수 있어요.</p>
+          <div class="actions"><button type="button" class="act" id="close-now">지금 마감하기</button></div>
+          <p class="message" id="close-message" role="alert"></p>
+        </div>
         <details class="panel merge" id="merge-panel" data-only="links">
           <summary>받은 링크 합치기</summary>
           <p class="fine">다른 사람이 단톡방에 올린 링크를 열면 그 투표가 이 기기에 저절로 합쳐져요. 링크를 복사했다면 여기에 붙여 넣어도 되고, 여러 개를 한꺼번에 붙여 넣어도 돼요.</p>

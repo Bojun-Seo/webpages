@@ -178,35 +178,38 @@ test('a voter takes back their own ballot, and the maker anyone’s', async () =
   assert.equal((await call('DELETE', `/polls/team-dinner/ballots/${theirs.ballotId}`, { token, admin: adminKey })).status, 404);
 });
 
-test('the maker closes the poll and it decides; a member cannot, and nobody votes after', async () => {
+test('anyone with the PIN closes the poll and spins its roulette, nobody votes after, and only the maker reopens it', async () => {
   const { call, token, adminKey } = await made();
   await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '김민수', grades: [2, 1, 0] } });
   await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '이영희', grades: [1, 2, 0] } });
-  assert.equal((await call('POST', '/polls/team-dinner/close', { token })).status, 403);
+  assert.equal((await call('POST', '/polls/team-dinner/close', { token: 'not-the-token' })).status, 401);
   // Neither the maker nor anyone else sees how anyone voted before the close.
   const before = await call('GET', '/polls/team-dinner', { token, admin: adminKey });
   assert.ok(before.body.ballots.every((ballot) => ballot.grades === undefined));
-  assert.equal((await call('POST', '/polls/team-dinner/draw', { token, admin: adminKey })).status, 409);
-  const closed = await call('POST', '/polls/team-dinner/close', { token, admin: adminKey });
+  assert.equal((await call('POST', '/polls/team-dinner/draw', { token })).status, 409);
+  // A member closes it, with the token alone.
+  const closed = await call('POST', '/polls/team-dinner/close', { token });
   assert.equal(closed.status, 200);
   assert.ok(closed.body.poll.closedAt);
   assert.deepEqual(closed.body.ballots.map((ballot) => ballot.grades), [[2, 1, 0], [1, 2, 0]]);
-  // Dates 0 and 1 are level on everything, so the decision waits for the maker's roulette.
+  // Dates 0 and 1 are level on everything, so the decision waits for the roulette.
   assert.deepEqual(closed.body.poll.decision, { index: null, tied: [0, 1], drawn: false, pending: true });
   const late = await call('PUT', '/polls/team-dinner/ballot', { token, body: { name: '박지훈', grades: [2, 2, 2] } });
   assert.equal(late.status, 423);
-  assert.equal((await call('POST', '/polls/team-dinner/draw', { token })).status, 403);
-  const drawn = await call('POST', '/polls/team-dinner/draw', { token, admin: adminKey });
+  const drawn = await call('POST', '/polls/team-dinner/draw', { token });
   const picked = drawn.body.poll.decision.index;
   assert.deepEqual(drawn.body.poll.decision, { index: picked, tied: [0, 1], drawn: true });
   assert.ok([0, 1].includes(picked));
+  const reopen = await call('POST', '/polls/team-dinner/reopen', { token });
+  assert.equal(reopen.status, 403);
+  assert.equal(reopen.body.error, 'admin');
 
-  // Spinning again, or reopening and closing again, cannot draw again.
+  // Spinning again, by the maker or anyone, or reopening and closing again, cannot draw again.
   for (let i = 0; i < 5; i++) {
-    const spun = await call('POST', '/polls/team-dinner/draw', { token, admin: adminKey });
+    const spun = await call('POST', '/polls/team-dinner/draw', i % 2 ? { token, admin: adminKey } : { token });
     assert.equal(spun.body.poll.decision.index, picked);
     await call('POST', '/polls/team-dinner/reopen', { token, admin: adminKey });
-    const again = await call('POST', '/polls/team-dinner/close', { token, admin: adminKey });
+    const again = await call('POST', '/polls/team-dinner/close', { token });
     assert.deepEqual(again.body.poll.decision, { index: picked, tied: [0, 1], drawn: true });
   }
 });

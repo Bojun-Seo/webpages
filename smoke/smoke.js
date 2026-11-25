@@ -121,6 +121,10 @@ async function spinRoulette(page) {
 // that sends some.
 let researchEnv = null;
 
+// The Worker on memory answering the check of fair-pick with an API, which
+// another phone there reaches too.
+let serverEnv = null;
+
 // Where config.js names fair-pick's API in the check whose site gets one
 // while a poll goes round in links, and the Worker on memory answering it.
 const switching = { api: '', research: '' };
@@ -158,7 +162,8 @@ const setups = {
   // repository variable for it: the check names one of its own and answers
   // it with the Worker on memory.
   async '/fair-pick/?server'(context) {
-    await answerFairPick(context, memoryEnv(), { api: FAIR_PICK_API, research: FAIR_PICK_API });
+    serverEnv = memoryEnv();
+    await answerFairPick(context, serverEnv, { api: FAIR_PICK_API, research: FAIR_PICK_API });
   },
   // fair-pick with its polls in links and only research's records sent to
   // the API, as with the repository variable for research alone.
@@ -450,7 +455,7 @@ const checks = {
     return problems;
   },
 
-  async '/fair-pick/?server'(page) {
+  async '/fair-pick/?server'(page, { base }) {
     const problems = [];
 
     // A poll of dates picked on the calendar: every Friday of next month at
@@ -492,11 +497,31 @@ const checks = {
     await page.locator('#quick-fill button').last().click();
     await page.click('#vote-submit');
     await page.waitForFunction(() => /투표했어요/.test(document.getElementById('vote-message').textContent));
-    // Every date is level, so the maker spins the roulette for one.
-    await page.locator('#admin').evaluate((details) => { details.open = true; });
-    await page.click('#admin-close');
-    await page.waitForSelector('#decision:not([hidden])');
-    await spinRoulette(page);
+    // Every date is level. Another phone, with only the group ID and PIN,
+    // closes the poll and spins the roulette for one, and the maker sees it.
+    if (await page.isVisible('#close-row')) problems.push('fair-pick shows the maker the close button meant for the others');
+    const other = await page.context().browser().newContext({ viewport: { width: 375, height: 800 }, hasTouch: true });
+    await other.route('**', (route) => (route.request().url().startsWith(base) ? route.continue() : route.abort()));
+    await answerFairPick(other, serverEnv, { api: FAIR_PICK_API, research: FAIR_PICK_API });
+    const member = await other.newPage();
+    member.on('pageerror', (error) => problems.push(`fair-pick, other phone: ${error.message}`));
+    member.on('dialog', (dialog) => dialog.accept());
+    await member.goto(`${base}/fair-pick/`);
+    await member.fill('#enter-id', 'smoke-check');
+    await member.fill('#enter-pin', '482915');
+    await member.click('#enter-submit');
+    await member.waitForSelector('#poll-body:not([hidden])');
+    if (!/누군가 마감할 때까지/.test(await member.textContent('#poll-status'))) {
+      problems.push('fair-pick does not say that anyone may close the poll');
+    }
+    await member.click('#close-now');
+    await member.waitForSelector('#decision:not([hidden])');
+    await spinRoulette(member);
+    const drawn = await member.textContent('#decided');
+    await other.close();
+    await page.click('#refresh');
+    await page.waitForSelector('#decided');
+    if (await page.textContent('#decided') !== drawn) problems.push('fair-pick: the maker does not see what the other phone\'s roulette drew');
     const absent = await page.locator('#absent').textContent().catch(() => '');
     if (!absent.includes('못감')) problems.push(`fair-pick: the day picked names no one absent: "${absent}"`);
     if (!(await page.textContent('#results')).includes('점검')) problems.push('fair-pick: the closed poll does not name the voters');

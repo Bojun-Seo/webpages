@@ -689,6 +689,7 @@ details.panel:not([open]) { gap: 0; }
 .key-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .key-row code { font-family: var(--font-data); font-size: 0.875rem; overflow-wrap: anywhere; }
 .leave-row { text-align: center; }
+.close-row { display: grid; gap: 0.5rem; margin-top: 0.75rem; }
 
 /* Footer */
 .foot {

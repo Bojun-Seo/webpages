@@ -701,6 +701,7 @@ function renderPoll({ quiet = false } = {}) {
   renderShare();
   renderBallot();
   renderResults();
+  renderCloseRow();
   renderVoters();
   renderAdmin();
   if (LINKS) updateLink();
@@ -717,7 +718,8 @@ function renderHeader() {
   $('poll-note').hidden = !poll.note;
   const bits = [`${ballots.length}명 투표`];
   if (poll.closedAt) bits.unshift('마감됨');
-  else bits.push(poll.deadline ? `${timeText(poll.deadline)} 마감` : '만든 사람이 마감할 때까지');
+  else if (poll.deadline) bits.push(`${timeText(poll.deadline)} 마감`);
+  else bits.push(LINKS ? '만든 사람이 마감할 때까지' : '누군가 마감할 때까지');
   $('poll-status').textContent = bits.join(' · ');
 }
 
@@ -737,15 +739,17 @@ function renderDecision() {
   }
   const { index, tied, drawn, pending } = poll.decision;
   if (pending) {
-    const maker = Boolean(entryOf(poll.id)?.adminKey);
+    // On the API, which draws, anyone with the PIN spins; in links only the
+    // maker's phone, which draws itself.
+    const spins = !LINKS || Boolean(entryOf(poll.id)?.adminKey);
     box.className = 'decision none';
     box.replaceChildren(
       el('span', { class: 'label' }, `${timeText(poll.closedAt)} 마감 · ${ballots.length}명 투표`),
       el('strong', null, `공동 1위 ${tied.length}개`),
-      el('p', null, maker
+      el('p', null, spins
         ? '가운데 시작을 누르면 룰렛이 돌고, 멈춤을 누르면 그때 속도에서 서서히 멈추며 하나가 뽑혀요. 한 번 뽑힌 결과는 바뀌지 않아요.'
         : '투표를 만든 사람이 공동 1위를 룰렛에 올려 돌리면 정해져요.'),
-      wheelOf(tied, { spin: maker }),
+      wheelOf(tied, { spin: spins }),
       el('p', { class: 'message', id: 'wheel-message', role: 'alert' }));
     return;
   }
@@ -1797,19 +1801,20 @@ function renderOthers(picked) {
 }
 
 function renderHow() {
+  const spinner = LINKS ? '투표를 만든 사람이' : '그룹 ID와 PIN을 아는 사람 누구나';
   const steps = state.poll.kind === 'date'
     ? [
       '✕(못 가요)가 가장 적은 날만 남겨요. 가장 많은 사람이 올 수 있는 날이에요. 여기서는 누구나 한 사람으로 셉니다.',
       '그중 선호 점수가 가장 높은 날이에요. 선호 점수는 그날에 ○를 준 사람들의 마일리지를 더한 값이에요.',
       `마일리지는 모두 100%에서 시작해 ✕ 하나에 1/${state.poll.options.length}(후보 날짜 수), △ 하나에 그 절반씩 줄고, 남은 만큼이 그 사람 ○ 하나의 무게예요. 여러 날을 열어 둔 사람의 ○는 더 무겁고, 그런 사람이 △를 준 날은 그만큼 점수를 덜 받아요. ✕와 △는 남에게 맞춰 달라는 부탁이라 그만큼 마일리지가 드는 셈이에요.`,
-      '그래도 같으면 공동 1위로 두고, 마감한 뒤 투표를 만든 사람이 공동 1위를 룰렛에 올려 돌려서 하나를 뽑아요.',
+      `그래도 같으면 공동 1위로 두고, 마감한 뒤 ${spinner} 공동 1위를 룰렛에 올려 돌려서 하나를 뽑아요.`,
       '뽑힌 날에 ✕를 준 사람은 결정 바로 밑에 불참자로 이름이 나와요.',
     ]
     : [
       '모두가 모든 후보에 순위를 매겨요. 후보가 n개면 누구나 n-1점부터 0점까지를 한 번씩 주는 셈이라, 누구의 표든 무게가 같아요.',
       '맞대결에서 다른 모든 후보를 이기는 후보가 있으면(콩도르세 승자) 그 후보예요. 두 후보 가운데 한쪽을 더 위에 둔 사람이 많으면 그쪽이 이겨요.',
       '서로 물고 물리거나 비겨서 그런 후보가 없으면(콩도르세의 역설), 물고 물린 후보들 가운데 보르다 점수가 가장 높은 후보예요. 한 사람마다 아래에 둔 후보 하나에 1점씩 줘요.',
-      '그래도 같으면 공동 1위로 두고, 마감한 뒤 투표를 만든 사람이 공동 1위를 룰렛에 올려 돌려서 하나를 뽑아요.',
+      `그래도 같으면 공동 1위로 두고, 마감한 뒤 ${spinner} 공동 1위를 룰렛에 올려 돌려서 하나를 뽑아요.`,
     ];
   steps.push('1위 하나만 고르고, 나머지 후보에는 순위를 매기지 않아요. 결과에는 후보마다 누가 무엇을 골랐는지만 보여요.',
     '누가 무엇을 골랐는지는 마감한 뒤에 공개돼요. 남의 표를 보고 셈을 해서 투표하는 일을 막기 위해서예요.');
@@ -1865,6 +1870,33 @@ function renderVoters() {
   }));
   $('voters-note').hidden = state.sameNames.length === 0;
   $('voters-note').textContent = `이름이 같은 투표가 여러 기기에서 들어왔어요: ${state.sameNames.join(', ')}. 가장 나중 것만 셉니다.`;
+}
+
+// On the API anyone with the PIN may close the poll, so that it decides
+// even when its maker has lost the admin code: from below the results, or
+// for the maker from their menu, where they also reopen it. In links only
+// the maker closes.
+function renderCloseRow() {
+  const { poll } = state;
+  $('close-row').hidden = LINKS || Boolean(poll.closedAt) || Boolean(entryOf(poll.id)?.adminKey);
+  say('close-message');
+}
+
+async function onCloseNow(event) {
+  const { poll } = state;
+  if (!poll || poll.closedAt) return;
+  if (!window.confirm('지금 마감할까요? 마감하면 투표를 더 받지 않고 결과가 정해져요. 다시 여는 건 투표를 만든 사람만 할 수 있어요.')) return;
+  await withBusy(event.currentTarget, async () => {
+    try {
+      reload(await api.close(poll.id, authOf(entryOf(poll.id))));
+    } catch (error) {
+      if (error.status === 401) {
+        signedOut(error);
+        return;
+      }
+      say('close-message', error.message);
+    }
+  });
 }
 
 async function adminCall(button, call, done) {
@@ -2088,6 +2120,7 @@ function wire() {
   $('vote-other').addEventListener('click', voteAsSomeoneElse);
   $('vote-remove').addEventListener('click', onRemoveMine);
   $('refresh').addEventListener('click', (event) => withBusy(event.currentTarget, refresh));
+  $('close-now').addEventListener('click', onCloseNow);
   $('leave').addEventListener('click', leave);
   $('copy-invite').addEventListener('click', async (event) => {
     const button = event.currentTarget;
