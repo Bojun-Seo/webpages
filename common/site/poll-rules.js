@@ -25,7 +25,7 @@ export const YES = 2;
 // A date poll's maker may ask, when making it, that once it closes the
 // voters' answers go to research without names (research.js). The page
 // tells each voter so above their answers, and that whoever does not want
-// it should not vote, so a ballot cast then says IN: its voter went along.
+// it need not vote, so a ballot cast then says IN: its voter went along.
 // OUT keeps the poll out of research; voters could ask for it until the
 // page told them instead, and a ballot that did still does. A ballot with
 // neither was cast without the question, from a page from before it.

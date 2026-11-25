@@ -249,7 +249,7 @@ maker asks and every voter is told before voting, and then nothing that names an
   give records.
 - **Who agrees.** The maker ticks the question when making the poll; it cannot be added later.
   Each voter then reads, above their answers, that the poll's answers go to research and that
-  whoever does not want that should not vote in it: voting is going along, and a voter who thinks
+  whoever does not want that need not vote in it: voting is going along, and a voter who thinks
   better of it takes their ballot back before the close. The page used to let each voter keep the
   poll out instead, and a ballot that did still keeps it out. Nothing is sent then, when a ballot
   was cast from a page from before the question, or when fewer than two voted. Nobody is told who
