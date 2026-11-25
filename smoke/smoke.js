@@ -317,19 +317,20 @@ const checks = {
     return problems;
   },
 
-  // fair-pick in links, whose maker asks that the answers go to research:
-  // every voter is told, and that whoever does not want it need not vote,
+  // fair-pick in links with research's records sent to the API: a date
+  // poll's maker is told its answers go to research, with nothing to untick,
+  // and so is every voter, with that whoever does not want it need not vote;
   // the maker's phone sends them without names once the poll closes, and
   // takes them back.
   async '/fair-pick/?research'(page, { base }) {
     const problems = [];
     await page.click('#new-link');
     await page.waitForSelector('#picker .cal-day');
-    if (!(await page.isVisible('#research-fieldset'))) problems.push('fair-pick does not ask the maker about research');
+    if (!(await page.isVisible('#research-fieldset'))) problems.push('fair-pick does not tell the maker about research');
+    if (await page.locator('#research-fieldset input').count()) problems.push('fair-pick still lets the maker leave research out');
     await page.click('#picker [data-focus="next"]');
     await page.click('#picker [data-focus="wd:5"]');
     await page.fill('#title-input', '점검 연구');
-    await page.check('#research-input');
     await page.fill('#id-input', 'smoke-research');
     await page.fill('#pin-input', '48291573');
     await page.click('#create-submit');

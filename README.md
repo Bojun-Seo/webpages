@@ -39,9 +39,8 @@ changes it. That needs the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUN
 finds the Worker at the repository variable `FAIR_PICK_API`, which the build writes into it;
 [its README](fair-pick/README.md#set-up-the-api) says how to set them up. Without the variable the
 page needs no server and keeps its polls in links; the polls that went round in links before it
-was set keep going there. The same Worker keeps what closed date polls give to research when their
-maker asks, every voter told before voting, without names, and can do so while the polls stay in
-links: the page sends it to the repository variable `FAIR_PICK_RESEARCH_API`, else
+was set keep going there. The same Worker keeps what every closed date poll gives to research, its
+maker and voters told before, without names, and can do so while the polls stay in links: the page sends it to the repository variable `FAIR_PICK_RESEARCH_API`, else
 `FAIR_PICK_API`, and the secret `FAIR_PICK_RESEARCH_TOKEN` reads it
 ([research donations](fair-pick/README.md#research-donations)).
 

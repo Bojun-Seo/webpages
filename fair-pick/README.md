@@ -15,8 +15,8 @@ GitHub Pages serves the page, and a small API of its own, a Cloudflare Worker wi
 for each poll ([`api/`](api/)), keeps the polls, so the group ID and the PIN open a poll from any
 phone. Without the API the page needs nothing else: each poll travels in its links, sealed with
 the group ID and the PIN, and the votes add up as the links go round a group chat. The same Worker
-also keeps what a date poll gives to research once it closes, when its maker asked and its voters
-were told before voting: the answers without names ([research donations](#research-donations)), which it can
+also keeps what every date poll gives to research once it closes, its maker and voters told
+before: the answers without names ([research donations](#research-donations)), which it can
 keep on its own while the polls stay in links. What the page and the API
 both use, the voting rule, what a poll may hold, what it gives to research and the calendar, is in
 [`common/`](../common/).
@@ -76,10 +76,10 @@ live](#where-the-polls-live) changes how a poll gets from one phone to another.
    poll. It opens on the device that made the poll; another needs the admin code it shows.
 6. **Sharing.** 함께할 사람 부르기 copies the link, or an invitation with the link, the group ID and,
    where the device knows it, the PIN, or hands it to the phone's share sheet.
-7. **Research, when the maker asks.** Where the page has somewhere to send them, the maker of a
-   date poll may tick 마감한 뒤 이름을 뺀 답을 연구용으로 보내기. Every voter is then told so above
-   their answers and may tick 내 답이 들어간 이 투표는 보내지 말아 주세요; once the poll closes,
-   the maker's device sends the answers without names, or says why it does not. [Research
+7. **Research.** Where the page has somewhere to send them, every date poll's answers go to
+   research once it closes. The form tells the maker so, and every voter reads it above their
+   answers, with that whoever does not want it need not vote; once the poll closes, the maker's
+   device sends the answers without names, or says why it does not. [Research
    donations](#research-donations) says what goes and who sees it.
 
 ## How the group's choice is made
@@ -211,8 +211,8 @@ In links:
   guarantee.
 - **No server stores the polls.** Each phone keeps the polls it has opened in its local storage,
   under `fair-pick.links`, until 이 기기에서 이 투표 잊기 forgets one there. All that ever leaves the
-  phones is what a closed date poll gives to research, when its maker asked and its voters were
-  told before voting, without names ([research donations](#research-donations)).
+  phones is what a closed date poll gives to research, its maker and voters told before, without
+  names ([research donations](#research-donations)).
 
 On the API:
 
@@ -244,16 +244,17 @@ the ballots cast from it with what they were cast with, in its local storage und
 ## Research donations
 
 The page is also a source of data for research on how groups pick a date, such as how often a
-rule leaves a tie or picks a date with fewer ○ than another. It gives nothing unless a poll's
-maker asks and every voter is told before voting, and then nothing that names anyone.
+rule leaves a tie or picks a date with fewer ○ than another. Every date poll made from it gives a
+record once it closes, its maker and every voter told before, and nothing that names anyone.
 
 - **What goes.** A record of the closed poll ([`common/site/research.js`](../common/site/research.js)):
   each voter's ✕ △ ○ for each date, the rows sorted so that the order the voters came in is lost,
   and of each date only its weekday and whether it is a public holiday. The API adds the month it
   arrived. No name, title, note, date, group ID, PIN, link or address goes, and only date polls
   give records.
-- **Who agrees.** The maker ticks the question when making the poll; it cannot be added later.
-  Each voter then reads, above their answers, that the poll's answers go to research and that
+- **Who agrees.** Every date poll the page makes asks the question, and the form tells its maker
+  so; a poll made from a page from before, whose maker left it unticked, gives nothing, and it
+  cannot be added later. Each voter then reads, above their answers, that the poll's answers go to research and that
   whoever does not want that need not vote in it: voting is going along, and a voter who thinks
   better of it takes their ballot back before the close. The page used to let each voter keep the
   poll out instead, and a ballot that did still keeps it out. Nothing is sent then, when a ballot

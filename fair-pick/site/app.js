@@ -508,7 +508,8 @@ async function onCreate(event) {
     note: $('note-input').value,
     options: state.kind === 'date' ? [...state.picked].sort() : state.choices,
     deadline: deadline ? `${deadline.length === 16 ? `${deadline}:00` : deadline}+09:00` : null,
-    research: Boolean(RESEARCH_BASE) && state.kind === 'date' && $('research-input').checked,
+    // Every date poll goes to research once it closes, as the form tells its maker.
+    research: Boolean(RESEARCH_BASE) && state.kind === 'date',
   };
   const id = normalizeId($('id-input').value);
   const pin = $('pin-input').value.trim();
@@ -776,8 +777,9 @@ function renderDecision() {
 
 // --- Research ----------------------------------------------------------------
 
-// A closed date poll whose maker asked, and whose voters went along by
-// voting once told so, goes to research from its maker's device, without names
+// A closed date poll that asked, as every date poll the page makes now
+// does, and whose voters went along by voting once told so, goes to
+// research from its maker's device, without names
 // (../common/research.js): once, again when a link brings a later ballot,
 // and not after the maker takes it back. The page says which, and on the
 // other devices only whether it goes.
