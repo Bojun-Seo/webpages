@@ -5,7 +5,7 @@
 //   PORT=9000 npm run serve:api
 //   LINKS=1 npm run serve:api  # polls in links, records for research here
 //
-// npm run serve serves the page as it is published, polls in links.
+// npm run serve serves the page with no API, polls in links.
 //
 // The page asks config.js where its API is, and where to send records for
 // research; this answers that both are here, under /api, or with LINKS=1

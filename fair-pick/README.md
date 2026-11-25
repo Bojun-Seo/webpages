@@ -11,12 +11,13 @@ economics that studies how a group should choose. Dates are picked on a Korean c
 Sundays and public holidays in red and Saturdays in blue; the holidays are those in
 [`common/site/holidays.json`](../common/README.md#update-the-holidays).
 
-GitHub Pages serves the page, and it needs nothing else: each poll travels in its links, sealed
-with the group ID and the PIN, and the votes add up as the links go round a group chat. A small API
-of its own, a Cloudflare Worker with a Durable Object for each poll ([`api/`](api/)), can keep the
-polls in one place instead once it is set up. The same Worker can also keep, on its own, what a
-date poll gives to research once it closes, when its maker asked and every voter went along:
-the answers without names ([research donations](#research-donations)). What the page and the API
+GitHub Pages serves the page, and a small API of its own, a Cloudflare Worker with a Durable Object
+for each poll ([`api/`](api/)), keeps the polls, so the group ID and the PIN open a poll from any
+phone. Without the API the page needs nothing else: each poll travels in its links, sealed with
+the group ID and the PIN, and the votes add up as the links go round a group chat. The same Worker
+also keeps what a date poll gives to research once it closes, when its maker asked and every voter
+went along: the answers without names ([research donations](#research-donations)), which it can
+keep on its own while the polls stay in links. What the page and the API
 both use, the voting rule, what a poll may hold, what it gives to research and the calendar, is in
 [`common/`](../common/).
 
@@ -180,8 +181,9 @@ in an order drawn from the ballot's ID, the same on every phone; its dates keep 
 ### On the API
 
 Once `FAIR_PICK_API` names the Worker in [`api/`](api/), [set up below](#set-up-the-api), the page
-keeps its polls there instead. The link to a poll is then its address, `?g=<group ID>`, and anyone
-with the group ID and PIN sees the same poll at once from any phone, with no links to pass on.
+keeps its polls there instead, as it is published now. The link to a poll is then its address,
+`?g=<group ID>`, and anyone with the group ID and PIN sees the same poll at once from any phone,
+with no links to pass on.
 
 A site that gets the API while polls are going round in links leaves those polls there, so they
 carry on as before. A link from before opens in links, and so does a poll a phone keeps in links,
@@ -316,12 +318,13 @@ site is put together.
 
 ## Run and test locally
 
-To try the page as it is published, polls in links:
+To try the page:
 
 ```
 cd fair-pick
-npm run serve              # http://localhost:8000/fair-pick/
-npm run serve:api          # the same, with an API on memory that forgets the polls when it stops
+npm run serve:api          # http://localhost:8000/fair-pick/, polls on an API on memory, as published,
+                           # which forgets them when it stops
+npm run serve              # the page with no API, polls in links
 LINKS=1 npm run serve:api  # polls in links, and records for research on memory
 ```
 
